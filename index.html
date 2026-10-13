@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Camera Split Screen · Filters</title>
+<title>Camera Split · Filters + Flash + Beauty</title>
 <style>
   :root{
     --bg:#0b0f14;
@@ -14,6 +14,7 @@
     --muted:#8b949e;
     --accent:#4f8ef7;
     --danger:#ef4444;
+    --flash:#fbbf24;
   }
 
   *{ box-sizing:border-box; }
@@ -207,9 +208,11 @@
     display:flex; align-items:center; justify-content:center;
     overflow:hidden;
     background:#05080b;
+    isolation:isolate;
   }
   .cam-video{
-    position:relative; z-index:1;
+    position:absolute; inset:0;
+    z-index:1;
     width:100%; height:100%;
     object-fit:cover; display:block;
     background:#000;
@@ -222,15 +225,32 @@
     pointer-events:none;
   }
 
-  .cam-overlay{
+  /* warm screen fill light */
+  .screen-flash{
     position:absolute; inset:0;
     z-index:3;
+    pointer-events:none;
+    opacity:0;
+    background:
+      radial-gradient(circle at 50% 38%, #fffdf7 0%, #fff3d9 45%, #ffe3ac 100%);
+    transition: opacity .3s ease;
+  }
+  .screen-flash.on{ opacity:.5; }
+  .screen-flash.burst{ opacity:1; transition: opacity .04s ease; }
+
+  .cam-overlay{
+    position:absolute; inset:0;
+    z-index:4;
     display:flex; flex-direction:column; justify-content:space-between;
     pointer-events:none;
   }
   .cam-top{
-    display:flex; justify-content:flex-end; gap:6px;
+    display:flex; align-items:flex-start; justify-content:space-between;
+    gap:10px;
     padding:10px;
+  }
+  .cam-top-group{
+    display:flex; gap:6px; flex-wrap:wrap;
   }
   .cam-overlay .cam-btn{ pointer-events:auto; }
 
@@ -240,7 +260,6 @@
     background:linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.36) 58%, transparent);
   }
 
-  /* filter chips */
   .filter-strip{
     display:flex; gap:8px;
     padding:0 12px;
@@ -273,7 +292,6 @@
   }
   .chip .emoji{ font-size:15px; line-height:1; }
 
-  /* capture button row */
   .cam-bottom{
     display:flex; align-items:center; justify-content:center;
     gap:14px; padding:0 12px;
@@ -281,21 +299,22 @@
 
   .cam-btn{
     height:40px; min-width:40px;
-    display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
     font:inherit; font-size:13px; font-weight:550;
     color:#fff;
     background:rgba(20,26,34,.72);
     border:1px solid rgba(255,255,255,.14);
     border-radius:11px;
-    padding:0 14px;
+    padding:0 13px;
     cursor:pointer;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    transition:background .15s ease, border-color .15s ease, transform .05s ease, opacity .15s ease;
+    transition:background .15s ease, border-color .15s ease, transform .05s ease, opacity .15s ease, color .15s ease;
   }
   .cam-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.28); }
   .cam-btn:active{ transform:translateY(1px); }
   .cam-btn.on{ background:var(--accent); border-color:var(--accent); }
+  .cam-btn.on.flash{ background:var(--flash); border-color:var(--flash); color:#1a1400; }
   .cam-btn:disabled{ opacity:.35; cursor:not-allowed; }
 
   /* big shutter */
@@ -364,7 +383,7 @@
   .cam-state p{ margin:0 0 14px; font-size:13px; color:var(--muted); line-height:1.6; max-width:330px; }
   .cam-state .cs-err{ color:#fca5a5; }
 
-  /* snapshot flash */
+  /* snapshot white flash */
   .flash{
     position:absolute; inset:0;
     z-index:7;
@@ -454,7 +473,7 @@
     .pane-bar{ gap:6px; padding:6px; }
     .seg-btn{ padding:5px 8px; }
     .select{ max-width:110px; }
-    .cam-btn{ padding:0 11px; font-size:12px; }
+    .cam-btn{ padding:0 10px; font-size:12px; height:36px; min-width:36px; }
     .chip{ height:34px; padding:0 12px; font-size:12px; }
     .shutter{ width:60px; height:60px; }
     .shutter::before{ width:44px; height:44px; }
@@ -465,7 +484,7 @@
 
   <header class="topbar">
     <div class="brand">
-      <div class="mark"></div><span>Camera Split · Filters</span>
+      <div class="mark"></div><span>Camera Split · FX</span>
     </div>
     <div class="spacer"></div>
     <button class="btn" data-act="layout" title="Toggle layout">
@@ -500,15 +519,22 @@
         <div class="cam-wrap" id="camWrap">
           <video class="cam-video" id="video" playsinline autoplay muted></video>
           <canvas class="cam-canvas" id="fxCanvas"></canvas>
+          <div class="screen-flash" id="screenFlash"></div>
         </div>
 
         <div class="fx-status" id="fxStatus"></div>
 
         <div class="cam-overlay">
           <div class="cam-top">
-            <button class="cam-btn" id="btnMirror" title="Mirror preview">⇋</button>
-            <button class="cam-btn" id="btnFlip" title="Switch camera">🔄</button>
-            <button class="cam-btn" id="btnFull" title="Fullscreen preview">⛶</button>
+            <div class="cam-top-group">
+              <button class="cam-btn" id="btnBeauty" title="Beauty filter (off / soft / smooth)">✨</button>
+              <button class="cam-btn flash" id="btnFlash" title="Flash">⚡</button>
+            </div>
+            <div class="cam-top-group">
+              <button class="cam-btn" id="btnMirror" title="Mirror preview">⇋</button>
+              <button class="cam-btn" id="btnFlip" title="Switch camera">🔄</button>
+              <button class="cam-btn" id="btnFull" title="Fullscreen preview">⛶</button>
+            </div>
           </div>
 
           <div class="cam-bottom-group">
@@ -592,14 +618,11 @@
 (() => {
   "use strict";
 
-  /* ============================================================
-     Helpers
-  ============================================================ */
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-  const KEY = "camera-split-fx-v1";
+  const KEY = "camera-split-fx-v2";
 
   /* ============================================================
-     Filters catalogue
+     Filters
   ============================================================ */
   const FILTERS = [
     { id: "none",   label: "None",       emoji: "🚫" },
@@ -612,7 +635,6 @@
     { id: "pirate", label: "Pirate",     emoji: "🏴☠️" }
   ];
 
-  /* FaceMesh landmark indices */
   const LMK = {
     L_EYE_OUT: 33,  L_EYE_IN: 133,  L_EYE_TOP: 159, L_EYE_BOT: 145,
     R_EYE_OUT: 263, R_EYE_IN: 362,  R_EYE_TOP: 386, R_EYE_BOT: 374,
@@ -621,6 +643,20 @@
     L_CHEEK: 234, R_CHEEK: 454,
     MOUTH_L: 61, MOUTH_R: 291, MOUTH_TOP: 13, MOUTH_BOT: 14
   };
+
+  /* Beauty levels: 0 = off, 1 = soft, 2 = smooth */
+  const BEAUTY_LABELS = ["✨", "✨¹", "✨²"];
+  const BEAUTY_TITLES = [
+    "Beauty: off",
+    "Beauty: soft (skin smoothing)",
+    "Beauty: smooth (extra glow + eye light)"
+  ];
+  /* Color grade applied per level */
+  const BEAUTY_GRADE = [
+    "none",
+    "brightness(1.05) contrast(1.02) saturate(1.05)",
+    "brightness(1.08) contrast(1.03) saturate(1.09)"
+  ];
 
   /* ============================================================
      State
@@ -633,6 +669,8 @@
       mirrored: true,
       deviceId: "",
       filter: "none",
+      beauty: 0,
+      flash: false,
       content: {
         mode: "web",
         url: "https://en.wikipedia.org/wiki/Main_Page",
@@ -654,6 +692,8 @@
         mirrored: p.mirrored !== false,
         deviceId: typeof p.deviceId === "string" ? p.deviceId : "",
         filter: FILTERS.some(f => f.id === p.filter) ? p.filter : "none",
+        beauty: [0,1,2].includes(+p.beauty) ? +p.beauty : 0,
+        flash: p.flash === true,
         content: {
           mode: p.content && p.content.mode === "note" ? "note" : "web",
           url: p.content && typeof p.content.url === "string" ? p.content.url : d.content.url,
@@ -684,6 +724,7 @@
   const video       = document.getElementById("video");
   const fxCanvas    = document.getElementById("fxCanvas");
   const fxCtx       = fxCanvas.getContext("2d");
+  const screenFlash = document.getElementById("screenFlash");
 
   const recDot      = document.getElementById("recDot");
   const camSelect   = document.getElementById("camSelect");
@@ -696,6 +737,8 @@
   const fxStatus    = document.getElementById("fxStatus");
   const filterStrip = document.getElementById("filterStrip");
 
+  const btnBeauty   = document.getElementById("btnBeauty");
+  const btnFlash    = document.getElementById("btnFlash");
   const btnMirror   = document.getElementById("btnMirror");
   const btnFlip     = document.getElementById("btnFlip");
   const btnSnap     = document.getElementById("btnSnap");
@@ -794,6 +837,7 @@
   let stream = null;
   let starting = false;
   let devices = [];
+  let hasTorch = false;
 
   function showState(icon, text, btnLabel, isError) {
     csIcon.textContent = icon;
@@ -811,12 +855,34 @@
     camToggle.title = on ? "Stop camera" : "Start camera";
     btnSnap.disabled = !on;
     btnFlip.disabled = !on || devices.length < 2;
+    btnFlash.disabled = !on;
+    btnBeauty.disabled = !on;
+  }
+
+  async function applyTorch(on) {
+    if (!stream) return false;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return false;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: !!on }] });
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   function stopCamera() {
-    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (stream) {
+      const track = stream.getVideoTracks()[0];
+      if (track) { try { track.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) {} }
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
     video.srcObject = null;
+    hasTorch = false;
+    screenFlash.classList.remove("on", "burst");
     setLive(false);
+    updateFlashUI();
   }
 
   function friendlyError(err) {
@@ -863,14 +929,30 @@
 
       try { await video.play(); } catch (e) {}
 
-      setLive(true);
-      hideState();
-
+      // Torch support?
       const track = stream.getVideoTracks()[0];
+      try {
+        const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+        hasTorch = !!caps.torch;
+      } catch (e) { hasTorch = false; }
+
       const settings = track && track.getSettings ? track.getSettings() : {};
       if (settings.deviceId) { state.deviceId = settings.deviceId; save(); }
 
       await refreshDevices(settings.deviceId);
+      setLive(true);
+      hideState();
+
+      // Re-apply flash state for the new camera
+      if (state.flash) {
+        if (hasTorch) {
+          await applyTorch(true);
+        } else {
+          screenFlash.classList.add("on");
+        }
+      }
+      updateFlashUI();
+
     } catch (err) {
       stopCamera();
       showState("🚫", friendlyError(err), "Try again", true);
@@ -939,7 +1021,70 @@
   }
 
   /* ============================================================
-     FACE TRACKING (MediaPipe)
+     FLASH
+     - Rear camera w/ torch  → physical LED
+     - Front / no torch      → warm screen fill light
+  ============================================================ */
+  function updateFlashUI() {
+    btnFlash.classList.toggle("on", !!state.flash);
+
+    if (!stream) {
+      btnFlash.title = "Flash (start the camera first)";
+      return;
+    }
+    if (hasTorch) {
+      btnFlash.title = state.flash ? "Flash: LED on (tap to turn off)" : "Flash: tap to turn on LED";
+    } else {
+      btnFlash.title = state.flash
+        ? "Fill light: on (screen flash) — tap to turn off"
+        : "Fill light: tap to use the screen as a warm flash";
+    }
+  }
+
+  async function toggleFlash() {
+    if (!stream) return;
+
+    state.flash = !state.flash;
+    save();
+
+    if (state.flash) {
+      if (hasTorch) {
+        const ok = await applyTorch(true);
+        if (!ok) {
+          // Torch claimed to exist but failed — fall back to screen
+          hasTorch = false;
+          screenFlash.classList.add("on");
+        }
+      } else {
+        screenFlash.classList.add("on");
+      }
+    } else {
+      if (hasTorch) await applyTorch(false);
+      screenFlash.classList.remove("on");
+    }
+    updateFlashUI();
+  }
+
+  /* ============================================================
+     BEAUTY
+  ============================================================ */
+  const blurCanvas = document.createElement("canvas");
+  const blurCtx = blurCanvas.getContext("2d");
+
+  function updateBeautyUI() {
+    btnBeauty.textContent = BEAUTY_LABELS[state.beauty];
+    btnBeauty.classList.toggle("on", state.beauty > 0);
+    btnBeauty.title = BEAUTY_TITLES[state.beauty];
+  }
+
+  function cycleBeauty() {
+    state.beauty = (state.beauty + 1) % 3;
+    save();
+    updateBeautyUI();
+  }
+
+  /* ============================================================
+     FACE TRACKING
   ============================================================ */
   let faceLandmarker = null;
   let fxLoadFailed   = false;
@@ -949,7 +1094,7 @@
 
   async function initFaceTracking() {
     if (faceLandmarker || fxLoadFailed || fxLoading) return;
-    if (state.filter === "none") return;      // lazy: only load when a filter is picked
+    if (state.filter === "none") return;
     fxLoading = true;
     updateFxStatus();
 
@@ -995,14 +1140,8 @@
   }
 
   function updateFxStatus() {
-    if (state.filter === "none" || !stream) {
-      fxStatus.classList.remove("show");
-      return;
-    }
-    if (faceLandmarker) {
-      fxStatus.classList.remove("show");
-      return;
-    }
+    if (state.filter === "none" || !stream) { fxStatus.classList.remove("show"); return; }
+    if (faceLandmarker) { fxStatus.classList.remove("show"); return; }
     fxStatus.classList.add("show");
     fxStatus.innerHTML = fxLoadFailed
       ? "⚠️ Filters unavailable"
@@ -1010,7 +1149,7 @@
   }
 
   /* ============================================================
-     Projection helpers
+     Projection
   ============================================================ */
   function makeProjector(vw, vh, tw, th, mirrored) {
     const scale = Math.max(tw / vw, th / vh);
@@ -1024,7 +1163,13 @@
     };
   }
 
-  /* Canvas dimensions in CSS px (kept in sync with the wrap) */
+  /* Cover rect for drawing video into a target of size tw × th */
+  function coverRect(vw, vh, tw, th) {
+    const scale = Math.max(tw / vw, th / vh);
+    const dw = vw * scale, dh = vh * scale;
+    return { dx: (tw - dw) / 2, dy: (th - dh) / 2, dw, dh };
+  }
+
   let fxW = 1, fxH = 1, fxDpr = 1;
 
   function resizeFx() {
@@ -1077,13 +1222,79 @@
   }
 
   /* ============================================================
-     FILTER RENDERERS
-     Every renderer receives (ctx, lm, P) where
-       lm = array of 468 normalized landmarks
-       P(i) -> { x, y } in canvas pixels
+     BEAUTY: soft-focus skin smoothing + highlight glow
   ============================================================ */
+  function drawSoftFocus(ctx, tw, th, level, mirrored) {
+    if (level <= 0) return;
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return;
 
-  /* ---- 🕶️ Sunglasses ---- */
+    // Downscaled canvas → upscale gives natural diffusion
+    const bw = Math.max(1, Math.round(tw / 3));
+    const bh = Math.max(1, Math.round(th / 3));
+
+    if (blurCanvas.width !== bw || blurCanvas.height !== bh) {
+      blurCanvas.width = bw;
+      blurCanvas.height = bh;
+    }
+
+    const r = coverRect(vw, vh, tw, th);
+    const s = bw / tw;   // uniform scale
+
+    blurCtx.setTransform(1, 0, 0, 1, 0, 0);
+    blurCtx.clearRect(0, 0, bw, bh);
+    blurCtx.save();
+    if (mirrored) { blurCtx.translate(bw, 0); blurCtx.scale(-1, 1); }
+    blurCtx.drawImage(video, r.dx * s, r.dy * s, r.dw * s, r.dh * s);
+    blurCtx.restore();
+
+    // --- skin smoothing: soft blurred layer over the sharp frame ---
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.globalAlpha = level === 1 ? 0.40 : 0.58;
+    ctx.drawImage(blurCanvas, 0, 0, bw, bh, 0, 0, tw, th);
+    ctx.restore();
+
+    // --- level 2: extra dreamy highlight glow ---
+    if (level >= 2) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.16;
+      ctx.drawImage(blurCanvas, 0, 0, bw, bh, 0, 0, tw, th);
+      ctx.restore();
+    }
+  }
+
+  /* Brighten the eye area when landmarks are available */
+  function drawEyeBrighten(ctx, lm, P, level) {
+    const lEye = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
+    const rEye = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
+    const eyeDist = dist(lEye, rEye);
+    const radius = eyeDist * (level >= 2 ? 0.52 : 0.42);
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = level >= 2 ? 0.20 : 0.12;
+
+    for (const e of [lEye, rEye]) {
+      const g = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, radius);
+      g.addColorStop(0,    "rgba(255,251,242,0.95)");
+      g.addColorStop(0.45, "rgba(255,246,232,0.32)");
+      g.addColorStop(1,    "rgba(255,246,232,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* ============================================================
+     FACE FILTER RENDERERS
+  ============================================================ */
   function fxShades(ctx, lm, P) {
     const lc = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
     const rc = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
@@ -1099,7 +1310,6 @@
     ctx.translate(c.x, c.y);
     ctx.rotate(ang);
 
-    // bridge
     ctx.fillStyle = "#0a0a0f";
     ctx.fillRect(-gap, -lensH * 0.06, gap * 2, lensH * 0.13);
 
@@ -1116,13 +1326,11 @@
     drawLens(-eyeDist / 2, lensGrad);
     drawLens( eyeDist / 2, lensGrad);
 
-    // rims
     ctx.strokeStyle = "rgba(0,0,0,0.9)";
     ctx.lineWidth = Math.max(2, lensH * 0.085);
     drawLens(-eyeDist / 2);
     drawLens( eyeDist / 2);
 
-    // shine
     ctx.fillStyle = "rgba(255,255,255,0.2)";
     ctx.beginPath();
     ctx.ellipse(-eyeDist / 2 - lensW * 0.16, -lensH * 0.22, lensW * 0.2, lensH * 0.13, -0.42, 0, Math.PI * 2);
@@ -1131,7 +1339,6 @@
     ctx.ellipse( eyeDist / 2 - lensW * 0.16, -lensH * 0.22, lensW * 0.2, lensH * 0.13, -0.42, 0, Math.PI * 2);
     ctx.fill();
 
-    // arms
     ctx.strokeStyle = "#0a0a0f";
     ctx.lineWidth = Math.max(2, lensH * 0.1);
     ctx.beginPath();
@@ -1146,7 +1353,6 @@
     ctx.restore();
   }
 
-  /* ---- 🐶 Dog ---- */
   function fxDog(ctx, lm, P) {
     const top   = P(LMK.FOREHEAD);
     const chin  = P(LMK.CHIN);
@@ -1158,7 +1364,6 @@
     const faceW = dist(lc, rc);
     const faceH = dist(top, chin);
 
-    // ears
     const drawEar = (cx, cy, dir) => {
       const w = faceW * 0.32;
       const h = faceH * 0.54;
@@ -1192,7 +1397,6 @@
     drawEar(lc.x + faceW * 0.05, earY, -1);
     drawEar(rc.x - faceW * 0.05, earY, +1);
 
-    // nose
     const nx = nose.x;
     const ny = nose.y + faceH * 0.035;
     const nw = faceW * 0.17;
@@ -1216,7 +1420,6 @@
     ctx.fill();
     ctx.restore();
 
-    // whisker dots
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     for (let s = -1; s <= 1; s += 2) {
       for (let i = 0; i < 3; i++) {
@@ -1230,7 +1433,6 @@
       }
     }
 
-    // tongue
     const tW = faceW * 0.14;
     const tH = faceH * 0.14;
     ctx.fillStyle = "#ff5b7a";
@@ -1245,7 +1447,6 @@
     ctx.stroke();
   }
 
-  /* ---- 👨 Mustache ---- */
   function fxStache(ctx, lm, P) {
     const ml = P(LMK.MOUTH_L);
     const mr = P(LMK.MOUTH_R);
@@ -1263,11 +1464,9 @@
     ctx.fillStyle = "#1a1210";
     ctx.beginPath();
     ctx.moveTo(0, -h * 0.05);
-    // left wing
     ctx.bezierCurveTo(-w * 0.18, -h * 0.72, -w * 0.45, -h * 0.88, -w * 0.5, -h * 0.15);
     ctx.bezierCurveTo(-w * 0.53,  h * 0.38, -w * 0.34,  h * 0.45, -w * 0.2, h * 0.05);
     ctx.bezierCurveTo(-w * 0.12, -h * 0.16, -w * 0.06, -h * 0.06, 0, -h * 0.05);
-    // right wing
     ctx.bezierCurveTo( w * 0.06, -h * 0.06,  w * 0.12, -h * 0.16,  w * 0.2, h * 0.05);
     ctx.bezierCurveTo( w * 0.34,  h * 0.45,  w * 0.53,  h * 0.38,  w * 0.5, -h * 0.15);
     ctx.bezierCurveTo( w * 0.45, -h * 0.88,  w * 0.18, -h * 0.72, 0, -h * 0.05);
@@ -1285,7 +1484,6 @@
     ctx.restore();
   }
 
-  /* ---- 👑 Crown ---- */
   function fxCrown(ctx, lm, P) {
     const top = P(LMK.FOREHEAD);
     const lc  = P(LMK.L_CHEEK);
@@ -1307,7 +1505,6 @@
 
     const x0 = -w / 2;
 
-    // Crown silhouette
     ctx.beginPath();
     ctx.moveTo(x0, 0);
     ctx.lineTo(x0, -h * 0.16);
@@ -1332,11 +1529,9 @@
     ctx.lineWidth = Math.max(1.5, w * 0.012);
     ctx.stroke();
 
-    // band
     ctx.fillStyle = "#b8791a";
     ctx.fillRect(x0, -h * 0.16, w, h * 0.18);
 
-    // jewels
     const jewels = ["#ff3b6b", "#4f8ef7", "#34d399", "#a78bfa", "#fbbf24"];
     for (let i = 0; i < 5; i++) {
       const jx = x0 + (i + 0.5) * (w / 5);
@@ -1350,7 +1545,6 @@
       ctx.fill();
     }
 
-    // sparkles on tall spikes
     for (let i = 0; i < 3; i++) {
       const sx = x0 + (i * 2 + 0.5) * (w / 5);
       drawSparkle(ctx, sx, -h * 0.98, w * 0.032, "rgba(255,255,240,0.95)");
@@ -1359,7 +1553,6 @@
     ctx.restore();
   }
 
-  /* ---- 🐰 Bunny ---- */
   function fxBunny(ctx, lm, P) {
     const top = P(LMK.FOREHEAD);
     const lc  = P(LMK.L_CHEEK);
@@ -1380,7 +1573,6 @@
       ctx.translate(cx + offsetX, top.y + faceH * 0.02);
       ctx.rotate(ang + tilt);
 
-      // white outer
       const g = ctx.createLinearGradient(0, 0, 0, -eh);
       g.addColorStop(0, "#f2eef6");
       g.addColorStop(1, "#ffffff");
@@ -1393,7 +1585,6 @@
       ctx.lineWidth = Math.max(1, ew * 0.05);
       ctx.stroke();
 
-      // pink inner
       ctx.fillStyle = "#ffb6c9";
       ctx.beginPath();
       ctx.ellipse(0, -eh / 2, ew * 0.28, eh * 0.36, 0, 0, Math.PI * 2);
@@ -1407,7 +1598,6 @@
     drawEar( spread,  0.2);
   }
 
-  /* ---- 😍 Heart Eyes ---- */
   function fxHeart(ctx, lm, P) {
     const lEye = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
     const rEye = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
@@ -1451,7 +1641,6 @@
     drawHeart(rEye.x, rEye.y, base, Math.PI * 0.8);
   }
 
-  /* ---- 🏴☠️ Pirate ---- */
   function fxPirate(ctx, lm, P) {
     const lEye = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
     const rEye = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
@@ -1459,11 +1648,9 @@
     const eyeDist = dist(lEye, rEye);
     const ang = Math.atan2(rEye.y - lEye.y, rEye.x - lEye.x);
 
-    // patch goes on whichever eye sits on the left of the screen
     const patchEye = lEye.x < rEye.x ? lEye : rEye;
     const size = eyeDist * 0.52;
 
-    // strap across the head
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(ang);
@@ -1476,7 +1663,6 @@
     ctx.stroke();
     ctx.restore();
 
-    // the patch itself
     ctx.save();
     ctx.translate(patchEye.x, patchEye.y);
     ctx.rotate(ang);
@@ -1502,7 +1688,6 @@
     ctx.restore();
   }
 
-  /* ---- Dispatcher ---- */
   function drawFilterSet(ctx, lm, P) {
     switch (state.filter) {
       case "dog":    fxDog(ctx, lm, P);    break;
@@ -1524,33 +1709,50 @@
     rafId = requestAnimationFrame(loop);
 
     const vw = video.videoWidth, vh = video.videoHeight;
-    if (!vw || !vh) return;
+    if (!vw || !vh || !stream) return;
 
     resizeFx();
     fxCtx.setTransform(fxDpr, 0, 0, fxDpr, 0, 0);
     fxCtx.clearRect(0, 0, fxW, fxH);
 
-    if (state.filter === "none" || !stream) {
-      lastLandmarks = null;
-      return;
-    }
+    const beautyOn = state.beauty > 0;
+    const filterOn = state.filter !== "none";
+    const needsCanvas = beautyOn || filterOn;
 
-    // Detection at ~30fps
+    // Face detection (only when a filter needs it)
     const now = performance.now();
-    if (faceLandmarker && now - lastDetectAt > 28) {
+    if (filterOn && faceLandmarker && now - lastDetectAt > 28) {
       lastDetectAt = now;
       try {
         const res = faceLandmarker.detectForVideo(video, now);
         lastLandmarks = (res && res.faceLandmarks && res.faceLandmarks[0]) || null;
-      } catch (e) {
-        // video not ready / paused — keep previous landmarks
-      }
+      } catch (e) { /* video not ready */ }
     }
+    if (!filterOn) lastLandmarks = null;
 
-    if (lastLandmarks) {
-      const project = makeProjector(vw, vh, fxW, fxH, !!state.mirrored);
-      drawFilterSet(fxCtx, lastLandmarks, project);
-    }
+    if (!needsCanvas) return;   // canvas stays transparent → video shows through
+
+    const mirrored = !!state.mirrored;
+    const r = coverRect(vw, vh, fxW, fxH);
+
+    // ----- 1. Base frame (with color grade) -----
+    fxCtx.save();
+    fxCtx.fillStyle = "#05080b";
+    fxCtx.fillRect(0, 0, fxW, fxH);
+    fxCtx.filter = beautyOn ? BEAUTY_GRADE[state.beauty] : "none";
+    if (mirrored) { fxCtx.translate(fxW, 0); fxCtx.scale(-1, 1); }
+    fxCtx.drawImage(video, r.dx, r.dy, r.dw, r.dh);
+    fxCtx.restore();
+
+    // ----- 2. Beauty soft-focus -----
+    if (beautyOn) drawSoftFocus(fxCtx, fxW, fxH, state.beauty, mirrored);
+
+    // ----- 3. Face-driven enhancements + filters -----
+    let project = null;
+    if (lastLandmarks) project = makeProjector(vw, vh, fxW, fxH, mirrored);
+
+    if (project && beautyOn) drawEyeBrighten(fxCtx, lastLandmarks, project, state.beauty);
+    if (project && filterOn) drawFilterSet(fxCtx, lastLandmarks, project);
   }
 
   function startLoop() {
@@ -1594,33 +1796,70 @@
   }
 
   /* ============================================================
-     SNAPSHOT (composited with filters)
+     SNAPSHOT (composited: color grade + beauty + filters)
   ============================================================ */
-  function capture() {
-    const vw = video.videoWidth, vh = video.videoHeight;
-    if (!stream || !vw || !vh) return null;
-
+  function renderFull(vw, vh) {
     const out = document.createElement("canvas");
-    out.width = vw;
-    out.height = vh;
-    const ctx = out.getContext("2d");
+    out.width = vw; out.height = vh;
+    const octx = out.getContext("2d");
+    const mirrored = !!state.mirrored;
 
-    // 1. draw the frame (mirrored to match the preview)
-    ctx.save();
-    if (state.mirrored) { ctx.translate(vw, 0); ctx.scale(-1, 1); }
-    ctx.drawImage(video, 0, 0, vw, vh);
-    ctx.restore();
+    // 1. base frame
+    octx.save();
+    octx.fillStyle = "#000";
+    octx.fillRect(0, 0, vw, vh);
+    if (state.beauty > 0 && "filter" in octx) octx.filter = BEAUTY_GRADE[state.beauty];
+    if (mirrored) { octx.translate(vw, 0); octx.scale(-1, 1); }
+    octx.drawImage(video, 0, 0, vw, vh);
+    octx.restore();
 
-    // 2. draw the filter at full video resolution
-    if (state.filter !== "none" && lastLandmarks) {
-      const project = makeProjector(vw, vh, vw, vh, !!state.mirrored);
-      drawFilterSet(ctx, lastLandmarks, project);
+    // 2. soft focus
+    if (state.beauty > 0) {
+      const bw = Math.max(1, Math.round(vw / 3));
+      const bh = Math.max(1, Math.round(vh / 3));
+      const bc = document.createElement("canvas");
+      bc.width = bw; bc.height = bh;
+      const bctx = bc.getContext("2d");
+      bctx.save();
+      if (mirrored) { bctx.translate(bw, 0); bctx.scale(-1, 1); }
+      bctx.drawImage(video, 0, 0, bw, bh);
+      bctx.restore();
+
+      octx.save();
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = "high";
+      octx.globalAlpha = state.beauty === 1 ? 0.40 : 0.58;
+      octx.drawImage(bc, 0, 0, bw, bh, 0, 0, vw, vh);
+      octx.restore();
+
+      if (state.beauty >= 2) {
+        octx.save();
+        octx.imageSmoothingEnabled = true;
+        octx.imageSmoothingQuality = "high";
+        octx.globalCompositeOperation = "screen";
+        octx.globalAlpha = 0.16;
+        octx.drawImage(bc, 0, 0, bw, bh, 0, 0, vw, vh);
+        octx.restore();
+      }
+    }
+
+    // 3. landmarks-driven effects
+    if (lastLandmarks) {
+      const P = makeProjector(vw, vh, vw, vh, mirrored);
+      if (state.beauty > 0) drawEyeBrighten(octx, lastLandmarks, P, state.beauty);
+      if (state.filter !== "none") drawFilterSet(octx, lastLandmarks, P);
     }
 
     return out.toDataURL("image/png");
   }
 
-  function takeSnapshot() {
+  function capture() {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!stream || !vw || !vh) return null;
+    return renderFull(vw, vh);
+  }
+
+  function doCapture() {
     const data = capture();
     if (!data) return;
 
@@ -1630,6 +1869,23 @@
 
     modalImg.src = data;
     modal.classList.add("show");
+  }
+
+  function takeSnapshot() {
+    if (!stream) return;
+
+    // Screen-fill-light mode: burst the warm light, let the sensor see it, then capture
+    if (state.flash && !hasTorch) {
+      screenFlash.classList.add("burst");
+      setTimeout(() => {
+        screenFlash.classList.remove("burst");
+        if (state.flash) screenFlash.classList.add("on");
+      }, 220);
+      setTimeout(doCapture, 110);
+      return;
+    }
+
+    doCapture();
   }
 
   function closeModal() {
@@ -1726,6 +1982,8 @@
   csBtn.addEventListener("click", () => startCamera(state.deviceId || ""));
   btnSnap.addEventListener("click", takeSnapshot);
   btnFlip.addEventListener("click", flipCamera);
+  btnFlash.addEventListener("click", toggleFlash);
+  btnBeauty.addEventListener("click", cycleBeauty);
 
   btnMirror.addEventListener("click", () => {
     state.mirrored = !state.mirrored;
@@ -1792,6 +2050,9 @@
     state = defaults();
     applyMirror();
     setFilter("none");
+    updateBeautyUI();
+    updateFlashUI();
+    screenFlash.classList.remove("on", "burst");
     mountPanes();
     applyLayout();
     renderContent();
@@ -1809,14 +2070,18 @@
       stopLoop();
     } else {
       video.play().catch(() => {});
-      if (state.filter !== "none") startLoop();
+      if (state.filter !== "none" || state.beauty > 0) startLoop();
     }
   });
 
   window.addEventListener("resize", () => { resizeFx(); });
 
   window.addEventListener("beforeunload", () => {
-    if (stream) stream.getTracks().forEach(t => t.stop());
+    if (stream) {
+      const track = stream.getVideoTracks()[0];
+      if (track) { try { track.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) {} }
+      stream.getTracks().forEach(t => t.stop());
+    }
     stopLoop();
   });
 
@@ -1826,24 +2091,25 @@
   mountPanes();
   applyLayout();
   applyMirror();
+  updateBeautyUI();
+  updateFlashUI();
   renderContent();
   setLive(false);
 
-  // restore saved filter chip highlight
   filterStrip.querySelectorAll(".chip").forEach(c =>
     c.classList.toggle("on", c.dataset.filter === state.filter)
   );
 
-  // Start camera, and kick off face tracking if a filter was saved
   startCamera(state.deviceId || "").then(() => {
     if (state.filter !== "none") {
       initFaceTracking();
       startLoop();
     }
     updateFxStatus();
+    updateFlashUI();
   });
 
-  startLoop();   // harmless while idle — it early-returns
+  startLoop();
 
 })();
 </script>
