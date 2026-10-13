@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
-<title>Overlay Launcher</title>
+<title>Split Screen Launcher</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;margin:0}
@@ -26,123 +26,115 @@
     transition:transform .12s ease;
   }
   #bubble:active{transform:scale(.93);cursor:grabbing}
-  #bubble .badge{
-    position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;padding:0 4px;
-    border-radius:9px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;
-    display:grid;place-items:center;border:2px solid #0b0d12;
-  }
-  #bubble .badge:empty{display:none}
 
-  /* ---------- Launcher panel ---------- */
-  #panel{
-    position:fixed;z-index:99998;width:min(92vw,340px);display:none;
-    background:rgba(18,21,28,.94);
-    -webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);
-    border:1px solid rgba(255,255,255,.11);border-radius:22px;
-    padding:14px;box-shadow:0 26px 70px rgba(0,0,0,.65);
+  /* ---------- Split Screen Overlay ---------- */
+  #overlay{
+    position:fixed;inset:0;z-index:10000;
+    display:none;flex-direction:column;
+    background:rgba(11,13,18,.97);
+    -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
   }
-  #panel.show{display:block;animation:pop .16s cubic-bezier(.2,.9,.3,1.3)}
-  @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+  #overlay.show{display:flex}
 
-  .p-head{display:flex;align-items:center;gap:8px;margin:2px 4px 12px}
-  .p-head strong{font-size:15px;letter-spacing:.2px}
-  .p-head .sub{font-size:10.5px;opacity:.5;margin-left:auto}
-  .p-head .tilebtn{
-    width:28px;height:28px;border-radius:9px;border:1px solid rgba(255,255,255,.12);
-    background:rgba(255,255,255,.06);color:#cfd8e6;font-size:13px;cursor:pointer;
-    display:grid;place-items:center;margin-left:6px;
+  .split-topbar{
+    flex:0 0 auto;height:52px;display:flex;align-items:center;gap:10px;
+    padding:0 12px;background:rgba(255,255,255,.055);
+    border-bottom:1px solid rgba(255,255,255,.09);
+    -webkit-app-region:drag;
   }
-  .p-head .tilebtn:hover{background:rgba(255,255,255,.16)}
+  .split-title{
+    font-size:15px;font-weight:700;letter-spacing:.3px;
+    background:linear-gradient(90deg,#FFFC00,#fff);-webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;background-clip:text;
+  }
+  .split-actions{margin-left:auto;display:flex;gap:6px}
+  .split-actions button{
+    width:36px;height:36px;border-radius:11px;border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.07);color:#dbe3ef;font-size:16px;cursor:pointer;
+    display:grid;place-items:center;padding:0;transition:background .15s;
+  }
+  .split-actions button:hover{background:rgba(255,255,255,.2)}
+  .split-actions button:active{transform:scale(.94)}
 
-  .apps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 6px}
-  .tile{
-    appearance:none;border:0;background:transparent;color:inherit;font:inherit;
-    display:flex;flex-direction:column;align-items:center;gap:6px;
-    padding:6px 2px;border-radius:14px;cursor:pointer;
+  .split-container{
+    flex:1;display:flex;overflow:hidden;position:relative;
+    padding:8px;gap:0;
   }
-  .tile .ico{
-    width:46px;height:46px;border-radius:14px;display:grid;place-items:center;
-    font-size:22px;line-height:1;transition:transform .12s ease;
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 6px 14px rgba(0,0,0,.4);
-  }
-  .tile:active .ico{transform:scale(.92)}
-  .tile .lbl{font-size:10.5px;opacity:.78;max-width:66px;overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap}
-  .tile.add .ico{
-    background:rgba(255,255,255,.06);
-    border:1px dashed rgba(255,255,255,.32);color:#cbd5e1;font-size:20px;
-    box-shadow:none;
-  }
-  .p-foot{
-    margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);
-    font-size:10px;line-height:1.45;opacity:.45;
-  }
+  .split-container.vertical{flex-direction:column}
 
-  /* ---------- Floating windows ---------- */
-  .win{
-    position:fixed;z-index:1000;display:flex;flex-direction:column;
-    min-width:220px;min-height:150px;
-    background:#12151c;border:1px solid rgba(255,255,255,.13);
-    border-radius:16px;overflow:hidden;
-    box-shadow:0 26px 70px rgba(0,0,0,.72);
+  .pane{
+    flex:1;display:flex;flex-direction:column;
+    background:#12151c;border-radius:14px;overflow:hidden;
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 8px 30px rgba(0,0,0,.4);
+    min-width:0;min-height:0;
   }
-  .win.min{height:auto!important}
-  .win.min .win-body,.win.min .win-foot,.win.min .win-resize{display:none}
+  .pane-header{
+    flex:0 0 44px;display:flex;align-items:center;gap:8px;
+    padding:0 10px;background:rgba(255,255,255,.05);
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  .pane-icon{font-size:20px;line-height:1}
+  .pane-name{
+    flex:1;font-size:13px;font-weight:600;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;
+  }
+  .pane-actions{display:flex;gap:4px}
+  .pane-actions button{
+    height:30px;padding:0 8px;border-radius:8px;border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.07);color:#dbe3ef;font-size:11px;font-weight:600;
+    cursor:pointer;display:grid;place-items:center;white-space:nowrap;
+  }
+  .pane-actions button:hover{background:rgba(255,255,255,.18)}
+  .pane-actions button:active{transform:scale(.95)}
+  .pane-actions .btn-app{font-size:15px;padding:0 7px}
 
-  .win-head{
-    height:42px;flex:0 0 42px;display:flex;align-items:center;gap:8px;
-    padding:0 8px;background:rgba(255,255,255,.055);
-    border-bottom:1px solid rgba(255,255,255,.07);
-    cursor:grab;touch-action:none;user-select:none;
+  .pane-body{
+    flex:1;position:relative;background:#0b0d12;overflow:hidden;
   }
-  .win-head:active{cursor:grabbing}
-  .win-head .dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px;
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
-  .win-head .ttl{flex:1;font-size:12.5px;font-weight:600;overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap;opacity:.92}
-  .win-head .acts{display:flex;gap:4px}
-  .win-head button{
-    width:27px;height:27px;border-radius:9px;border:0;cursor:pointer;
-    background:rgba(255,255,255,.08);color:#dbe3ef;font-size:12.5px;
-    display:grid;place-items:center;padding:0;
+  .pane-body iframe{
+    width:100%;height:100%;border:0;display:block;background:#fff;
   }
-  .win-head button:hover{background:rgba(255,255,255,.2)}
-  .win-head button[data-a="close"]:hover{background:#ef4444;color:#fff}
+  .pane-body .empty{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:12px;text-align:center;
+    padding:24px;font-size:13px;color:#8b97ab;
+  }
+  .pane-body .empty .big{
+    font-size:36px;opacity:.4;
+  }
+  .pane-body .empty button{
+    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);
+    color:#e6ecf5;font:inherit;font-size:13px;font-weight:600;
+    padding:10px 20px;border-radius:12px;cursor:pointer;
+  }
+  .pane-body .empty button:hover{background:rgba(255,255,255,.18)}
 
-  .win-body{flex:1;position:relative;background:#0b0d12;overflow:hidden}
-  .win-body iframe{width:100%;height:100%;border:0;display:block;background:#fff}
-  .win-body .empty{
-    position:absolute;inset:0;display:grid;place-items:center;text-align:center;
-    font-size:12px;opacity:.5;padding:20px;line-height:1.6;
+  /* Divider */
+  .divider{
+    flex:0 0 8px;position:relative;z-index:5;
+    display:flex;align-items:center;justify-content:center;
+    cursor:col-resize;touch-action:none;
   }
-  .win-foot{
-    flex:0 0 auto;display:flex;align-items:center;gap:6px;
-    padding:6px 9px;font-size:10px;color:#9aa6b8;
-    background:rgba(255,255,255,.04);border-top:1px solid rgba(255,255,255,.07);
+  .split-container.vertical .divider{
+    cursor:row-resize;flex:0 0 8px;
   }
-  .win-foot span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .win-foot button{
-    border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.07);
-    color:#dbe3ef;font:inherit;font-size:10px;padding:3px 8px;border-radius:7px;
-    cursor:pointer;white-space:nowrap;
+  .divider::after{
+    content:'';border-radius:4px;background:rgba(255,255,255,.18);
+    transition:background .15s;
   }
-  .win-foot button:hover{background:rgba(255,255,255,.18)}
+  .split-container:not(.vertical) .divider::after{
+    width:4px;height:36px;
+  }
+  .split-container.vertical .divider::after{
+    width:36px;height:4px;
+  }
+  .divider:hover::after,.divider:active::after{background:rgba(255,252,0,.6)}
 
-  .win-resize{
-    position:absolute;right:0;bottom:0;width:22px;height:22px;
-    cursor:nwse-resize;touch-action:none;z-index:6;
-  }
-  .win-resize::after{
-    content:'';position:absolute;right:5px;bottom:5px;width:9px;height:9px;
-    border-right:2px solid rgba(255,255,255,.45);
-    border-bottom:2px solid rgba(255,255,255,.45);
-    border-radius:0 0 3px 0;
-  }
-
-  /* ---------- Modal ---------- */
+  /* ---------- Modals ---------- */
   .modal{
-    position:fixed;inset:0;z-index:100000;display:none;
-    background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    position:fixed;inset:0;z-index:100001;display:none;
+    background:rgba(0,0,0,.65);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
     align-items:center;justify-content:center;padding:16px;
   }
   .modal.show{display:flex}
@@ -152,6 +144,7 @@
     border-radius:22px;padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.75);
     animation:pop .18s cubic-bezier(.2,.9,.3,1.3);
   }
+  @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
   .sheet h3{margin:0 0 16px;font-size:16px}
   .sheet label{display:block;font-size:11px;opacity:.62;margin-bottom:11px}
   .sheet input{
@@ -182,10 +175,24 @@
   .row button.danger{background:transparent;border-color:rgba(239,68,68,.5);color:#ff8080}
   .row button:hover{filter:brightness(1.12)}
 
+  .app-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .app-list button{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;
+    border-radius:12px;border:1px solid rgba(255,255,255,.1);
+    background:rgba(255,255,255,.05);color:inherit;font:inherit;font-size:13px;
+    cursor:pointer;text-align:left;
+  }
+  .app-list button:hover{background:rgba(255,255,255,.14)}
+  .app-list .emoji{font-size:22px;line-height:1}
+  .app-list .nm{flex:1;font-weight:600}
+  .app-list .add-new{
+    justify-content:center;border-style:dashed;color:#cbd5e1;font-weight:600;
+  }
+
   /* ---------- Toast ---------- */
   #toast{
     position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);
-    z-index:100001;padding:11px 18px;border-radius:14px;
+    z-index:100002;padding:11px 18px;border-radius:14px;
     background:rgba(24,28,38,.96);border:1px solid rgba(255,255,255,.14);
     font-size:12.5px;box-shadow:0 14px 40px rgba(0,0,0,.6);
     opacity:0;pointer-events:none;transition:.25s ease;max-width:88vw;text-align:center;
@@ -195,26 +202,70 @@
 </head>
 <body>
 
-  <!-- Floating launcher bubble -->
-  <div id="bubble" title="Open app launcher">📱<span class="badge" id="badge"></span></div>
+  <!-- Floating bubble -->
+  <div id="bubble" title="Toggle split screen">📱</div>
 
-  <!-- App launcher panel -->
-  <div id="panel">
-    <div class="p-head">
-      <strong>My apps</strong>
-      <span class="sub">tap · hold to edit</span>
-      <button class="tilebtn" id="btnTile" title="Tile all windows">▦</button>
+  <!-- Split Screen Overlay -->
+  <div id="overlay" class="show">
+    <div class="split-topbar">
+      <span class="split-title">Split Screen</span>
+      <div class="split-actions">
+        <button id="btnSwap" title="Swap panes">⇄</button>
+        <button id="btnOrient" title="Toggle orientation">⇅</button>
+        <button id="btnAdd" title="Add app">＋</button>
+        <button id="btnClose" title="Close overlay">✕</button>
+      </div>
     </div>
-    <div class="apps" id="grid"></div>
-    <div class="p-foot">
-      Tip: open two apps, then hit ▦ to split them on screen at once.
+    <div class="split-container" id="splitContainer">
+      <!-- Left / Top pane -->
+      <div class="pane" id="paneLeft">
+        <div class="pane-header">
+          <span class="pane-icon">📱</span>
+          <span class="pane-name">Left pane</span>
+          <div class="pane-actions">
+            <button class="btn-change" data-side="left">Change</button>
+            <button class="btn-app" data-side="left" style="display:none">📲</button>
+            <button class="btn-browser" data-side="left" style="display:none">↗</button>
+          </div>
+        </div>
+        <div class="pane-body"></div>
+      </div>
+
+      <!-- Divider -->
+      <div class="divider" id="divider"></div>
+
+      <!-- Right / Bottom pane -->
+      <div class="pane" id="paneRight">
+        <div class="pane-header">
+          <span class="pane-icon">📱</span>
+          <span class="pane-name">Right pane</span>
+          <div class="pane-actions">
+            <button class="btn-change" data-side="right">Change</button>
+            <button class="btn-app" data-side="right" style="display:none">📲</button>
+            <button class="btn-browser" data-side="right" style="display:none">↗</button>
+          </div>
+        </div>
+        <div class="pane-body"></div>
+      </div>
     </div>
   </div>
 
-  <!-- Add / edit app modal -->
-  <div class="modal" id="modal">
+  <!-- Choose App Modal -->
+  <div class="modal" id="pickModal">
     <div class="sheet">
-      <h3 id="mTitle">Add app</h3>
+      <h3 id="pickTitle">Choose app</h3>
+      <div class="app-list" id="pickList"></div>
+      <div class="row">
+        <span class="spacer"></span>
+        <button id="pickCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit App Modal -->
+  <div class="modal" id="editModal">
+    <div class="sheet">
+      <h3 id="editTitle">Add app</h3>
       <label>Name<input id="fName" placeholder="Snapchat" autocomplete="off"></label>
       <label>Icon (emoji)<input id="fEmoji" placeholder="👻" maxlength="4" autocomplete="off"></label>
       <label>Colour<input id="fColor" type="color" value="#FFFC00"></label>
@@ -223,10 +274,10 @@
         <input id="fScheme" placeholder="snapchat://" autocomplete="off"></label>
       <div class="presets" id="presets"></div>
       <div class="row">
-        <button id="mDelete" class="danger" style="display:none">Delete</button>
+        <button id="editDelete" class="danger" style="display:none">Delete</button>
         <span class="spacer"></span>
-        <button id="mCancel">Cancel</button>
-        <button id="mSave" class="primary">Save</button>
+        <button id="editCancel">Cancel</button>
+        <button id="editSave" class="primary">Save</button>
       </div>
     </div>
   </div>
@@ -237,28 +288,25 @@
 (() => {
   "use strict";
 
-  /* ==================== Storage & defaults ==================== */
-  const LS_APPS = "overlayLauncher.apps.v1";
-  const LS_POS  = "overlayLauncher.bubble.v1";
+  /* ==================== Storage & Defaults ==================== */
+  const LS_APPS   = "splitScreen.apps.v1";
+  const LS_PANES  = "splitScreen.panes.v1";
+  const LS_LAYOUT = "splitScreen.layout.v1";
+  const LS_BUBBLE = "splitScreen.bubble.v1";
 
-  const DEFAULT_APPS = [{
-    id: "snapchat",
-    name: "Snapchat",
-    emoji: "👻",
-    color: "#FFFC00",
-    url: "https://web.snapchat.com/",
-    scheme: "snapchat://"
-  }];
+  const DEFAULT_APPS = [
+    { id:"snapchat", name:"Snapchat", emoji:"👻", color:"#FFFC00", url:"https://web.snapchat.com/", scheme:"snapchat://" },
+    { id:"instagram", name:"Instagram", emoji:"📸", color:"#E1306C", url:"https://www.instagram.com/", scheme:"instagram://app" },
+    { id:"whatsapp", name:"WhatsApp", emoji:"💬", color:"#25D366", url:"https://web.whatsapp.com/", scheme:"whatsapp://" },
+    { id:"youtube", name:"YouTube", emoji:"▶️", color:"#FF0000", url:"https://m.youtube.com/", scheme:"vnd.youtube://" }
+  ];
 
   const PRESETS = [
-    { name:"Instagram", emoji:"📸", color:"#E1306C", url:"https://www.instagram.com/",   scheme:"instagram://app" },
-    { name:"WhatsApp",  emoji:"💬", color:"#25D366", url:"https://web.whatsapp.com/",    scheme:"whatsapp://" },
-    { name:"YouTube",   emoji:"▶️", color:"#FF0000", url:"https://m.youtube.com/",       scheme:"vnd.youtube://" },
-    { name:"TikTok",    emoji:"🎵", color:"#111111", url:"https://www.tiktok.com/",      scheme:"snssdk1233://" },
-    { name:"Discord",   emoji:"🎮", color:"#5865F2", url:"https://discord.com/app",      scheme:"discord://" },
-    { name:"Maps",      emoji:"🗺️", color:"#4285F4", url:"https://maps.google.com/",     scheme:"" },
-    { name:"Reddit",    emoji:"👽", color:"#FF4500", url:"https://www.reddit.com/",      scheme:"reddit://" },
-    { name:"X",         emoji:"𝕏",  color:"#000000", url:"https://x.com/",               scheme:"twitter://" }
+    { name:"TikTok",    emoji:"🎵", color:"#111111", url:"https://www.tiktok.com/",   scheme:"snssdk1233://" },
+    { name:"Discord",   emoji:"🎮", color:"#5865F2", url:"https://discord.com/app",   scheme:"discord://" },
+    { name:"Maps",      emoji:"🗺️", color:"#4285F4", url:"https://maps.google.com/",  scheme:"" },
+    { name:"Reddit",    emoji:"👽", color:"#FF4500", url:"https://www.reddit.com/",   scheme:"reddit://" },
+    { name:"X",         emoji:"𝕏",  color:"#000000", url:"https://x.com/",            scheme:"twitter://" }
   ];
 
   const $ = s => document.querySelector(s);
@@ -268,29 +316,51 @@
   const uid = () => "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
   let apps = loadApps();
-  let openWins = [];
-  let zTop = 1000;
+  let paneApps = loadPanes();           // { left: appId|null, right: appId|null }
+  let layout = loadLayout();            // { orientation:'horizontal'|'vertical', leftSize:number }
+  let editingId = null;
+  let pickSide = null;
 
   function loadApps() {
     try {
       const raw = localStorage.getItem(LS_APPS);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length) return parsed;
-      }
+      if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length) return p; }
     } catch (e) {}
     return JSON.parse(JSON.stringify(DEFAULT_APPS));
   }
-  function saveApps() {
-    try { localStorage.setItem(LS_APPS, JSON.stringify(apps)); } catch (e) {}
+  function saveApps() { try { localStorage.setItem(LS_APPS, JSON.stringify(apps)); } catch (e) {} }
+
+  function loadPanes() {
+    try {
+      const raw = localStorage.getItem(LS_PANES);
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && typeof p === "object") return { left: p.left || null, right: p.right || null };
+      }
+    } catch (e) {}
+    return { left: "snapchat", right: null };
   }
+  function savePanes() { try { localStorage.setItem(LS_PANES, JSON.stringify(paneApps)); } catch (e) {} }
+
+  function loadLayout() {
+    try {
+      const raw = localStorage.getItem(LS_LAYOUT);
+      if (raw) {
+        const l = JSON.parse(raw);
+        if (l && l.orientation) return { orientation: l.orientation, leftSize: l.leftSize || 50 };
+      }
+    } catch (e) {}
+    return { orientation: "horizontal", leftSize: 50 };
+  }
+  function saveLayout() { try { localStorage.setItem(LS_LAYOUT, JSON.stringify(layout)); } catch (e) {} }
 
   /* ==================== Elements ==================== */
   const bubble = $("#bubble");
-  const badge  = $("#badge");
-  const panel  = $("#panel");
-  const grid   = $("#grid");
-  const modal  = $("#modal");
+  const overlay = $("#overlay");
+  const splitContainer = $("#splitContainer");
+  const paneLeft = $("#paneLeft");
+  const paneRight = $("#paneRight");
+  const divider = $("#divider");
   const toastEl = $("#toast");
 
   /* ==================== Toast ==================== */
@@ -302,273 +372,116 @@
     toastTimer = setTimeout(() => toastEl.classList.remove("show"), ms);
   }
 
-  /* ==================== Launcher panel ==================== */
-  function renderApps() {
-    grid.innerHTML = "";
+  /* ==================== Layout ==================== */
+  function applyLayout() {
+    splitContainer.classList.toggle("vertical", layout.orientation === "vertical");
+    const dir = layout.orientation === "vertical" ? "height" : "width";
+    paneLeft.style.flex = `0 0 ${layout.leftSize}%`;
+    paneRight.style.flex = "1";
+    // For vertical, we need to set height instead of width; flex-basis handles both.
+    // But we need to ensure paneLeft has correct flex-basis.
+    if (layout.orientation === "vertical") {
+      paneLeft.style.flexBasis = layout.leftSize + "%";
+    } else {
+      paneLeft.style.flexBasis = layout.leftSize + "%";
+    }
+    // Adjust divider cursor
+    divider.style.cursor = layout.orientation === "vertical" ? "row-resize" : "col-resize";
+  }
+
+  /* ==================== Render Panes ==================== */
+  function getApp(id) { return apps.find(a => a.id === id) || null; }
+
+  function renderPane(side) {
+    const pane = side === "left" ? paneLeft : paneRight;
+    const appId = paneApps[side];
+    const app = appId ? getApp(appId) : null;
+
+    const iconEl = pane.querySelector(".pane-icon");
+    const nameEl = pane.querySelector(".pane-name");
+    const bodyEl = pane.querySelector(".pane-body");
+    const btnApp = pane.querySelector(".btn-app");
+    const btnBrowser = pane.querySelector(".btn-browser");
+
+    if (app) {
+      iconEl.textContent = app.emoji || "📱";
+      nameEl.textContent = app.name;
+      btnApp.style.display = app.scheme ? "" : "none";
+      btnBrowser.style.display = app.url ? "" : "none";
+
+      if (app.url) {
+        // Use a key to force reload if URL changed (unlikely here)
+        let iframe = bodyEl.querySelector("iframe");
+        if (!iframe || iframe.dataset.appId !== app.id) {
+          bodyEl.innerHTML = `<iframe src="${esc(app.url)}"
+            allow="camera;microphone;clipboard-write;fullscreen;autoplay;encrypted-media"
+            referrerpolicy="no-referrer" loading="lazy" data-app-id="${esc(app.id)}"></iframe>`;
+        }
+      } else {
+        bodyEl.innerHTML = `<div class="empty"><span class="big">🔗</span><span>No web URL set for this app.</span><span style="font-size:11px;opacity:.7">Use the 📲 button to launch the installed app.</span></div>`;
+      }
+    } else {
+      iconEl.textContent = "📱";
+      nameEl.textContent = side === "left" ? "Left pane" : "Right pane";
+      btnApp.style.display = "none";
+      btnBrowser.style.display = "none";
+      bodyEl.innerHTML = `<div class="empty">
+        <span class="big">＋</span>
+        <span>No app selected</span>
+        <button data-side="${side}" class="choose-app">Choose app</button>
+      </div>`;
+      bodyEl.querySelector(".choose-app").addEventListener("click", () => openPicker(side));
+    }
+  }
+
+  function renderAllPanes() {
+    renderPane("left");
+    renderPane("right");
+  }
+
+  /* ==================== Picker Modal ==================== */
+  function openPicker(side) {
+    pickSide = side;
+    const title = $("#pickTitle");
+    title.textContent = side === "left" ? "Choose app for Left pane" : "Choose app for Right pane";
+    const list = $("#pickList");
+    list.innerHTML = "";
 
     apps.forEach(app => {
-      const t = document.createElement("button");
-      t.className = "tile";
-      t.type = "button";
-      t.innerHTML =
-        `<span class="ico" style="background:${esc(app.color || "#334155")}">${esc(app.emoji || "📱")}</span>` +
-        `<span class="lbl">${esc(app.name)}</span>`;
-
-      let lpTimer = null, longPressed = false;
-
-      t.addEventListener("pointerdown", () => {
-        longPressed = false;
-        lpTimer = setTimeout(() => {
-          longPressed = true;
-          if (navigator.vibrate) navigator.vibrate(15);
-          openModal(app);
-        }, 600);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.innerHTML = `<span class="emoji">${esc(app.emoji || "📱")}</span>
+        <span class="nm">${esc(app.name)}</span>
+        ${paneApps[side] === app.id ? "✓" : ""}`;
+      btn.addEventListener("click", () => {
+        paneApps[side] = app.id;
+        savePanes();
+        renderPane(side);
+        closePicker();
       });
-      ["pointerup", "pointerleave", "pointercancel"].forEach(ev =>
-        t.addEventListener(ev, () => { clearTimeout(lpTimer); lpTimer = null; }));
-
-      t.addEventListener("click", e => {
-        if (longPressed) { longPressed = false; e.preventDefault(); return; }
-        openApp(app);
-      });
-      t.addEventListener("contextmenu", e => { e.preventDefault(); openModal(app); });
-
-      grid.appendChild(t);
+      list.appendChild(btn);
     });
 
-    // "Add app" tile
-    const add = document.createElement("button");
-    add.className = "tile add";
-    add.type = "button";
-    add.innerHTML = `<span class="ico">＋</span><span class="lbl">Add app</span>`;
-    add.addEventListener("click", () => openModal(null));
-    grid.appendChild(add);
-  }
-
-  function positionPanel() {
-    panel.style.visibility = "hidden";
-    panel.classList.add("show");
-
-    const b = bubble.getBoundingClientRect();
-    const pw = panel.offsetWidth, ph = panel.offsetHeight;
-
-    let left = b.left + b.width / 2 - pw / 2;
-    let top  = b.top - ph - 14;
-    if (top < 8) top = b.bottom + 14;
-
-    left = clamp(left, 10, window.innerWidth - pw - 10);
-    top  = clamp(top, 10, window.innerHeight - ph - 10);
-
-    panel.style.left = left + "px";
-    panel.style.top  = top + "px";
-    panel.style.visibility = "";
-  }
-
-  function openPanel()  { positionPanel(); }
-  function closePanel() { panel.classList.remove("show"); }
-  function togglePanel(){ panel.classList.contains("show") ? closePanel() : openPanel(); }
-
-  /* ==================== App windows ==================== */
-  function openApp(app) {
-    const existing = openWins.find(w => w.appId === app.id);
-    if (existing) {
-      existing.el.classList.remove("min");
-      focusWin(existing);
-      closePanel();
-      return;
-    }
-    createWindow(app);
-    closePanel();
-  }
-
-  function focusWin(win) { win.el.style.zIndex = ++zTop; }
-
-  function createWindow(app) {
-    const el = document.createElement("div");
-    el.className = "win";
-
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const w = Math.min(430, vw - 20);
-    const h = Math.min(640, vh - 120);
-    const n = openWins.length;
-    const left = clamp(16 + n * 26, 8, Math.max(8, vw - w - 8));
-    const top  = clamp(64 + n * 26, 8, Math.max(8, vh - h - 8));
-
-    el.style.width  = w + "px";
-    el.style.height = h + "px";
-    el.style.left   = left + "px";
-    el.style.top    = top + "px";
-    el.style.zIndex = ++zTop;
-
-    const body = app.url
-      ? `<iframe src="${esc(app.url)}"
-                 allow="camera;microphone;clipboard-write;fullscreen;autoplay;encrypted-media"
-                 referrerpolicy="no-referrer"
-                 loading="lazy"></iframe>`
-      : `<div class="empty">No web URL set for this app.<br>Use 📲 to launch the installed app.</div>`;
-
-    el.innerHTML = `
-      <div class="win-head">
-        <span class="dot" style="background:${esc(app.color || "#64748b")}"></span>
-        <span class="ttl">${esc(app.name)}</span>
-        <div class="acts">
-          ${app.scheme ? `<button data-a="app" title="Open in installed app">📲</button>` : ""}
-          <button data-a="tab" title="Open in browser">↗</button>
-          <button data-a="min" title="Minimise">–</button>
-          <button data-a="close" title="Close">✕</button>
-        </div>
-      </div>
-      <div class="win-body">${body}</div>
-      <div class="win-foot">
-        <span>Blank page? Many sites block embedding.</span>
-        ${app.scheme ? `<button data-a="app2">Open app</button>` : ""}
-        <button data-a="tab2">Browser</button>
-      </div>
-      <div class="win-resize" title="Resize"></div>
-    `;
-
-    document.body.appendChild(el);
-
-    const winObj = { appId: app.id, app, el };
-    openWins.push(winObj);
-    updateBadge();
-
-    // Header actions
-    el.addEventListener("click", e => {
-      const btn = e.target.closest("button[data-a]");
-      if (!btn) return;
-      const a = btn.dataset.a;
-      if (a === "close")      closeWin(winObj);
-      else if (a === "min")   el.classList.toggle("min");
-      else if (a === "tab" || a === "tab2") {
-        const target = app.url || app.scheme;
-        if (target) window.open(target, "_blank", "noopener");
-      }
-      else if (a === "app" || a === "app2") launchScheme(app);
+    // Add new app button
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "add-new";
+    addBtn.innerHTML = "＋ Add new app";
+    addBtn.addEventListener("click", () => {
+      closePicker();
+      openEditor(null);
     });
+    list.appendChild(addBtn);
 
-    // Bring to front on any interaction
-    el.addEventListener("pointerdown", () => focusWin(winObj), true);
-
-    // Drag + resize
-    makeDraggable(el, el.querySelector(".win-head"));
-    makeResizable(el, el.querySelector(".win-resize"));
+    $("#pickModal").classList.add("show");
   }
 
-  function closeWin(win) {
-    win.el.remove();
-    openWins = openWins.filter(w => w !== win);
-    updateBadge();
+  function closePicker() {
+    $("#pickModal").classList.remove("show");
+    pickSide = null;
   }
 
-  function updateBadge() {
-    badge.textContent = openWins.length > 1 ? String(openWins.length) : "";
-  }
-
-  /* ==================== Drag & resize ==================== */
-  function makeDraggable(el, handle) {
-    let st = null;
-    handle.addEventListener("pointerdown", e => {
-      if (e.target.closest("button")) return;
-      e.preventDefault();
-      handle.setPointerCapture(e.pointerId);
-      const r = el.getBoundingClientRect();
-      st = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top };
-      focusWinByEl(el);
-    });
-    handle.addEventListener("pointermove", e => {
-      if (!st) return;
-      const x = clamp(st.ox + e.clientX - st.sx, 0, window.innerWidth  - 70);
-      const y = clamp(st.oy + e.clientY - st.sy, 0, window.innerHeight - 46);
-      el.style.left = x + "px";
-      el.style.top  = y + "px";
-    });
-    const end = e => {
-      st = null;
-      try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
-    };
-    handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
-  }
-
-  function focusWinByEl(el) {
-    const win = openWins.find(w => w.el === el);
-    if (win) focusWin(win);
-  }
-
-  function makeResizable(el, handle) {
-    let st = null;
-    handle.addEventListener("pointerdown", e => {
-      e.preventDefault();
-      e.stopPropagation();
-      handle.setPointerCapture(e.pointerId);
-      const r = el.getBoundingClientRect();
-      st = { sx: e.clientX, sy: e.clientY, w: r.width, h: r.height };
-      focusWinByEl(el);
-    });
-    handle.addEventListener("pointermove", e => {
-      if (!st) return;
-      const maxW = window.innerWidth  - el.offsetLeft - 6;
-      const maxH = window.innerHeight - el.offsetTop  - 6;
-      const w = clamp(st.w + e.clientX - st.sx, 220, maxW);
-      const h = clamp(st.h + e.clientY - st.sy, 150, maxH);
-      el.style.width  = w + "px";
-      el.style.height = h + "px";
-    });
-    const end = e => {
-      st = null;
-      try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
-    };
-    handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
-  }
-
-  /* ==================== Tile windows (split view) ==================== */
-  function tileWindows() {
-    const n = openWins.length;
-    if (!n) { toast("Open an app first"); return; }
-    const cols = Math.ceil(Math.sqrt(n));
-    const rows = Math.ceil(n / cols);
-    const gap = 8;
-    const w = (window.innerWidth  - gap * (cols + 1)) / cols;
-    const h = (window.innerHeight - gap * (rows + 1)) / rows;
-
-    openWins.forEach((win, i) => {
-      const c = i % cols, r = Math.floor(i / cols);
-      win.el.classList.remove("min");
-      win.el.style.left   = (gap + c * (w + gap)) + "px";
-      win.el.style.top    = (gap + r * (h + gap)) + "px";
-      win.el.style.width  = w + "px";
-      win.el.style.height = h + "px";
-    });
-    closePanel();
-    toast(n + " apps side by side");
-  }
-
-  /* ==================== Deep link launching ==================== */
-  function launchScheme(app) {
-    if (!app.scheme) { toast("No app link set for " + app.name); return; }
-
-    const started = Date.now();
-    const ifr = document.createElement("iframe");
-    ifr.style.cssText = "display:none;width:0;height:0;border:0";
-    document.body.appendChild(ifr);
-    try { ifr.src = app.scheme; } catch (e) { ifr.src = app.scheme; }
-    setTimeout(() => ifr.remove(), 1400);
-
-    setTimeout(() => {
-      const stillHere = document.visibilityState === "visible" &&
-                        Date.now() - started < 2600;
-      if (stillHere && app.url) {
-        toast("App not installed — opening web version…");
-        window.open(app.url, "_blank", "noopener");
-      }
-    }, 1600);
-  }
-
-  /* ==================== Add / edit modal ==================== */
-  let editingId = null;
-
+  /* ==================== Edit Modal ==================== */
   function renderPresets() {
     const box = $("#presets");
     box.innerHTML = "";
@@ -588,27 +501,26 @@
     });
   }
 
-  function openModal(app) {
+  function openEditor(app) {
     editingId = app ? app.id : null;
-    $("#mTitle").textContent  = app ? "Edit app" : "Add app";
-    $("#mName").value   = app ? app.name   : "";
+    $("#editTitle").textContent = app ? "Edit app" : "Add app";
+    $("#fName").value   = app ? app.name   : "";
     $("#fEmoji").value  = app ? (app.emoji || "") : "";
     $("#fColor").value  = app && /^#[0-9a-f]{6}$/i.test(app.color || "")
                             ? app.color : "#FFFC00";
     $("#fUrl").value    = app ? (app.url    || "") : "";
     $("#fScheme").value = app ? (app.scheme || "") : "";
-    $("#mDelete").style.display = app ? "" : "none";
-    modal.classList.add("show");
-    closePanel();
+    $("#editDelete").style.display = app ? "" : "none";
+    $("#editModal").classList.add("show");
     setTimeout(() => $("#fName").focus(), 60);
   }
 
-  function closeModal() {
-    modal.classList.remove("show");
+  function closeEditor() {
+    $("#editModal").classList.remove("show");
     editingId = null;
   }
 
-  function saveModal() {
+  function saveEditor() {
     const name = $("#fName").value.trim();
     if (!name) { toast("Give the app a name"); $("#fName").focus(); return; }
 
@@ -625,39 +537,108 @@
 
     if (editingId) {
       const i = apps.findIndex(a => a.id === editingId);
-      if (i > -1) {
-        apps[i] = Object.assign({}, apps[i], data);
-        // refresh any open window for this app
-        const win = openWins.find(w => w.appId === editingId);
-        if (win) { closeWin(win); createWindow(apps[i]); }
-      }
+      if (i > -1) apps[i] = Object.assign({}, apps[i], data);
     } else {
       apps.push(Object.assign({ id: uid() }, data));
     }
 
     saveApps();
-    renderApps();
-    closeModal();
+    renderAllPanes(); // in case an open pane uses this app
+    closeEditor();
     toast(editingId ? "App updated" : name + " added");
   }
 
-  function deleteApp() {
+  function deleteEditor() {
     if (!editingId) return;
     const app = apps.find(a => a.id === editingId);
     if (!app) return;
     if (!confirm(`Remove "${app.name}" from your launcher?`)) return;
 
     apps = apps.filter(a => a.id !== editingId);
-    const win = openWins.find(w => w.appId === editingId);
-    if (win) closeWin(win);
-
+    // Clear panes that used this app
+    if (paneApps.left === editingId) paneApps.left = null;
+    if (paneApps.right === editingId) paneApps.right = null;
     saveApps();
-    renderApps();
-    closeModal();
+    savePanes();
+    renderAllPanes();
+    closeEditor();
     toast("Removed");
   }
 
-  /* ==================== Bubble drag / tap ==================== */
+  /* ==================== Pane Actions ==================== */
+  function swapPanes() {
+    const tmp = paneApps.left;
+    paneApps.left = paneApps.right;
+    paneApps.right = tmp;
+    savePanes();
+    renderAllPanes();
+    toast("Panes swapped");
+  }
+
+  function toggleOrientation() {
+    layout.orientation = layout.orientation === "horizontal" ? "vertical" : "horizontal";
+    saveLayout();
+    applyLayout();
+    toast(layout.orientation === "horizontal" ? "Side by side" : "Stacked");
+  }
+
+  /* ==================== Deep Link ==================== */
+  function launchScheme(app) {
+    if (!app || !app.scheme) { toast("No app link set"); return; }
+    const started = Date.now();
+    const ifr = document.createElement("iframe");
+    ifr.style.cssText = "display:none;width:0;height:0;border:0";
+    document.body.appendChild(ifr);
+    try { ifr.src = app.scheme; } catch (e) { ifr.src = app.scheme; }
+    setTimeout(() => ifr.remove(), 1400);
+
+    setTimeout(() => {
+      const stillHere = document.visibilityState === "visible" &&
+                        Date.now() - started < 2600;
+      if (stillHere && app.url) {
+        toast("App not installed — opening web version…");
+        window.open(app.url, "_blank", "noopener");
+      }
+    }, 1600);
+  }
+
+  /* ==================== Divider Drag ==================== */
+  function initDivider() {
+    let st = null;
+    divider.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      divider.setPointerCapture(e.pointerId);
+      const rect = splitContainer.getBoundingClientRect();
+      st = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startSize: layout.leftSize,
+        containerW: rect.width,
+        containerH: rect.height
+      };
+    });
+    divider.addEventListener("pointermove", e => {
+      if (!st) return;
+      let pct;
+      if (layout.orientation === "horizontal") {
+        const dx = e.clientX - st.startX;
+        pct = st.startSize + (dx / st.containerW) * 100;
+      } else {
+        const dy = e.clientY - st.startY;
+        pct = st.startSize + (dy / st.containerH) * 100;
+      }
+      layout.leftSize = clamp(pct, 15, 85);
+      applyLayout();
+    });
+    const end = e => {
+      if (st) { saveLayout(); st = null; }
+      try { divider.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    divider.addEventListener("pointerup", end);
+    divider.addEventListener("pointercancel", end);
+  }
+
+  /* ==================== Bubble Drag / Tap ==================== */
   function setBubblePos(x, y, persist = true) {
     const size = 56;
     x = clamp(x, 6, window.innerWidth  - size - 6);
@@ -667,13 +648,13 @@
     bubble.style.right = "auto";
     bubble.style.bottom = "auto";
     if (persist) {
-      try { localStorage.setItem(LS_POS, JSON.stringify({ x, y })); } catch (e) {}
+      try { localStorage.setItem(LS_BUBBLE, JSON.stringify({ x, y })); } catch (e) {}
     }
   }
 
   (function initBubblePos() {
     let saved = null;
-    try { saved = JSON.parse(localStorage.getItem(LS_POS) || "null"); } catch (e) {}
+    try { saved = JSON.parse(localStorage.getItem(LS_BUBBLE) || "null"); } catch (e) {}
     if (saved && typeof saved.x === "number") {
       setBubblePos(saved.x, saved.y, false);
     } else {
@@ -700,7 +681,7 @@
         const r = bubble.getBoundingClientRect();
         setBubblePos(r.left, r.top, true);
       } else {
-        togglePanel();
+        overlay.classList.toggle("show");
       }
     }
     bDrag = null;
@@ -708,36 +689,83 @@
   });
   bubble.addEventListener("pointercancel", () => { bDrag = null; });
 
-  /* ==================== Global events ==================== */
-  document.addEventListener("pointerdown", e => {
-    if (panel.contains(e.target) || bubble.contains(e.target)) return;
-    if (modal.contains(e.target)) return;
-    closePanel();
-  });
+  /* ==================== Event Bindings ==================== */
+  // Top bar
+  $("#btnSwap").addEventListener("click", swapPanes);
+  $("#btnOrient").addEventListener("click", toggleOrientation);
+  $("#btnAdd").addEventListener("click", () => openEditor(null));
+  $("#btnClose").addEventListener("click", () => overlay.classList.remove("show"));
 
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape") {
-      if (modal.classList.contains("show")) closeModal();
-      else closePanel();
+  // Pane change buttons (delegated)
+  document.addEventListener("click", e => {
+    const changeBtn = e.target.closest(".btn-change");
+    if (changeBtn) {
+      const side = changeBtn.dataset.side;
+      openPicker(side);
+      return;
+    }
+    const appBtn = e.target.closest(".btn-app");
+    if (appBtn) {
+      const side = appBtn.dataset.side;
+      const appId = paneApps[side];
+      const app = appId ? getApp(appId) : null;
+      if (app) launchScheme(app);
+      return;
+    }
+    const browserBtn = e.target.closest(".btn-browser");
+    if (browserBtn) {
+      const side = browserBtn.dataset.side;
+      const appId = paneApps[side];
+      const app = appId ? getApp(appId) : null;
+      if (app && app.url) window.open(app.url, "_blank", "noopener");
+      return;
+    }
+    // Choose app button inside empty pane
+    const chooseBtn = e.target.closest(".choose-app");
+    if (chooseBtn) {
+      openPicker(chooseBtn.dataset.side);
     }
   });
 
+  // Picker modal
+  $("#pickCancel").addEventListener("click", closePicker);
+  $("#pickModal").addEventListener("pointerdown", e => {
+    if (e.target === $("#pickModal")) closePicker();
+  });
+
+  // Edit modal
+  $("#editSave").addEventListener("click", saveEditor);
+  $("#editCancel").addEventListener("click", closeEditor);
+  $("#editDelete").addEventListener("click", deleteEditor);
+  $("#editModal").addEventListener("pointerdown", e => {
+    if (e.target === $("#editModal")) closeEditor();
+  });
+  $("#fName").addEventListener("keydown", e => { if (e.key === "Enter") saveEditor(); });
+
+  // Keyboard shortcuts
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      if ($("#editModal").classList.contains("show")) closeEditor();
+      else if ($("#pickModal").classList.contains("show")) closePicker();
+      else overlay.classList.remove("show");
+    }
+  });
+
+  // Resize
   window.addEventListener("resize", () => {
     const r = bubble.getBoundingClientRect();
     setBubblePos(r.left, r.top, true);
-    if (panel.classList.contains("show")) positionPanel();
   });
 
-  $("#btnTile").addEventListener("click", tileWindows);
-  $("#mSave").addEventListener("click", saveModal);
-  $("#mCancel").addEventListener("click", closeModal);
-  $("#mDelete").addEventListener("click", deleteApp);
-  modal.addEventListener("pointerdown", e => { if (e.target === modal) closeModal(); });
-  $("#fName").addEventListener("keydown", e => { if (e.key === "Enter") saveModal(); });
-
   /* ==================== Boot ==================== */
-  renderApps();
   renderPresets();
+  applyLayout();
+  renderAllPanes();
+  initDivider();
+
+  // Ensure left/right panes have correct flex
+  paneLeft.style.flex = `0 0 ${layout.leftSize}%`;
+  paneRight.style.flex = "1";
 })();
 </script>
 </body>
