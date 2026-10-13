@@ -1,1071 +1,282 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12">
-<title>Split Screen Launcher</title>
-<style>
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;margin:0}
-  body{
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    background:radial-gradient(1200px 800px at 15% -10%,#1b2233 0%,#0b0d12 62%),#0b0d12;
-    color:#e9edf5;overflow:hidden;overscroll-behavior:none;
-    user-select:none;-webkit-user-select:none;
-  }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Split Screen + MP4 Recorder</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ---------- Floating bubble ---------- */
-  #bubble{
-    position:fixed;width:56px;height:56px;border-radius:50%;
-    display:grid;place-items:center;font-size:24px;z-index:99999;
-    background:linear-gradient(145deg,#FFFC00,#ffd400);
-    color:#111;border:2px solid rgba(255,255,255,.35);
-    box-shadow:0 10px 30px rgba(255,252,0,.22),0 6px 18px rgba(0,0,0,.55);
-    cursor:grab;touch-action:none;
-    transition:transform .12s ease;
-  }
-  #bubble:active{transform:scale(.93);cursor:grabbing}
+    body {
+      height: 100vh;
+      overflow: hidden;
+      font-family: system-ui, sans-serif;
+      background: #111;
+    }
 
-  /* ---------- Split Screen Overlay ---------- */
-  #overlay{
-    position:fixed;inset:0;z-index:10000;
-    display:none;flex-direction:column;
-    background:rgba(11,13,18,.97);
-    -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
-  }
-  #overlay.show{display:flex}
+    .split {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
 
-  .split-topbar{
-    flex:0 0 auto;height:52px;display:flex;align-items:center;gap:10px;
-    padding:0 12px;background:rgba(255,255,255,.055);
-    border-bottom:1px solid rgba(255,255,255,.09);
-    padding-top:env(safe-area-inset-top);
-  }
-  .split-title{
-    font-size:15px;font-weight:700;letter-spacing:.3px;
-    background:linear-gradient(90deg,#FFFC00,#fff);-webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;background-clip:text;
-  }
-  .split-actions{margin-left:auto;display:flex;gap:6px}
-  .split-actions button{
-    width:36px;height:36px;border-radius:11px;border:1px solid rgba(255,255,255,.14);
-    background:rgba(255,255,255,.07);color:#dbe3ef;font-size:16px;cursor:pointer;
-    display:grid;place-items:center;padding:0;transition:background .15s;
-  }
-  .split-actions button:hover{background:rgba(255,255,255,.2)}
-  .split-actions button:active{transform:scale(.94)}
+    .pane {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+      padding: 20px;
+    }
 
-  .split-container{
-    flex:1;display:flex;overflow:hidden;position:relative;
-    padding:8px;gap:0;
-  }
-  .split-container.vertical{flex-direction:column}
+    .left  { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
+    .right { background: linear-gradient(135deg, #7c2d12, #f97316); }
 
-  .pane{
-    flex:1;display:flex;flex-direction:column;
-    background:#12151c;border-radius:14px;overflow:hidden;
-    border:1px solid rgba(255,255,255,.1);
-    box-shadow:0 8px 30px rgba(0,0,0,.4);
-    min-width:0;min-height:0;
-  }
-  .pane-header{
-    flex:0 0 44px;display:flex;align-items:center;gap:8px;
-    padding:0 10px;background:rgba(255,255,255,.05);
-    border-bottom:1px solid rgba(255,255,255,.08);
-  }
-  .pane-icon{font-size:20px;line-height:1}
-  .pane-name{
-    flex:1;font-size:13px;font-weight:600;overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap;
-  }
-  .pane-actions{display:flex;gap:4px}
-  .pane-actions button{
-    height:30px;padding:0 8px;border-radius:8px;border:1px solid rgba(255,255,255,.14);
-    background:rgba(255,255,255,.07);color:#dbe3ef;font-size:11px;font-weight:600;
-    cursor:pointer;display:grid;place-items:center;white-space:nowrap;
-  }
-  .pane-actions button:hover{background:rgba(255,255,255,.18)}
-  .pane-actions button:active{transform:scale(.95)}
-  .pane-actions .btn-app{font-size:15px;padding:0 7px}
+    .record-btn {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      padding: 14px 28px;
+      border: none;
+      border-radius: 999px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      transition: 0.2s;
+    }
 
-  .pane-body{
-    flex:1;position:relative;background:#0b0d12;overflow:hidden;
-  }
-  .pane-body iframe{
-    width:100%;height:100%;border:0;display:block;background:#fff;
-  }
-  .pane-body .empty{
-    position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:12px;text-align:center;
-    padding:24px;font-size:13px;color:#8b97ab;
-  }
-  .pane-body .empty .big{font-size:36px;opacity:.4}
-  .pane-body .empty button{
-    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);
-    color:#e6ecf5;font:inherit;font-size:13px;font-weight:600;
-    padding:10px 20px;border-radius:12px;cursor:pointer;
-  }
-  .pane-body .empty button:hover{background:rgba(255,255,255,.18)}
+    .record-btn:hover   { background: #dc2626; transform: translateX(-50%) scale(1.05); }
+    .record-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .record-btn.recording { background: #111; animation: pulse 1.5s infinite; }
 
-  .divider{
-    flex:0 0 8px;position:relative;z-index:5;
-    display:flex;align-items:center;justify-content:center;
-    cursor:col-resize;touch-action:none;
-  }
-  .split-container.vertical .divider{cursor:row-resize;flex:0 0 8px}
-  .divider::after{
-    content:'';border-radius:4px;background:rgba(255,255,255,.18);
-    transition:background .15s;
-  }
-  .split-container:not(.vertical) .divider::after{width:4px;height:36px}
-  .split-container.vertical .divider::after{width:36px;height:4px}
-  .divider:hover::after,.divider:active::after{background:rgba(255,252,0,.6)}
+    .record-btn .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+    }
 
-  /* ---------- Modals ---------- */
-  .modal{
-    position:fixed;inset:0;z-index:100001;display:none;
-    background:rgba(0,0,0,.65);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-    align-items:center;justify-content:center;padding:16px;
-  }
-  .modal.show{display:flex}
-  .sheet{
-    width:min(96vw,440px);max-height:88vh;overflow:auto;
-    background:#141821;border:1px solid rgba(255,255,255,.12);
-    border-radius:22px;padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.75);
-    animation:pop .18s cubic-bezier(.2,.9,.3,1.3);
-  }
-  @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
-  .sheet h3{margin:0 0 4px;font-size:16px}
-  .sheet .sub{font-size:11px;opacity:.55;margin-bottom:14px;display:block}
-  .sheet label{display:block;font-size:11px;opacity:.62;margin-bottom:11px}
-  .sheet input,.sheet textarea{
-    display:block;width:100%;margin-top:5px;padding:10px 12px;
-    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);
-    border-radius:11px;color:#eef2f8;font:inherit;font-size:13px;outline:none;
-  }
-  .sheet input:focus,.sheet textarea:focus{border-color:rgba(255,252,0,.55);
-    box-shadow:0 0 0 3px rgba(255,252,0,.1)}
-  .sheet input[type=color]{padding:3px;height:40px;cursor:pointer}
+    .record-btn.recording .dot { background: #ef4444; }
 
-  .phone-pick-btn{
-    display:flex;align-items:center;justify-content:center;gap:8px;
-    width:100%;padding:11px;border-radius:12px;cursor:pointer;
-    border:1px dashed rgba(255,252,0,.5);background:rgba(255,252,0,.08);
-    color:#FFFC00;font:inherit;font-size:13px;font-weight:600;
-    margin-bottom:14px;
-  }
-  .phone-pick-btn:hover{background:rgba(255,252,0,.16)}
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70%  { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
 
-  .presets{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 16px}
-  .chip{
-    border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
-    color:#dbe3ef;font:inherit;font-size:11px;padding:6px 10px;border-radius:20px;
-    cursor:pointer;
-  }
-  .chip:hover{background:rgba(255,255,255,.16)}
-  .row{display:flex;gap:8px;align-items:center;margin-top:4px}
-  .row .spacer{flex:1}
-  .row button{
-    border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);
-    color:#e6ecf5;font:inherit;font-size:13px;font-weight:600;
-    padding:10px 16px;border-radius:12px;cursor:pointer;
-  }
-  .row button.primary{background:#FFFC00;color:#141414;border-color:#FFFC00}
-  .row button.danger{background:transparent;border-color:rgba(239,68,68,.5);color:#ff8080}
-  .row button:hover{filter:brightness(1.12)}
+    .status {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #fff;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      z-index: 10;
+      display: none;
+    }
 
-  /* App list in picker modals */
-  .app-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:52vh;overflow:auto;padding-right:2px}
-  .app-list button{
-    display:flex;align-items:center;gap:10px;padding:10px 12px;
-    border-radius:12px;border:1px solid rgba(255,255,255,.1);
-    background:rgba(255,255,255,.05);color:inherit;font:inherit;font-size:13px;
-    cursor:pointer;text-align:left;flex:0 0 auto;
-  }
-  .app-list button:hover{background:rgba(255,255,255,.14)}
-  .app-list .emoji{font-size:22px;line-height:1}
-  .app-list .nm{flex:1;font-weight:600}
-  .app-list .tag{
-    font-size:9.5px;padding:2px 7px;border-radius:8px;font-weight:700;
-    background:rgba(255,252,0,.15);color:#FFFC00;letter-spacing:.3px;
-  }
-  .app-list .add-new{
-    justify-content:center;border-style:dashed;color:#cbd5e1;font-weight:600;
-  }
-
-  /* Phone library picker */
-  .search-wrap{
-    position:sticky;top:0;background:#141821;padding-bottom:10px;z-index:2;
-    margin:-4px 0 0;
-  }
-  .search-wrap input{
-    width:100%;padding:11px 14px;border-radius:12px;
-    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
-    color:#eef2f8;font:inherit;font-size:14px;outline:none;
-  }
-  .search-wrap input:focus{border-color:rgba(255,252,0,.55);
-    box-shadow:0 0 0 3px rgba(255,252,0,.1)}
-
-  .cat-chips{
-    display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px;
-  }
-  .cat-chips button{
-    border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
-    color:#dbe3ef;font:inherit;font-size:11.5px;padding:6px 11px;border-radius:20px;
-    cursor:pointer;
-  }
-  .cat-chips button.on{background:#FFFC00;color:#141414;border-color:#FFFC00;font-weight:700}
-
-  .phone-grid{
-    display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
-    max-height:48vh;overflow:auto;padding:2px 2px 4px;
-  }
-  .phone-tile{
-    display:flex;flex-direction:column;align-items:center;gap:6px;
-    padding:12px 6px;border-radius:14px;
-    border:1px solid rgba(255,255,255,.1);
-    background:rgba(255,255,255,.045);color:inherit;font:inherit;
-    cursor:pointer;text-align:center;
-  }
-  .phone-tile:hover{background:rgba(255,255,255,.13)}
-  .phone-tile:active{transform:scale(.95)}
-  .phone-tile .pe{font-size:30px;line-height:1}
-  .phone-tile .pn{font-size:11px;font-weight:600;line-height:1.2;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
-  .phone-tile .pc{font-size:9px;opacity:.5;margin-top:-2px}
-
-  .empty-note{
-    padding:24px 10px;text-align:center;font-size:12.5px;color:#8b97ab;
-  }
-
-  /* Toast */
-  #toast{
-    position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);
-    z-index:100002;padding:11px 18px;border-radius:14px;
-    background:rgba(24,28,38,.96);border:1px solid rgba(255,255,255,.14);
-    font-size:12.5px;box-shadow:0 14px 40px rgba(0,0,0,.6);
-    opacity:0;pointer-events:none;transition:.25s ease;max-width:88vw;text-align:center;
-  }
-  #toast.show{opacity:1;transform:translate(-50%,0)}
-</style>
+    .status.show { display: block; }
+  </style>
 </head>
 <body>
 
-  <!-- Floating bubble -->
-  <div id="bubble" title="Toggle split screen">📱</div>
-
-  <!-- Split Screen Overlay -->
-  <div id="overlay" class="show">
-    <div class="split-topbar">
-      <span class="split-title">Split Screen</span>
-      <div class="split-actions">
-        <button id="btnSwap" title="Swap panes">⇄</button>
-        <button id="btnOrient" title="Toggle orientation">⇅</button>
-        <button id="btnAdd" title="Add app">＋</button>
-        <button id="btnClose" title="Close overlay">✕</button>
-      </div>
-    </div>
-    <div class="split-container" id="splitContainer">
-      <div class="pane" id="paneLeft">
-        <div class="pane-header">
-          <span class="pane-icon">📱</span>
-          <span class="pane-name">Left pane</span>
-          <div class="pane-actions">
-            <button class="btn-change" data-side="left">Change</button>
-            <button class="btn-app" data-side="left" style="display:none">📲</button>
-            <button class="btn-browser" data-side="left" style="display:none">↗</button>
-          </div>
-        </div>
-        <div class="pane-body"></div>
-      </div>
-
-      <div class="divider" id="divider"></div>
-
-      <div class="pane" id="paneRight">
-        <div class="pane-header">
-          <span class="pane-icon">📱</span>
-          <span class="pane-name">Right pane</span>
-          <div class="pane-actions">
-            <button class="btn-change" data-side="right">Change</button>
-            <button class="btn-app" data-side="right" style="display:none">📲</button>
-            <button class="btn-browser" data-side="right" style="display:none">↗</button>
-          </div>
-        </div>
-        <div class="pane-body"></div>
-      </div>
-    </div>
+  <div class="split">
+    <div class="pane left">Left Screen</div>
+    <div class="pane right">Right Screen</div>
   </div>
 
-  <!-- Choose App Modal (from a pane) -->
-  <div class="modal" id="pickModal">
-    <div class="sheet">
-      <h3 id="pickTitle">Choose app</h3>
-      <span class="sub">Your saved apps</span>
-      <div class="app-list" id="pickList"></div>
-      <div class="row">
-        <button id="pickFromPhone" class="primary">📲 From phone</button>
-        <span class="spacer"></span>
-        <button id="pickCancel">Cancel</button>
-      </div>
-    </div>
-  </div>
+  <div class="status" id="status">Recording…</div>
 
-  <!-- Phone App Library Modal -->
-  <div class="modal" id="phoneModal">
-    <div class="sheet">
-      <h3>Pick from your phone</h3>
-      <span class="sub">Tap an app to add it — deep link auto-detected</span>
-      <div class="search-wrap">
-        <input id="phoneSearch" placeholder="Search apps…" autocomplete="off">
-        <div class="cat-chips" id="catChips"></div>
-      </div>
-      <div class="phone-grid" id="phoneGrid"></div>
-      <div class="row" style="margin-top:14px">
-        <span class="spacer"></span>
-        <button id="phoneCancel">Cancel</button>
-      </div>
-    </div>
-  </div>
+  <button class="record-btn" id="recordBtn">
+    <span class="dot"></span>
+    <span id="btnText">Record Screen (MP4)</span>
+  </button>
 
-  <!-- Add / Edit App Modal -->
-  <div class="modal" id="editModal">
-    <div class="sheet">
-      <h3 id="editTitle">Add app</h3>
-      <span class="sub">Fill in manually, or pick from your phone</span>
+  <!-- ffmpeg.wasm for webm -> mp4 conversion -->
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 
-      <button type="button" class="phone-pick-btn" id="editPickFromPhone">📲 Pick from phone</button>
+  <script>
+    const { FFmpeg } = FFmpegWASM;
+    const { fetchFile } = FFmpegUtil;
 
-      <label>Name<input id="fName" placeholder="Snapchat" autocomplete="off"></label>
-      <label>Icon (emoji)<input id="fEmoji" placeholder="👻" maxlength="4" autocomplete="off"></label>
-      <label>Colour<input id="fColor" type="color" value="#FFFC00"></label>
-      <label>Web URL <span style="opacity:.6">(optional — used in split pane)</span>
-        <input id="fUrl" placeholder="https://web.snapchat.com/" inputmode="url" autocomplete="off"></label>
-      <label>App link / deep link
-        <input id="fScheme" placeholder="snapchat://" autocomplete="off"></label>
-      <label>Android package <span style="opacity:.6">(optional, better launching on Android)</span>
-        <input id="fPackage" placeholder="com.snapchat.android" autocomplete="off"></label>
+    const recordBtn = document.getElementById("recordBtn");
+    const btnText   = document.getElementById("btnText");
+    const statusEl  = document.getElementById("status");
 
-      <div class="row" style="margin-bottom:14px">
-        <button type="button" id="editTest" style="font-size:12px;padding:8px 14px">▶ Test launch</button>
-        <span class="spacer"></span>
-      </div>
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let stream = null;
+    let ffmpeg = null;
 
-      <div class="presets" id="presets"></div>
-      <div class="row">
-        <button id="editDelete" class="danger" style="display:none">Delete</button>
-        <span class="spacer"></span>
-        <button id="editCancel">Cancel</button>
-        <button id="editSave" class="primary">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="toast"></div>
-
-<script>
-(() => {
-  "use strict";
-
-  /* ==================== Platform Detection ==================== */
-  const UA = navigator.userAgent || "";
-  const isAndroid = /Android/i.test(UA);
-  const isIOS = /iPad|iPhone|iPod/.test(UA) ||
-                (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
-  /* ==================== Phone App Library ==================== */
-  // scheme = iOS/universal scheme · pkg = Android package · url = web fallback
-  const PHONE_APPS = [
-    // Social
-    { name:"Snapchat",   emoji:"👻", color:"#FFFC00", cat:"Social",    scheme:"snapchat://",       pkg:"com.snapchat.android",                     url:"https://web.snapchat.com/" },
-    { name:"Instagram",  emoji:"📸", color:"#E1306C", cat:"Social",    scheme:"instagram://app",   pkg:"com.instagram.android",                    url:"https://www.instagram.com/" },
-    { name:"TikTok",     emoji:"🎵", color:"#111111", cat:"Social",    scheme:"snssdk1233://",     pkg:"com.zhiliaoapp.musically",                 url:"https://www.tiktok.com/" },
-    { name:"Facebook",   emoji:"📘", color:"#1877F2", cat:"Social",    scheme:"fb://",             pkg:"com.facebook.katana",                      url:"https://m.facebook.com/" },
-    { name:"X",          emoji:"𝕏",  color:"#000000", cat:"Social",    scheme:"twitter://",        pkg:"com.twitter.android",                      url:"https://x.com/" },
-    { name:"Threads",    emoji:"🧵", color:"#000000", cat:"Social",    scheme:"bubbles://",        pkg:"com.instagram.barcelona",                  url:"https://www.threads.net/" },
-    { name:"Reddit",     emoji:"👽", color:"#FF4500", cat:"Social",    scheme:"reddit://",         pkg:"com.reddit.frontpage",                     url:"https://www.reddit.com/" },
-    { name:"Pinterest",  emoji:"📌", color:"#E60023", cat:"Social",    scheme:"pinterest://",      pkg:"com.pinterest",                            url:"https://www.pinterest.com/" },
-    { name:"LinkedIn",   emoji:"💼", color:"#0A66C2", cat:"Social",    scheme:"linkedin://",       pkg:"com.linkedin.android",                     url:"https://www.linkedin.com/" },
-    { name:"BeReal",     emoji:"📷", color:"#000000", cat:"Social",    scheme:"bereal://",         pkg:"com.bereal.ft",                            url:"" },
-    { name:"Tumblr",     emoji:"🌀", color:"#36465D", cat:"Social",    scheme:"tumblr://",         pkg:"com.tumblr",                               url:"https://www.tumblr.com/" },
-    { name:"Tinder",     emoji:"🔥", color:"#FE3C72", cat:"Social",    scheme:"tinder://",         pkg:"com.tinder",                               url:"https://tinder.com/" },
-
-    // Messaging
-    { name:"WhatsApp",   emoji:"💬", color:"#25D366", cat:"Messaging", scheme:"whatsapp://",       pkg:"com.whatsapp",                             url:"https://web.whatsapp.com/" },
-    { name:"Telegram",   emoji:"✈️", color:"#229ED9", cat:"Messaging", scheme:"tg://",             pkg:"org.telegram.messenger",                   url:"https://web.telegram.org/" },
-    { name:"Signal",     emoji:"🔒", color:"#3A76F0", cat:"Messaging", scheme:"sgnl://",           pkg:"org.thoughtcrime.securesms",               url:"" },
-    { name:"Discord",    emoji:"🎮", color:"#5865F2", cat:"Messaging", scheme:"discord://",        pkg:"com.discord",                              url:"https://discord.com/app" },
-    { name:"Messenger",  emoji:"💠", color:"#0084FF", cat:"Messaging", scheme:"fb-messenger://",   pkg:"com.facebook.orca",                        url:"https://www.messenger.com/" },
-    { name:"Slack",      emoji:"#️⃣", color:"#4A154B", cat:"Messaging", scheme:"slack://",          pkg:"com.Slack",                                url:"https://app.slack.com/" },
-    { name:"Zoom",       emoji:"📹", color:"#2D8CFF", cat:"Messaging", scheme:"zoommtg://",        pkg:"us.zoom.videomeetings",                    url:"https://zoom.us/" },
-    { name:"SMS",        emoji:"✉️", color:"#34C759", cat:"Messaging", scheme:"sms://",            pkg:"com.google.android.apps.messaging",        url:"" },
-    { name:"Phone",      emoji:"📞", color:"#34C759", cat:"Messaging", scheme:"tel://",            pkg:"com.android.dialer",                       url:"" },
-
-    // Media
-    { name:"YouTube",    emoji:"▶️", color:"#FF0000", cat:"Media",     scheme:"vnd.youtube://",    pkg:"com.google.android.youtube",               url:"https://m.youtube.com/" },
-    { name:"Spotify",    emoji:"🎧", color:"#1DB954", cat:"Media",     scheme:"spotify://",        pkg:"com.spotify.music",                        url:"https://open.spotify.com/" },
-    { name:"Netflix",    emoji:"🎬", color:"#E50914", cat:"Media",     scheme:"nflx://",           pkg:"com.netflix.mediaclient",                  url:"https://www.netflix.com/" },
-    { name:"Twitch",     emoji:"🎥", color:"#9146FF", cat:"Media",     scheme:"twitch://",         pkg:"tv.twitch.android.app",                    url:"https://m.twitch.tv/" },
-    { name:"SoundCloud", emoji:"🔊", color:"#FF5500", cat:"Media",     scheme:"soundcloud://",     pkg:"com.soundcloud.android",                   url:"https://soundcloud.com/" },
-    { name:"Shazam",     emoji:"🎤", color:"#0088FF", cat:"Media",     scheme:"shazam://",         pkg:"com.shazam.android",                       url:"https://www.shazam.com/" },
-    { name:"CapCut",     emoji:"✂️", color:"#000000", cat:"Media",     scheme:"capcut://",         pkg:"com.lemon.lvoverseas",                     url:"https://www.capcut.com/" },
-    { name:"Music",      emoji:"🎵", color:"#FC3C44", cat:"Media",     scheme:"music://",          pkg:"com.google.android.apps.youtube.music",    url:"" },
-    { name:"Podcasts",   emoji:"🎙️", color:"#9933CC", cat:"Media",     scheme:"podcasts://",       pkg:"com.google.android.apps.podcasts",         url:"" },
-
-    // Productivity
-    { name:"Gmail",      emoji:"📧", color:"#EA4335", cat:"Work",      scheme:"googlegmail://",    pkg:"com.google.android.gm",                    url:"https://mail.google.com/" },
-    { name:"Drive",      emoji:"📁", color:"#4285F4", cat:"Work",      scheme:"googledrive://",    pkg:"com.google.android.apps.docs",             url:"https://drive.google.com/" },
-    { name:"Calendar",   emoji:"📅", color:"#4285F4", cat:"Work",      scheme:"calshow://",        pkg:"com.google.android.calendar",              url:"https://calendar.google.com/" },
-    { name:"Notes",      emoji:"📝", color:"#FFCC00", cat:"Work",      scheme:"mobilenotes://",    pkg:"com.google.android.keep",                  url:"https://keep.google.com/" },
-    { name:"Docs",       emoji:"📄", color:"#4285F4", cat:"Work",      scheme:"googledocs://",     pkg:"com.google.android.apps.docs.editors.docs",url:"https://docs.google.com/" },
-    { name:"Duolingo",   emoji:"🦉", color:"#58CC02", cat:"Work",      scheme:"duolingo://",       pkg:"com.duolingo",                             url:"https://www.duolingo.com/" },
-
-    // Finance
-    { name:"Cash App",   emoji:"💵", color:"#00D632", cat:"Finance",   scheme:"squarecash://",     pkg:"com.squareup.cash",                        url:"https://cash.app/" },
-    { name:"Venmo",      emoji:"💸", color:"#3D95CE", cat:"Finance",   scheme:"venmo://",          pkg:"com.venmo",                                url:"https://venmo.com/" },
-    { name:"PayPal",     emoji:"🅿️", color:"#003087", cat:"Finance",   scheme:"paypal://",         pkg:"com.paypal.android.p2pmobile",             url:"https://www.paypal.com/" },
-    { name:"Coinbase",   emoji:"🪙", color:"#0052FF", cat:"Finance",   scheme:"coinbase://",       pkg:"com.coinbase.android",                     url:"https://www.coinbase.com/" },
-
-    // Travel & Maps
-    { name:"Maps",       emoji:"🗺️", color:"#4285F4", cat:"Travel",    scheme:"comgooglemaps://",  pkg:"com.google.android.apps.maps",             url:"https://maps.google.com/" },
-    { name:"Waze",       emoji:"🚗", color:"#33CCFF", cat:"Travel",    scheme:"waze://",           pkg:"com.waze",                                 url:"https://www.waze.com/" },
-    { name:"Uber",       emoji:"🚕", color:"#000000", cat:"Travel",    scheme:"uber://",           pkg:"com.ubercab",                              url:"https://m.uber.com/" },
-    { name:"Lyft",       emoji:"🚙", color:"#FF00BF", cat:"Travel",    scheme:"lyft://",           pkg:"me.lyft.android",                          url:"https://www.lyft.com/" },
-    { name:"Airbnb",     emoji:"🏠", color:"#FF5A5F", cat:"Travel",    scheme:"airbnb://",         pkg:"com.airbnb.android",                       url:"https://www.airbnb.com/" },
-    { name:"Amazon",     emoji:"📦", color:"#FF9900", cat:"Shopping",  scheme:"amazon://",         pkg:"com.amazon.mShop.android.shopping",        url:"https://www.amazon.com/" },
-
-    // Utilities
-    { name:"Chrome",     emoji:"🌐", color:"#4285F4", cat:"Utilities", scheme:"googlechrome://",   pkg:"com.android.chrome",                       url:"" },
-    { name:"Camera",     emoji:"📷", color:"#5C5C5C", cat:"Utilities", scheme:"camera://",         pkg:"",                                         url:"" },
-    { name:"Settings",   emoji:"⚙️", color:"#8E8E93", cat:"Utilities", scheme:"app-settings://",   pkg:"com.android.settings",                     url:"" },
-    { name:"Files",      emoji:"🗂️", color:"#3B82F6", cat:"Utilities", scheme:"shareddocuments://",pkg:"com.google.android.documentsui",           url:"" }
-  ];
-
-  const CATEGORIES = ["All", "Social", "Messaging", "Media", "Work", "Finance", "Travel", "Shopping", "Utilities"];
-
-  /* ==================== Storage ==================== */
-  const LS_APPS   = "splitScreen.apps.v2";
-  const LS_PANES  = "splitScreen.panes.v2";
-  const LS_LAYOUT = "splitScreen.layout.v2";
-  const LS_BUBBLE = "splitScreen.bubble.v2";
-
-  const DEFAULT_APPS = [
-    { id:"snapchat", name:"Snapchat", emoji:"👻", color:"#FFFC00", url:"https://web.snapchat.com/", scheme:"snapchat://", pkg:"com.snapchat.android" },
-    { id:"instagram", name:"Instagram", emoji:"📸", color:"#E1306C", url:"https://www.instagram.com/", scheme:"instagram://app", pkg:"com.instagram.android" },
-    { id:"whatsapp", name:"WhatsApp", emoji:"💬", color:"#25D366", url:"https://web.whatsapp.com/", scheme:"whatsapp://", pkg:"com.whatsapp" },
-    { id:"youtube", name:"YouTube", emoji:"▶️", color:"#FF0000", url:"https://m.youtube.com/", scheme:"vnd.youtube://", pkg:"com.google.android.youtube" }
-  ];
-
-  const $ = s => document.querySelector(s);
-  const esc = s => String(s ?? "").replace(/[&<>"']/g,
-    c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-  const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
-  const uid = () => "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-
-  let apps = loadApps();
-  let paneApps = loadPanes();
-  let layout = loadLayout();
-  let editingId = null;
-  let pickSide = null;
-  let phoneTarget = null;   // 'pick' | 'edit'
-  let phoneCat = "All";
-
-  function loadApps() {
-    try {
-      const raw = localStorage.getItem(LS_APPS);
-      if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length) return p; }
-    } catch (e) {}
-    return JSON.parse(JSON.stringify(DEFAULT_APPS));
-  }
-  function saveApps() { try { localStorage.setItem(LS_APPS, JSON.stringify(apps)); } catch (e) {} }
-
-  function loadPanes() {
-    try {
-      const raw = localStorage.getItem(LS_PANES);
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (p && typeof p === "object") return { left: p.left || null, right: p.right || null };
+    // ---- Pick a supported MIME type, prefer MP4, fall back to WebM ----
+    function pickMimeType() {
+      const candidates = [
+        "video/mp4;codecs=avc1.42E01E,mp4a.40.2", // Safari MP4
+        "video/mp4",
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp8,opus",
+        "video/webm"
+      ];
+      for (const t of candidates) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
       }
-    } catch (e) {}
-    return { left: "snapchat", right: null };
-  }
-  function savePanes() { try { localStorage.setItem(LS_PANES, JSON.stringify(paneApps)); } catch (e) {} }
-
-  function loadLayout() {
-    try {
-      const raw = localStorage.getItem(LS_LAYOUT);
-      if (raw) {
-        const l = JSON.parse(raw);
-        if (l && l.orientation) return { orientation: l.orientation, leftSize: l.leftSize || 50 };
-      }
-    } catch (e) {}
-    return { orientation: "horizontal", leftSize: 50 };
-  }
-  function saveLayout() { try { localStorage.setItem(LS_LAYOUT, JSON.stringify(layout)); } catch (e) {} }
-
-  /* ==================== Elements ==================== */
-  const bubble = $("#bubble");
-  const overlay = $("#overlay");
-  const splitContainer = $("#splitContainer");
-  const paneLeft = $("#paneLeft");
-  const paneRight = $("#paneRight");
-  const divider = $("#divider");
-  const toastEl = $("#toast");
-
-  /* ==================== Toast ==================== */
-  let toastTimer;
-  function toast(msg, ms = 2400) {
-    toastEl.textContent = msg;
-    toastEl.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove("show"), ms);
-  }
-
-  /* ==================== Layout ==================== */
-  function applyLayout() {
-    splitContainer.classList.toggle("vertical", layout.orientation === "vertical");
-    paneLeft.style.flex = `0 0 ${layout.leftSize}%`;
-    paneRight.style.flex = "1";
-    divider.style.cursor = layout.orientation === "vertical" ? "row-resize" : "col-resize";
-  }
-
-  /* ==================== Pane Rendering ==================== */
-  function getApp(id) { return apps.find(a => a.id === id) || null; }
-
-  function renderPane(side) {
-    const pane = side === "left" ? paneLeft : paneRight;
-    const appId = paneApps[side];
-    const app = appId ? getApp(appId) : null;
-
-    const iconEl = pane.querySelector(".pane-icon");
-    const nameEl = pane.querySelector(".pane-name");
-    const bodyEl = pane.querySelector(".pane-body");
-    const btnApp = pane.querySelector(".btn-app");
-    const btnBrowser = pane.querySelector(".btn-browser");
-
-    if (app) {
-      iconEl.textContent = app.emoji || "📱";
-      nameEl.textContent = app.name;
-      btnApp.style.display = (app.scheme || app.pkg) ? "" : "none";
-      btnBrowser.style.display = app.url ? "" : "none";
-
-      if (app.url) {
-        let iframe = bodyEl.querySelector("iframe");
-        if (!iframe || iframe.dataset.appId !== app.id) {
-          bodyEl.innerHTML = `<iframe src="${esc(app.url)}"
-            allow="camera;microphone;clipboard-write;fullscreen;autoplay;encrypted-media"
-            referrerpolicy="no-referrer" loading="lazy" data-app-id="${esc(app.id)}"></iframe>`;
-        }
-      } else {
-        bodyEl.innerHTML = `<div class="empty">
-          <span class="big">${esc(app.emoji || "📲")}</span>
-          <span><b>${esc(app.name)}</b> has no web page.</span>
-          <span style="font-size:11px;opacity:.7">Use 📲 to launch the installed app.</span>
-          <button data-side="${side}" class="launch-now">Launch app</button>
-        </div>`;
-        const lb = bodyEl.querySelector(".launch-now");
-        if (lb) lb.addEventListener("click", () => launchApp(app));
-      }
-    } else {
-      iconEl.textContent = "📱";
-      nameEl.textContent = side === "left" ? "Left pane" : "Right pane";
-      btnApp.style.display = "none";
-      btnBrowser.style.display = "none";
-      bodyEl.innerHTML = `<div class="empty">
-        <span class="big">＋</span>
-        <span>No app selected</span>
-        <button data-side="${side}" class="choose-app">Choose app</button>
-      </div>`;
-      bodyEl.querySelector(".choose-app").addEventListener("click", () => openPicker(side));
-    }
-  }
-
-  function renderAllPanes() { renderPane("left"); renderPane("right"); }
-
-  /* ==================== App Launcher (deep links) ==================== */
-  function launchApp(app) {
-    if (!app) return;
-
-    // Android: try intent:// (best chance of launching native app)
-    if (isAndroid && app.pkg) {
-      const fallback = app.url ? encodeURIComponent(app.url) : "";
-      let intent = `intent://#Intent;package=${app.pkg};`;
-      if (app.scheme) {
-        const sch = app.scheme.replace(/:\/\/.*$/, "").replace(/:$/, "");
-        if (sch) intent += `scheme=${sch};`;
-      }
-      if (fallback) intent += `S.browser_fallback_url=${fallback};`;
-      intent += "end";
-
-      const started = Date.now();
-      const ifr = document.createElement("iframe");
-      ifr.style.cssText = "display:none;width:0;height:0;border:0";
-      document.body.appendChild(ifr);
-      try { ifr.src = intent; } catch (e) {}
-      setTimeout(() => ifr.remove(), 1200);
-
-      setTimeout(() => {
-        const still = document.visibilityState === "visible" && Date.now() - started < 2600;
-        if (still) {
-          if (app.scheme) tryScheme(app);
-          else if (app.url) window.open(app.url, "_blank", "noopener");
-          else toast("Could not launch " + app.name);
-        }
-      }, 1500);
-      return;
+      return "";
     }
 
-    // iOS / other: use the custom URL scheme
-    if (app.scheme) { tryScheme(app); return; }
-    if (app.url) { window.open(app.url, "_blank", "noopener"); return; }
-    toast("No launch link set for " + app.name);
-  }
+    // ---- Load ffmpeg once (only if we need to convert webm -> mp4) ----
+    async function loadFFmpeg() {
+      if (ffmpeg) return ffmpeg;
+      statusEl.textContent = "Loading MP4 converter…";
+      statusEl.classList.add("show");
 
-  function tryScheme(app) {
-    const started = Date.now();
-    const ifr = document.createElement("iframe");
-    ifr.style.cssText = "display:none;width:0;height:0;border:0";
-    document.body.appendChild(ifr);
-    try { ifr.src = app.scheme; } catch (e) {}
-    setTimeout(() => ifr.remove(), 1200);
-
-    setTimeout(() => {
-      const still = document.visibilityState === "visible" && Date.now() - started < 2600;
-      if (still && app.url) {
-        toast("App not installed — opening web version…");
-        window.open(app.url, "_blank", "noopener");
-      } else if (still) {
-        toast("Could not open " + app.name);
-      }
-    }, 1500);
-  }
-
-  /* ==================== Picker (existing apps) ==================== */
-  function openPicker(side) {
-    pickSide = side;
-    $("#pickTitle").textContent = side === "left"
-      ? "Choose app for Left pane" : "Choose app for Right pane";
-
-    const list = $("#pickList");
-    list.innerHTML = "";
-
-    apps.forEach(app => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.innerHTML = `<span class="emoji">${esc(app.emoji || "📱")}</span>
-        <span class="nm">${esc(app.name)}</span>
-        ${paneApps[side] === app.id ? '<span style="color:#FFFC00;font-weight:700">✓</span>' : ""}`;
-      btn.addEventListener("click", () => {
-        paneApps[side] = app.id;
-        savePanes();
-        renderPane(side);
-        closePicker();
+      ffmpeg = new FFmpeg();
+      const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
       });
-      list.appendChild(btn);
-    });
-
-    const addBtn = document.createElement("button");
-    addBtn.type = "button";
-    addBtn.className = "add-new";
-    addBtn.innerHTML = "＋ Add new app";
-    addBtn.addEventListener("click", () => { closePicker(); openEditor(null); });
-    list.appendChild(addBtn);
-
-    $("#pickModal").classList.add("show");
-  }
-  function closePicker() { $("#pickModal").classList.remove("show"); pickSide = null; }
-
-  /* ==================== Phone Library Modal ==================== */
-  function openPhonePicker(target) {
-    phoneTarget = target; // 'pick' | 'edit'
-    phoneCat = "All";
-    $("#phoneSearch").value = "";
-    renderCatChips();
-    renderPhoneGrid();
-    closePicker();
-    $("#phoneModal").classList.add("show");
-    setTimeout(() => $("#phoneSearch").focus(), 100);
-  }
-  function closePhonePicker() {
-    $("#phoneModal").classList.remove("show");
-    phoneTarget = null;
-  }
-
-  function renderCatChips() {
-    const box = $("#catChips");
-    box.innerHTML = "";
-    CATEGORIES.forEach(cat => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = cat;
-      if (cat === phoneCat) b.classList.add("on");
-      b.addEventListener("click", () => {
-        phoneCat = cat;
-        renderCatChips();
-        renderPhoneGrid();
-      });
-      box.appendChild(b);
-    });
-  }
-
-  function renderPhoneGrid() {
-    const q = ($("#phoneSearch").value || "").trim().toLowerCase();
-    const grid = $("#phoneGrid");
-    grid.innerHTML = "";
-
-    const filtered = PHONE_APPS.filter(a => {
-      if (phoneCat !== "All" && a.cat !== phoneCat) return false;
-      if (!q) return true;
-      return a.name.toLowerCase().includes(q) || a.cat.toLowerCase().includes(q);
-    });
-
-    if (!filtered.length) {
-      grid.innerHTML = `<div class="empty-note" style="grid-column:1/-1">No apps match that search.</div>`;
-      return;
+      return ffmpeg;
     }
 
-    filtered.forEach(papp => {
-      const t = document.createElement("button");
-      t.type = "button";
-      t.className = "phone-tile";
-      t.innerHTML = `<span class="pe">${esc(papp.emoji)}</span>
-                     <span class="pn">${esc(papp.name)}</span>`;
-      t.addEventListener("click", () => handlePhonePick(papp));
-      grid.appendChild(t);
-    });
-  }
-
-  function handlePhonePick(papp) {
-    // Build an app record from the phone library entry
-    const record = {
-      name: papp.name,
-      emoji: papp.emoji,
-      color: papp.color,
-      url: papp.url || "",
-      scheme: papp.scheme || "",
-      pkg: papp.pkg || ""
-    };
-
-    if (phoneTarget === "edit") {
-      // Prefill the edit form
-      $("#fName").value = record.name;
-      $("#fEmoji").value = record.emoji;
-      $("#fColor").value = /^#[0-9a-f]{6}$/i.test(record.color) ? record.color : "#FFFC00";
-      $("#fUrl").value = record.url;
-      $("#fScheme").value = record.scheme;
-      $("#fPackage").value = record.pkg;
-      closePhonePicker();
-      $("#editModal").classList.add("show");
-      toast(record.name + " loaded — edit and Save");
-      return;
+    // Helper: load a script URL as a same-origin blob (fixes CORS for worker/wasm)
+    async function toBlobURL(url, mimeType) {
+      const res = await fetch(url);
+      const buf = await res.arrayBuffer();
+      return URL.createObjectURL(new Blob([buf], { type: mimeType }));
     }
 
-    if (phoneTarget === "pick") {
-      // Directly add to library + assign to pane
-      const existing = apps.find(a => a.name.toLowerCase() === record.name.toLowerCase());
-      let appId;
-      if (existing) {
-        appId = existing.id;
-      } else {
-        record.id = uid();
-        apps.push(record);
-        saveApps();
-        appId = record.id;
+    // ---- Convert webm blob to mp4 using ffmpeg.wasm ----
+    async function convertToMp4(webmBlob) {
+      const ff = await loadFFmpeg();
+
+      statusEl.textContent = "Converting to MP4…";
+      statusEl.classList.add("show");
+
+      const inputName  = "input.webm";
+      const outputName = "output.mp4";
+
+      await ff.writeFile(inputName, await fetchFile(webmBlob));
+
+      await ff.exec([
+        "-i", inputName,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
+        outputName
+      ]);
+
+      const data = await ff.readFile(outputName);
+      await ff.deleteFile(inputName);
+      await ff.deleteFile(outputName);
+
+      return new Blob([data.buffer], { type: "video/mp4" });
+    }
+
+    // ---- Download helper ----
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // ---- Main button handler ----
+    recordBtn.addEventListener("click", async () => {
+      // STOP
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        return;
       }
-      if (pickSide) {
-        paneApps[pickSide] = appId;
-        savePanes();
-        renderPane(pickSide);
+
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { cursor: "always", frameRate: 30 },
+          audio: true
+        });
+
+        const mimeType = pickMimeType();
+        mediaRecorder = new MediaRecorder(
+          stream,
+          mimeType ? { mimeType } : undefined
+        );
+
+        recordedChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          const usedType = mediaRecorder.mimeType || mimeType || "video/webm";
+          const rawBlob = new Blob(recordedChunks, { type: usedType });
+
+          stream.getTracks().forEach((t) => t.stop());
+
+          recordBtn.disabled = true;
+          btnText.textContent = "Processing…";
+
+          try {
+            let mp4Blob;
+            if (usedType.includes("mp4")) {
+              // Browser already produced MP4 (e.g. Safari)
+              mp4Blob = new Blob([rawBlob], { type: "video/mp4" });
+            } else {
+              // Convert webm -> mp4
+              mp4Blob = await convertToMp4(rawBlob);
+            }
+
+            downloadBlob(mp4Blob, `screen-recording-${Date.now()}.mp4`);
+          } catch (err) {
+            console.error("MP4 conversion failed:", err);
+            alert("MP4 conversion failed. Downloading original WebM instead.");
+            downloadBlob(rawBlob, `screen-recording-${Date.now()}.webm`);
+          } finally {
+            recordBtn.disabled = false;
+            btnText.textContent = "Record Screen (MP4)";
+            recordBtn.classList.remove("recording");
+            statusEl.classList.remove("show");
+            mediaRecorder = null;
+          }
+        };
+
+        // If user clicks browser's "Stop sharing"
+        stream.getVideoTracks()[0].onended = () => {
+          if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+          }
+        };
+
+        mediaRecorder.start(1000); // collect chunks every second
+        btnText.textContent = "Stop Recording";
+        recordBtn.classList.add("recording");
+        statusEl.textContent = "Recording…";
+        statusEl.classList.add("show");
+
+      } catch (err) {
+        console.error("Screen recording error:", err);
+        alert("Could not start screen recording. Please allow screen capture permissions.");
       }
-      closePhonePicker();
-      toast(record.name + " added");
-    }
-  }
-
-  /* ==================== Edit Modal ==================== */
-  function renderPresets() {
-    // No longer used for manual presets, but keep a small set of quick fills
-    const box = $("#presets");
-    box.innerHTML = "";
-    const quick = [
-      { name:"Snapchat",  emoji:"👻", color:"#FFFC00", url:"https://web.snapchat.com/", scheme:"snapchat://", pkg:"com.snapchat.android" },
-      { name:"Instagram", emoji:"📸", color:"#E1306C", url:"https://www.instagram.com/", scheme:"instagram://app", pkg:"com.instagram.android" },
-      { name:"WhatsApp",  emoji:"💬", color:"#25D366", url:"https://web.whatsapp.com/", scheme:"whatsapp://", pkg:"com.whatsapp" }
-    ];
-    quick.forEach(p => {
-      const c = document.createElement("button");
-      c.type = "button";
-      c.className = "chip";
-      c.textContent = p.emoji + " " + p.name;
-      c.addEventListener("click", () => {
-        $("#fName").value = p.name;
-        $("#fEmoji").value = p.emoji;
-        $("#fColor").value = p.color;
-        $("#fUrl").value = p.url;
-        $("#fScheme").value = p.scheme;
-        $("#fPackage").value = p.pkg;
-      });
-      box.appendChild(c);
     });
-  }
-
-  function openEditor(app) {
-    editingId = app ? app.id : null;
-    $("#editTitle").textContent = app ? "Edit app" : "Add app";
-    $("#fName").value    = app ? app.name   : "";
-    $("#fEmoji").value   = app ? (app.emoji || "") : "";
-    $("#fColor").value   = app && /^#[0-9a-f]{6}$/i.test(app.color || "") ? app.color : "#FFFC00";
-    $("#fUrl").value     = app ? (app.url    || "") : "";
-    $("#fScheme").value  = app ? (app.scheme || "") : "";
-    $("#fPackage").value = app ? (app.pkg    || "") : "";
-    $("#editDelete").style.display = app ? "" : "none";
-    $("#editModal").classList.add("show");
-    setTimeout(() => $("#fName").focus(), 60);
-  }
-  function closeEditor() { $("#editModal").classList.remove("show"); editingId = null; }
-
-  function saveEditor() {
-    const name = $("#fName").value.trim();
-    if (!name) { toast("Give the app a name"); $("#fName").focus(); return; }
-
-    let url = $("#fUrl").value.trim();
-    if (url && !/^[a-z][a-z0-9+.-]*:/i.test(url)) url = "https://" + url;
-
-    const data = {
-      name,
-      emoji:   $("#fEmoji").value.trim() || "📱",
-      color:   $("#fColor").value,
-      url,
-      scheme:  $("#fScheme").value.trim(),
-      pkg:     $("#fPackage").value.trim()
-    };
-
-    if (editingId) {
-      const i = apps.findIndex(a => a.id === editingId);
-      if (i > -1) apps[i] = Object.assign({}, apps[i], data);
-    } else {
-      apps.push(Object.assign({ id: uid() }, data));
-    }
-
-    saveApps();
-    renderAllPanes();
-    closeEditor();
-    toast(editingId ? "App updated" : name + " added");
-  }
-
-  function deleteEditor() {
-    if (!editingId) return;
-    const app = apps.find(a => a.id === editingId);
-    if (!app) return;
-    if (!confirm(`Remove "${app.name}" from your launcher?`)) return;
-    apps = apps.filter(a => a.id !== editingId);
-    if (paneApps.left === editingId) paneApps.left = null;
-    if (paneApps.right === editingId) paneApps.right = null;
-    saveApps(); savePanes();
-    renderAllPanes();
-    closeEditor();
-    toast("Removed");
-  }
-
-  function testLaunchFromEditor() {
-    const app = {
-      name:    $("#fName").value.trim() || "Test",
-      url:     $("#fUrl").value.trim(),
-      scheme:  $("#fScheme").value.trim(),
-      pkg:     $("#fPackage").value.trim()
-    };
-    if (!app.url && !app.scheme && !app.pkg) {
-      toast("Fill in a URL, scheme, or package first");
-      return;
-    }
-    launchApp(app);
-  }
-
-  /* ==================== Pane Actions ==================== */
-  function swapPanes() {
-    const tmp = paneApps.left;
-    paneApps.left = paneApps.right;
-    paneApps.right = tmp;
-    savePanes();
-    renderAllPanes();
-    toast("Panes swapped");
-  }
-
-  function toggleOrientation() {
-    layout.orientation = layout.orientation === "horizontal" ? "vertical" : "horizontal";
-    saveLayout();
-    applyLayout();
-    toast(layout.orientation === "horizontal" ? "Side by side" : "Stacked");
-  }
-
-  /* ==================== Divider Drag ==================== */
-  function initDivider() {
-    let st = null;
-    divider.addEventListener("pointerdown", e => {
-      e.preventDefault();
-      divider.setPointerCapture(e.pointerId);
-      const rect = splitContainer.getBoundingClientRect();
-      st = {
-        startX: e.clientX, startY: e.clientY,
-        startSize: layout.leftSize,
-        containerW: rect.width, containerH: rect.height
-      };
-    });
-    divider.addEventListener("pointermove", e => {
-      if (!st) return;
-      let pct;
-      if (layout.orientation === "horizontal") {
-        const dx = e.clientX - st.startX;
-        pct = st.startSize + (dx / st.containerW) * 100;
-      } else {
-        const dy = e.clientY - st.startY;
-        pct = st.startSize + (dy / st.containerH) * 100;
-      }
-      layout.leftSize = clamp(pct, 15, 85);
-      applyLayout();
-    });
-    const end = e => {
-      if (st) { saveLayout(); st = null; }
-      try { divider.releasePointerCapture(e.pointerId); } catch (_) {}
-    };
-    divider.addEventListener("pointerup", end);
-    divider.addEventListener("pointercancel", end);
-  }
-
-  /* ==================== Bubble ==================== */
-  function setBubblePos(x, y, persist = true) {
-    const size = 56;
-    x = clamp(x, 6, window.innerWidth  - size - 6);
-    y = clamp(y, 6, window.innerHeight - size - 6);
-    bubble.style.left = x + "px";
-    bubble.style.top  = y + "px";
-    bubble.style.right = "auto";
-    bubble.style.bottom = "auto";
-    if (persist) {
-      try { localStorage.setItem(LS_BUBBLE, JSON.stringify({ x, y })); } catch (e) {}
-    }
-  }
-
-  (function initBubblePos() {
-    let saved = null;
-    try { saved = JSON.parse(localStorage.getItem(LS_BUBBLE) || "null"); } catch (e) {}
-    if (saved && typeof saved.x === "number") setBubblePos(saved.x, saved.y, false);
-    else setBubblePos(window.innerWidth - 72, window.innerHeight - 96, false);
-  })();
-
-  let bDrag = null;
-  bubble.addEventListener("pointerdown", e => {
-    e.preventDefault();
-    bubble.setPointerCapture(e.pointerId);
-    const r = bubble.getBoundingClientRect();
-    bDrag = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, moved: false };
-  });
-  bubble.addEventListener("pointermove", e => {
-    if (!bDrag) return;
-    const dx = e.clientX - bDrag.sx, dy = e.clientY - bDrag.sy;
-    if (!bDrag.moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) bDrag.moved = true;
-    if (bDrag.moved) setBubblePos(bDrag.ox + dx, bDrag.oy + dy, false);
-  });
-  bubble.addEventListener("pointerup", e => {
-    if (bDrag) {
-      if (bDrag.moved) {
-        const r = bubble.getBoundingClientRect();
-        setBubblePos(r.left, r.top, true);
-      } else {
-        overlay.classList.toggle("show");
-      }
-    }
-    bDrag = null;
-    try { bubble.releasePointerCapture(e.pointerId); } catch (_) {}
-  });
-  bubble.addEventListener("pointercancel", () => { bDrag = null; });
-
-  /* ==================== Event Bindings ==================== */
-  $("#btnSwap").addEventListener("click", swapPanes);
-  $("#btnOrient").addEventListener("click", toggleOrientation);
-  $("#btnAdd").addEventListener("click", () => openEditor(null));
-  $("#btnClose").addEventListener("click", () => overlay.classList.remove("show"));
-
-  // Delegated pane actions
-  document.addEventListener("click", e => {
-    const changeBtn = e.target.closest(".btn-change");
-    if (changeBtn) { openPicker(changeBtn.dataset.side); return; }
-
-    const appBtn = e.target.closest(".btn-app");
-    if (appBtn) {
-      const appId = paneApps[appBtn.dataset.side];
-      const app = appId ? getApp(appId) : null;
-      if (app) launchApp(app);
-      return;
-    }
-    const browserBtn = e.target.closest(".btn-browser");
-    if (browserBtn) {
-      const appId = paneApps[browserBtn.dataset.side];
-      const app = appId ? getApp(appId) : null;
-      if (app && app.url) window.open(app.url, "_blank", "noopener");
-      return;
-    }
-    const chooseBtn = e.target.closest(".choose-app");
-    if (chooseBtn) { openPicker(chooseBtn.dataset.side); return; }
-  });
-
-  // Pick modal
-  $("#pickCancel").addEventListener("click", closePicker);
-  $("#pickFromPhone").addEventListener("click", () => openPhonePicker("pick"));
-  $("#pickModal").addEventListener("pointerdown", e => {
-    if (e.target === $("#pickModal")) closePicker();
-  });
-
-  // Phone library modal
-  $("#phoneSearch").addEventListener("input", renderPhoneGrid);
-  $("#phoneCancel").addEventListener("click", closePhonePicker);
-  $("#phoneModal").addEventListener("pointerdown", e => {
-    if (e.target === $("#phoneModal")) closePhonePicker();
-  });
-
-  // Edit modal
-  $("#editSave").addEventListener("click", saveEditor);
-  $("#editCancel").addEventListener("click", closeEditor);
-  $("#editDelete").addEventListener("click", deleteEditor);
-  $("#editTest").addEventListener("click", testLaunchFromEditor);
-  $("#editPickFromPhone").addEventListener("click", () => {
-    closeEditor();
-    openPhonePicker("edit");
-  });
-  $("#editModal").addEventListener("pointerdown", e => {
-    if (e.target === $("#editModal")) closeEditor();
-  });
-  $("#fName").addEventListener("keydown", e => { if (e.key === "Enter") saveEditor(); });
-
-  // Keyboard
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape") {
-      if ($("#editModal").classList.contains("show")) closeEditor();
-      else if ($("#phoneModal").classList.contains("show")) closePhonePicker();
-      else if ($("#pickModal").classList.contains("show")) closePicker();
-      else overlay.classList.remove("show");
-    }
-  });
-
-  window.addEventListener("resize", () => {
-    const r = bubble.getBoundingClientRect();
-    setBubblePos(r.left, r.top, true);
-  });
-
-  /* ==================== Boot ==================== */
-  renderPresets();
-  applyLayout();
-  renderAllPanes();
-  initDivider();
-
-  // First-run hint
-  setTimeout(() => {
-    if (!localStorage.getItem("splitScreen.hinted")) {
-      toast("Tap 📲 on a pane to pick an app from your phone", 3800);
-      try { localStorage.setItem("splitScreen.hinted", "1"); } catch (e) {}
-    }
-  }, 1200);
-})();
-</script>
+  </script>
 </body>
 </html>
