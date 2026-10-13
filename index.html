@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Camera Split Screen</title>
+<title>Camera Split Screen · Filters</title>
 <style>
   :root{
     --bg:#0b0f14;
@@ -21,14 +21,11 @@
 
   body{
     margin:0;
-    height:100vh;
-    height:100dvh;
+    height:100vh; height:100dvh;
     overflow:hidden;
     overscroll-behavior:none;
-    display:flex;
-    flex-direction:column;
-    background:var(--bg);
-    color:var(--text);
+    display:flex; flex-direction:column;
+    background:var(--bg); color:var(--text);
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing:antialiased;
   }
@@ -36,11 +33,8 @@
   /* ============ Top bar ============ */
   .topbar{
     flex:0 0 auto;
-    display:flex;
-    align-items:center;
-    gap:8px;
-    height:54px;
-    padding:0 14px;
+    display:flex; align-items:center; gap:8px;
+    height:54px; padding:0 14px;
     border-bottom:1px solid var(--border);
     background:linear-gradient(180deg,#171d25,#12171e);
     z-index:60;
@@ -64,22 +58,22 @@
     border:1px solid var(--border);
     border-radius:9px;
     padding:7px 12px;
-    cursor:pointer;
-    white-space:nowrap;
+    cursor:pointer; white-space:nowrap;
     transition:background .15s ease, border-color .15s ease, transform .05s ease, opacity .15s ease;
   }
   .btn:hover{ background:#232b35; border-color:#3a424d; }
   .btn:active{ transform:translateY(1px); }
   .btn:disabled{ opacity:.45; cursor:not-allowed; }
   .btn .glyph{ font-size:14px; line-height:1; opacity:.9; }
+  .btn.primary{
+    background:var(--accent); border-color:var(--accent); color:#fff;
+  }
+  .btn.primary:hover{ background:#3f7de6; border-color:#3f7de6; }
 
   /* ============ Stage ============ */
   .stage{
-    flex:1 1 auto;
-    min-height:0; min-width:0;
-    display:grid;
-    padding:10px;
-    gap:0;
+    flex:1 1 auto; min-height:0; min-width:0;
+    display:grid; padding:10px;
   }
   .stage[data-layout="vertical"]{
     grid-template-columns: var(--a,50%) 12px minmax(0,1fr);
@@ -97,8 +91,7 @@
   }
   .divider::before{
     content:"";
-    background:var(--border);
-    border-radius:99px;
+    background:var(--border); border-radius:99px;
     transition:background .15s ease;
   }
   .stage[data-layout="vertical"] .divider{ cursor:col-resize; }
@@ -144,10 +137,7 @@
     box-shadow:0 0 0 3px rgba(239,68,68,.2);
     animation:pulse 2s infinite;
   }
-  @keyframes pulse{
-    0%,100%{ opacity:1; }
-    50%{ opacity:.35; }
-  }
+  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
 
   .seg{
     display:flex; gap:2px; padding:2px;
@@ -158,11 +148,9 @@
   }
   .seg-btn{
     font:inherit; font-size:12px; font-weight:550;
-    color:var(--muted);
-    background:transparent;
+    color:var(--muted); background:transparent;
     border:0; border-radius:7px;
-    padding:5px 10px;
-    cursor:pointer;
+    padding:5px 10px; cursor:pointer;
     transition:background .15s ease, color .15s ease;
   }
   .seg-btn:hover{ color:var(--text); }
@@ -171,13 +159,11 @@
   .urlbar{ flex:1 1 auto; display:flex; gap:6px; min-width:0; }
   .url-input{
     flex:1 1 auto; min-width:0;
-    font:inherit; font-size:13px;
-    color:var(--text);
+    font:inherit; font-size:13px; color:var(--text);
     background:#0b0f14;
     border:1px solid var(--border);
     border-radius:8px;
-    padding:6px 10px;
-    outline:none;
+    padding:6px 10px; outline:none;
     transition:border-color .15s ease, box-shadow .15s ease;
   }
   .url-input::placeholder{ color:#5c6672; }
@@ -191,39 +177,31 @@
     width:30px; height:30px;
     display:grid; place-items:center;
     font:inherit; font-size:14px;
-    color:var(--muted);
-    background:transparent;
+    color:var(--muted); background:transparent;
     border:1px solid transparent;
-    border-radius:8px;
-    cursor:pointer;
-    flex:0 0 auto;
+    border-radius:8px; cursor:pointer; flex:0 0 auto;
     transition:background .15s ease, color .15s ease, border-color .15s ease;
   }
   .icon:hover{ color:var(--text); background:#222a34; border-color:var(--border); }
   .icon.on{ color:#fff; background:var(--accent); border-color:var(--accent); }
 
-  /* select */
   .select{
-    font:inherit; font-size:12.5px;
-    color:var(--text);
+    font:inherit; font-size:12.5px; color:var(--text);
     background:#0b0f14;
     border:1px solid var(--border);
     border-radius:8px;
-    padding:6px 8px;
-    outline:none;
-    max-width:170px;
-    cursor:pointer;
+    padding:6px 8px; outline:none;
+    max-width:170px; cursor:pointer;
   }
   .select:focus{ border-color:var(--accent); }
 
   .pane-body{
     position:relative;
-    flex:1 1 auto;
-    min-height:0;
+    flex:1 1 auto; min-height:0;
     background:#05080b;
   }
 
-  /* ============ Camera ============ */
+  /* ============ Camera layers ============ */
   .cam-wrap{
     position:absolute; inset:0;
     display:flex; align-items:center; justify-content:center;
@@ -231,16 +209,22 @@
     background:#05080b;
   }
   .cam-video{
+    position:relative; z-index:1;
     width:100%; height:100%;
-    object-fit:cover;
-    display:block;
+    object-fit:cover; display:block;
     background:#000;
-    transition:opacity .25s ease;
   }
   .cam-video.mirror{ transform:scaleX(-1); }
 
+  .cam-canvas{
+    position:absolute; inset:0;
+    z-index:2;
+    pointer-events:none;
+  }
+
   .cam-overlay{
     position:absolute; inset:0;
+    z-index:3;
     display:flex; flex-direction:column; justify-content:space-between;
     pointer-events:none;
   }
@@ -248,47 +232,132 @@
     display:flex; justify-content:flex-end; gap:6px;
     padding:10px;
   }
-  .cam-bottom{
-    display:flex; align-items:center; justify-content:center; gap:8px;
-    padding:12px;
-    background:linear-gradient(to top, rgba(0,0,0,.62), transparent);
+  .cam-overlay .cam-btn{ pointer-events:auto; }
+
+  .cam-bottom-group{
+    display:flex; flex-direction:column; gap:10px;
+    padding:0 0 14px;
+    background:linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.36) 58%, transparent);
   }
-  .cam-overlay .icon,
-  .cam-overlay .btn{ pointer-events:auto; }
+
+  /* filter chips */
+  .filter-strip{
+    display:flex; gap:8px;
+    padding:0 12px;
+    overflow-x:auto; overflow-y:hidden;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  .filter-strip::-webkit-scrollbar{ display:none; }
+
+  .chip{
+    flex:0 0 auto;
+    display:inline-flex; align-items:center; gap:7px;
+    height:38px; padding:0 14px;
+    font:inherit; font-size:12.5px; font-weight:600;
+    color:#fff;
+    background:rgba(20,26,34,.72);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:999px;
+    cursor:pointer; white-space:nowrap;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition:background .15s ease, border-color .15s ease, transform .1s ease, box-shadow .15s ease;
+  }
+  .chip:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.28); }
+  .chip:active{ transform:scale(.95); }
+  .chip.on{
+    background:var(--accent);
+    border-color:var(--accent);
+    box-shadow:0 6px 18px -6px rgba(79,142,247,.75);
+  }
+  .chip .emoji{ font-size:15px; line-height:1; }
+
+  /* capture button row */
+  .cam-bottom{
+    display:flex; align-items:center; justify-content:center;
+    gap:14px; padding:0 12px;
+  }
 
   .cam-btn{
-    height:38px; min-width:38px;
+    height:40px; min-width:40px;
     display:inline-flex; align-items:center; justify-content:center; gap:7px;
     font:inherit; font-size:13px; font-weight:550;
     color:#fff;
     background:rgba(20,26,34,.72);
     border:1px solid rgba(255,255,255,.14);
-    border-radius:10px;
-    padding:0 13px;
+    border-radius:11px;
+    padding:0 14px;
     cursor:pointer;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    transition:background .15s ease, border-color .15s ease, transform .05s ease;
+    transition:background .15s ease, border-color .15s ease, transform .05s ease, opacity .15s ease;
   }
-  .cam-btn:hover{ background:rgba(38,47,58,.85); border-color:rgba(255,255,255,.25); }
+  .cam-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.28); }
   .cam-btn:active{ transform:translateY(1px); }
-  .cam-btn.primary{
-    background:var(--accent);
-    border-color:var(--accent);
-    box-shadow:0 6px 18px -6px rgba(79,142,247,.7);
-  }
-  .cam-btn.primary:hover{ background:#3f7de6; }
   .cam-btn.on{ background:var(--accent); border-color:var(--accent); }
-  .cam-btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .cam-btn:disabled{ opacity:.35; cursor:not-allowed; }
+
+  /* big shutter */
+  .shutter{
+    width:66px; height:66px;
+    border-radius:50%;
+    border:3px solid rgba(255,255,255,.85);
+    background:transparent;
+    display:grid; place-items:center;
+    cursor:pointer; padding:0;
+    position:relative;
+    transition: transform .1s ease, border-color .15s ease;
+    pointer-events:auto;
+  }
+  .shutter::before{
+    content:"";
+    width:48px; height:48px; border-radius:50%;
+    background:#fff;
+    box-shadow: 0 4px 16px -4px rgba(0,0,0,.85);
+    transition: background .15s ease, transform .1s ease;
+  }
+  .shutter:hover{ border-color:#fff; }
+  .shutter:hover::before{ background:#ffe9b0; }
+  .shutter:active{ transform:scale(.93); }
+  .shutter:active::before{ transform:scale(.86); }
+  .shutter:disabled{ opacity:.35; cursor:not-allowed; }
+
+  /* status badge */
+  .fx-status{
+    position:absolute;
+    top:10px; left:10px;
+    z-index:5;
+    display:none;
+    align-items:center; gap:7px;
+    padding:6px 12px;
+    font-size:11.5px; font-weight:600;
+    color:#fff;
+    background:rgba(20,26,34,.8);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:999px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events:none;
+  }
+  .fx-status.show{ display:inline-flex; }
+  .fx-status .spinner{
+    width:12px; height:12px;
+    border:2px solid rgba(255,255,255,.28);
+    border-top-color:#fff;
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
 
   /* camera off / error state */
   .cam-state{
     position:absolute; inset:0;
+    z-index:6;
     display:none;
     place-items:center; text-align:center;
     padding:26px;
     background:#05080b;
-    z-index:3;
   }
   .cam-state.show{ display:grid; }
   .cam-state .cs-icon{ font-size:34px; margin-bottom:12px; opacity:.8; }
@@ -298,27 +367,21 @@
   /* snapshot flash */
   .flash{
     position:absolute; inset:0;
-    background:#fff;
-    opacity:0;
+    z-index:7;
+    background:#fff; opacity:0;
     pointer-events:none;
-    z-index:5;
   }
   .flash.fire{ animation:flash .42s ease-out; }
-  @keyframes flash{
-    0%{ opacity:.92; }
-    100%{ opacity:0; }
-  }
+  @keyframes flash{ 0%{opacity:.92} 100%{opacity:0} }
 
   /* ============ Content pane ============ */
   .frame, .note, .placeholder{ display:none; }
-
   .frame{ width:100%; height:100%; border:0; background:#fff; }
   .note{
     width:100%; height:100%;
     border:0; outline:none; resize:none;
     padding:16px 18px;
-    background:#0f141a;
-    color:var(--text);
+    background:#0f141a; color:var(--text);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size:13.5px; line-height:1.65;
   }
@@ -344,9 +407,7 @@
   /* ============ Snapshot modal ============ */
   .modal{
     position:fixed; inset:0;
-    display:none;
-    place-items:center;
-    padding:20px;
+    display:none; place-items:center; padding:20px;
     background:rgba(3,6,10,.78);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -354,7 +415,7 @@
   }
   .modal.show{ display:grid; }
   .modal-card{
-    width:min(560px, 100%);
+    width:min(560px,100%);
     max-height:88vh;
     display:flex; flex-direction:column;
     background:var(--panel);
@@ -364,10 +425,7 @@
     box-shadow:0 30px 70px -20px rgba(0,0,0,.95);
     animation:pop .22s cubic-bezier(.2,.9,.3,1.2);
   }
-  @keyframes pop{
-    from{ transform:scale(.94); opacity:0; }
-    to{ transform:scale(1); opacity:1; }
-  }
+  @keyframes pop{ from{transform:scale(.94);opacity:0} to{transform:scale(1);opacity:1} }
   .modal-head{
     display:flex; align-items:center; gap:10px;
     padding:12px 14px;
@@ -376,11 +434,8 @@
   }
   .modal-head .spacer{ flex:1; }
   .modal-img{
-    width:100%;
-    max-height:62vh;
-    object-fit:contain;
-    background:#000;
-    display:block;
+    width:100%; max-height:62vh;
+    object-fit:contain; background:#000; display:block;
   }
   .modal-actions{
     display:flex; gap:8px; justify-content:flex-end;
@@ -388,12 +443,6 @@
     border-top:1px solid var(--border);
     background:var(--panel-2);
   }
-  .btn.primary{
-    background:var(--accent);
-    border-color:var(--accent);
-    color:#fff;
-  }
-  .btn.primary:hover{ background:#3f7de6; border-color:#3f7de6; }
 
   /* ============ Responsive ============ */
   @media (max-width:720px){
@@ -405,7 +454,10 @@
     .pane-bar{ gap:6px; padding:6px; }
     .seg-btn{ padding:5px 8px; }
     .select{ max-width:110px; }
-    .cam-btn{ padding:0 10px; font-size:12px; }
+    .cam-btn{ padding:0 11px; font-size:12px; }
+    .chip{ height:34px; padding:0 12px; font-size:12px; }
+    .shutter{ width:60px; height:60px; }
+    .shutter::before{ width:44px; height:44px; }
   }
 </style>
 </head>
@@ -413,7 +465,7 @@
 
   <header class="topbar">
     <div class="brand">
-      <div class="mark"></div><span>Camera Split</span>
+      <div class="mark"></div><span>Camera Split · Filters</span>
     </div>
     <div class="spacer"></div>
     <button class="btn" data-act="layout" title="Toggle layout">
@@ -444,21 +496,26 @@
         <button class="icon" id="camToggle" title="Start / stop camera">⏻</button>
       </div>
 
-      <div class="pane-body">
-        <div class="cam-wrap">
+      <div class="pane-body" id="camBody">
+        <div class="cam-wrap" id="camWrap">
           <video class="cam-video" id="video" playsinline autoplay muted></video>
+          <canvas class="cam-canvas" id="fxCanvas"></canvas>
         </div>
+
+        <div class="fx-status" id="fxStatus"></div>
 
         <div class="cam-overlay">
           <div class="cam-top">
             <button class="cam-btn" id="btnMirror" title="Mirror preview">⇋</button>
-          </div>
-          <div class="cam-bottom">
             <button class="cam-btn" id="btnFlip" title="Switch camera">🔄</button>
-            <button class="cam-btn primary" id="btnSnap" title="Take snapshot">
-              <span style="font-size:16px;line-height:1">◉</span> Snapshot
-            </button>
             <button class="cam-btn" id="btnFull" title="Fullscreen preview">⛶</button>
+          </div>
+
+          <div class="cam-bottom-group">
+            <div class="filter-strip" id="filterStrip"></div>
+            <div class="cam-bottom">
+              <button class="shutter" id="btnSnap" title="Take snapshot"></button>
+            </div>
           </div>
         </div>
 
@@ -473,8 +530,6 @@
         <div class="flash" id="flash"></div>
       </div>
     </section>
-
-    <!-- divider injected by JS -->
 
     <!-- ===================== CONTENT PANE ===================== -->
     <section class="pane mode-web" id="contentPane">
@@ -521,8 +576,7 @@
   <div class="modal" id="modal">
     <div class="modal-card">
       <div class="modal-head">
-        <span>◉</span>
-        <span>Snapshot</span>
+        <span>◉</span><span>Snapshot</span>
         <span class="spacer"></span>
         <button class="icon" id="modalClose" title="Close">✕</button>
       </div>
@@ -539,10 +593,34 @@
   "use strict";
 
   /* ============================================================
-     Constants & helpers
+     Helpers
   ============================================================ */
-  const KEY = "camera-split-v1";
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+  const KEY = "camera-split-fx-v1";
+
+  /* ============================================================
+     Filters catalogue
+  ============================================================ */
+  const FILTERS = [
+    { id: "none",   label: "None",       emoji: "🚫" },
+    { id: "dog",    label: "Dog",        emoji: "🐶" },
+    { id: "shades", label: "Shades",     emoji: "🕶️" },
+    { id: "stache", label: "Mustache",   emoji: "👨" },
+    { id: "crown",  label: "Crown",      emoji: "👑" },
+    { id: "bunny",  label: "Bunny",      emoji: "🐰" },
+    { id: "heart",  label: "Heart Eyes", emoji: "😍" },
+    { id: "pirate", label: "Pirate",     emoji: "🏴☠️" }
+  ];
+
+  /* FaceMesh landmark indices */
+  const LMK = {
+    L_EYE_OUT: 33,  L_EYE_IN: 133,  L_EYE_TOP: 159, L_EYE_BOT: 145,
+    R_EYE_OUT: 263, R_EYE_IN: 362,  R_EYE_TOP: 386, R_EYE_BOT: 374,
+    NOSE: 1, NOSE_BRIDGE: 168,
+    FOREHEAD: 10, CHIN: 152,
+    L_CHEEK: 234, R_CHEEK: 454,
+    MOUTH_L: 61, MOUTH_R: 291, MOUTH_TOP: 13, MOUTH_BOT: 14
+  };
 
   /* ============================================================
      State
@@ -554,6 +632,7 @@
       camFirst: true,
       mirrored: true,
       deviceId: "",
+      filter: "none",
       content: {
         mode: "web",
         url: "https://en.wikipedia.org/wiki/Main_Page",
@@ -574,15 +653,14 @@
         camFirst: p.camFirst !== false,
         mirrored: p.mirrored !== false,
         deviceId: typeof p.deviceId === "string" ? p.deviceId : "",
+        filter: FILTERS.some(f => f.id === p.filter) ? p.filter : "none",
         content: {
           mode: p.content && p.content.mode === "note" ? "note" : "web",
           url: p.content && typeof p.content.url === "string" ? p.content.url : d.content.url,
           note: p.content && typeof p.content.note === "string" ? p.content.note : ""
         }
       };
-    } catch (e) {
-      return d;
-    }
+    } catch (e) { return d; }
   }
 
   let state = load();
@@ -596,13 +674,17 @@
   }
 
   /* ============================================================
-     DOM refs
+     DOM
   ============================================================ */
   const stage       = document.getElementById("stage");
   const camPane     = document.getElementById("camPane");
   const contentPane = document.getElementById("contentPane");
+  const camWrap     = document.getElementById("camWrap");
 
   const video       = document.getElementById("video");
+  const fxCanvas    = document.getElementById("fxCanvas");
+  const fxCtx       = fxCanvas.getContext("2d");
+
   const recDot      = document.getElementById("recDot");
   const camSelect   = document.getElementById("camSelect");
   const camToggle   = document.getElementById("camToggle");
@@ -611,6 +693,8 @@
   const csText      = document.getElementById("csText");
   const csBtn       = document.getElementById("csBtn");
   const flash       = document.getElementById("flash");
+  const fxStatus    = document.getElementById("fxStatus");
+  const filterStrip = document.getElementById("filterStrip");
 
   const btnMirror   = document.getElementById("btnMirror");
   const btnFlip     = document.getElementById("btnFlip");
@@ -641,29 +725,18 @@
   divider.setAttribute("aria-label", "Resize panes");
   divider.title = "Drag to resize · double-click to reset";
 
-  /* ============================================================
-     Layout: order of panes + divider
-  ============================================================ */
   function mountPanes() {
-    // Re-append in the right order
     if (state.camFirst) {
-      stage.appendChild(camPane);
-      stage.appendChild(divider);
-      stage.appendChild(contentPane);
+      stage.appendChild(camPane); stage.appendChild(divider); stage.appendChild(contentPane);
     } else {
-      stage.appendChild(contentPane);
-      stage.appendChild(divider);
-      stage.appendChild(camPane);
+      stage.appendChild(contentPane); stage.appendChild(divider); stage.appendChild(camPane);
     }
   }
 
   function applyLayout() {
     stage.dataset.layout = state.layout;
     stage.style.setProperty("--a", (state.ratio * 100).toFixed(3) + "%");
-    divider.setAttribute(
-      "aria-orientation",
-      state.layout === "vertical" ? "vertical" : "horizontal"
-    );
+    divider.setAttribute("aria-orientation", state.layout === "vertical" ? "vertical" : "horizontal");
 
     const vert = state.layout === "vertical";
     layoutBtn.querySelector(".glyph").textContent = vert ? "▥" : "▤";
@@ -671,16 +744,11 @@
     layoutBtn.title = vert ? "Switch to stacked layout" : "Switch to side-by-side layout";
   }
 
-  /* ============================================================
-     Divider dragging
-  ============================================================ */
   let dragging = false;
-
   function setRatio(r) {
     state.ratio = clamp(r, 0.12, 0.88);
     stage.style.setProperty("--a", (state.ratio * 100).toFixed(3) + "%");
   }
-
   function ratioFromPointer(e) {
     const s = stage.getBoundingClientRect();
     const d = divider.getBoundingClientRect();
@@ -691,7 +759,6 @@
     const avail = s.height - d.height;
     return (e.clientY - s.top - d.height / 2) / avail;
   }
-
   divider.addEventListener("pointerdown", e => {
     dragging = true;
     divider.setPointerCapture(e.pointerId);
@@ -700,12 +767,7 @@
     document.body.style.cursor = state.layout === "vertical" ? "col-resize" : "row-resize";
     e.preventDefault();
   });
-
-  divider.addEventListener("pointermove", e => {
-    if (!dragging) return;
-    setRatio(ratioFromPointer(e));
-  });
-
+  divider.addEventListener("pointermove", e => { if (dragging) setRatio(ratioFromPointer(e)); });
   function endDrag() {
     if (!dragging) return;
     dragging = false;
@@ -717,7 +779,6 @@
   divider.addEventListener("pointerup", endDrag);
   divider.addEventListener("pointercancel", endDrag);
   divider.addEventListener("dblclick", () => { setRatio(0.5); save(); });
-
   divider.addEventListener("keydown", e => {
     const step = e.shiftKey ? 0.05 : 0.02;
     const fwd  = state.layout === "vertical" ? "ArrowRight" : "ArrowDown";
@@ -742,23 +803,18 @@
     csBtn.style.display = btnLabel === null ? "none" : "";
     camState.classList.add("show");
   }
-  function hideState() {
-    camState.classList.remove("show");
-  }
+  function hideState() { camState.classList.remove("show"); }
 
   function setLive(on) {
     recDot.classList.toggle("on", on);
     camToggle.classList.toggle("on", on);
     camToggle.title = on ? "Stop camera" : "Start camera";
     btnSnap.disabled = !on;
-    btnFlip.disabled = !on;
+    btnFlip.disabled = !on || devices.length < 2;
   }
 
   function stopCamera() {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     video.srcObject = null;
     setLive(false);
   }
@@ -787,18 +843,16 @@
       }
 
       stopCamera();
+      lastLandmarks = null;
 
       const constraints = {
         audio: false,
-        video: deviceId
-          ? { deviceId: { exact: deviceId } }
-          : { facingMode: "user" }
+        video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "user" }
       };
 
       stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
 
-      // Wait for metadata so dimensions are known before first snapshot
       if (video.readyState < 1) {
         await new Promise(res => {
           const done = () => { video.removeEventListener("loadedmetadata", done); res(); };
@@ -812,17 +866,11 @@
       setLive(true);
       hideState();
 
-      // Remember which device actually got used
       const track = stream.getVideoTracks()[0];
       const settings = track && track.getSettings ? track.getSettings() : {};
-      if (settings.deviceId) {
-        state.deviceId = settings.deviceId;
-        save();
-      }
+      if (settings.deviceId) { state.deviceId = settings.deviceId; save(); }
 
-      // Labels are only available after permission is granted
       await refreshDevices(settings.deviceId);
-
     } catch (err) {
       stopCamera();
       showState("🚫", friendlyError(err), "Try again", true);
@@ -836,7 +884,6 @@
     try {
       const all = await navigator.mediaDevices.enumerateDevices();
       devices = all.filter(d => d.kind === "videoinput");
-
       camSelect.innerHTML = "";
 
       if (!devices.length) {
@@ -844,7 +891,6 @@
         o.textContent = "No camera";
         camSelect.appendChild(o);
         camSelect.disabled = true;
-        btnFlip.disabled = true;
         return;
       }
 
@@ -857,16 +903,12 @@
       });
 
       const pick = activeId || state.deviceId;
-      if (pick && devices.some(d => d.deviceId === pick)) {
-        camSelect.value = pick;
-      } else {
-        camSelect.value = devices[0].deviceId;
-      }
+      camSelect.value = (pick && devices.some(d => d.deviceId === pick))
+        ? pick : devices[0].deviceId;
 
-      btnFlip.disabled = devices.length < 2;
+      setLive(!!stream);
     } catch (e) {
       camSelect.disabled = true;
-      btnFlip.disabled = true;
     }
   }
 
@@ -882,8 +924,7 @@
 
   function flipCamera() {
     if (!stream || devices.length < 2) return;
-    const current = camSelect.value;
-    let i = devices.findIndex(d => d.deviceId === current);
+    let i = devices.findIndex(d => d.deviceId === camSelect.value);
     if (i === -1) i = 0;
     const next = devices[(i + 1) % devices.length];
     camSelect.value = next.deviceId;
@@ -897,24 +938,686 @@
     btnMirror.classList.toggle("on", !!state.mirrored);
   }
 
-  /* ---------- Snapshot ---------- */
-  function capture() {
-    if (!stream || !video.videoWidth) return null;
+  /* ============================================================
+     FACE TRACKING (MediaPipe)
+  ============================================================ */
+  let faceLandmarker = null;
+  let fxLoadFailed   = false;
+  let fxLoading      = false;
+  let lastLandmarks  = null;
+  let lastDetectAt   = 0;
 
-    const w = video.videoWidth;
-    const h = video.videoHeight;
-    const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h;
+  async function initFaceTracking() {
+    if (faceLandmarker || fxLoadFailed || fxLoading) return;
+    if (state.filter === "none") return;      // lazy: only load when a filter is picked
+    fxLoading = true;
+    updateFxStatus();
 
-    const ctx = c.getContext("2d");
-    if (state.mirrored) {
-      ctx.translate(w, 0);
-      ctx.scale(-1, 1);
+    try {
+      const vision = await import(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"
+      );
+
+      const fileset = await vision.FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+      );
+
+      let landmarker;
+      const baseOpts = {
+        modelAssetPath:
+          "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+      };
+
+      try {
+        landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
+          baseOptions: Object.assign({ delegate: "GPU" }, baseOpts),
+          runningMode: "VIDEO",
+          numFaces: 1
+        });
+      } catch (gpuErr) {
+        console.warn("[filters] GPU delegate failed, falling back to CPU", gpuErr);
+        landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
+          baseOptions: Object.assign({ delegate: "CPU" }, baseOpts),
+          runningMode: "VIDEO",
+          numFaces: 1
+        });
+      }
+
+      faceLandmarker = landmarker;
+      console.log("[filters] Face tracking ready");
+    } catch (err) {
+      fxLoadFailed = true;
+      console.warn("[filters] Face tracking unavailable:", err);
+    } finally {
+      fxLoading = false;
+      updateFxStatus();
     }
-    ctx.drawImage(video, 0, 0, w, h);
+  }
 
-    return c.toDataURL("image/png");
+  function updateFxStatus() {
+    if (state.filter === "none" || !stream) {
+      fxStatus.classList.remove("show");
+      return;
+    }
+    if (faceLandmarker) {
+      fxStatus.classList.remove("show");
+      return;
+    }
+    fxStatus.classList.add("show");
+    fxStatus.innerHTML = fxLoadFailed
+      ? "⚠️ Filters unavailable"
+      : '<span class="spinner"></span> Loading face tracking…';
+  }
+
+  /* ============================================================
+     Projection helpers
+  ============================================================ */
+  function makeProjector(vw, vh, tw, th, mirrored) {
+    const scale = Math.max(tw / vw, th / vh);
+    const dw = vw * scale, dh = vh * scale;
+    const ox = (tw - dw) / 2, oy = (th - dh) / 2;
+    return (lm) => {
+      let x = lm.x * vw;
+      const y = lm.y * vh;
+      if (mirrored) x = vw - x;
+      return { x: x * scale + ox, y: y * scale + oy };
+    };
+  }
+
+  /* Canvas dimensions in CSS px (kept in sync with the wrap) */
+  let fxW = 1, fxH = 1, fxDpr = 1;
+
+  function resizeFx() {
+    const rect = camWrap.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    if (w === fxW && h === fxH && dpr === fxDpr) return;
+    fxW = w; fxH = h; fxDpr = dpr;
+    fxCanvas.width  = Math.round(w * dpr);
+    fxCanvas.height = Math.round(h * dpr);
+    fxCanvas.style.width  = w + "px";
+    fxCanvas.style.height = h + "px";
+  }
+
+  /* ============================================================
+     Drawing helpers
+  ============================================================ */
+  function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawSparkle(ctx, cx, cy, r, color) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.2, r * 0.18);
+    ctx.lineCap = "round";
+    ctx.shadowColor = color;
+    ctx.shadowBlur = r * 0.9;
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+    ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
+    ctx.stroke();
+    const d = r * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(cx - d, cy - d); ctx.lineTo(cx + d, cy + d);
+    ctx.moveTo(cx + d, cy - d); ctx.lineTo(cx - d, cy + d);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ============================================================
+     FILTER RENDERERS
+     Every renderer receives (ctx, lm, P) where
+       lm = array of 468 normalized landmarks
+       P(i) -> { x, y } in canvas pixels
+  ============================================================ */
+
+  /* ---- 🕶️ Sunglasses ---- */
+  function fxShades(ctx, lm, P) {
+    const lc = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
+    const rc = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
+    const c  = mid(lc, rc);
+    const eyeDist = dist(lc, rc);
+    const ang = Math.atan2(rc.y - lc.y, rc.x - lc.x);
+
+    const lensW = eyeDist * 0.66;
+    const lensH = lensW * 0.78;
+    const gap   = eyeDist * 0.10;
+
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(ang);
+
+    // bridge
+    ctx.fillStyle = "#0a0a0f";
+    ctx.fillRect(-gap, -lensH * 0.06, gap * 2, lensH * 0.13);
+
+    const lensGrad = ctx.createLinearGradient(0, -lensH / 2, 0, lensH / 2);
+    lensGrad.addColorStop(0,    "rgba(28,32,50,0.96)");
+    lensGrad.addColorStop(0.42, "rgba(62,80,118,0.94)");
+    lensGrad.addColorStop(1,    "rgba(8,10,20,0.96)");
+
+    const drawLens = (cx, fill) => {
+      roundRect(ctx, cx - lensW / 2, -lensH / 2, lensW, lensH, lensH * 0.34);
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); } else ctx.stroke();
+    };
+
+    drawLens(-eyeDist / 2, lensGrad);
+    drawLens( eyeDist / 2, lensGrad);
+
+    // rims
+    ctx.strokeStyle = "rgba(0,0,0,0.9)";
+    ctx.lineWidth = Math.max(2, lensH * 0.085);
+    drawLens(-eyeDist / 2);
+    drawLens( eyeDist / 2);
+
+    // shine
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.beginPath();
+    ctx.ellipse(-eyeDist / 2 - lensW * 0.16, -lensH * 0.22, lensW * 0.2, lensH * 0.13, -0.42, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse( eyeDist / 2 - lensW * 0.16, -lensH * 0.22, lensW * 0.2, lensH * 0.13, -0.42, 0, Math.PI * 2);
+    ctx.fill();
+
+    // arms
+    ctx.strokeStyle = "#0a0a0f";
+    ctx.lineWidth = Math.max(2, lensH * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(-eyeDist / 2 - lensW / 2, -lensH * 0.1);
+    ctx.lineTo(-eyeDist / 2 - lensW / 2 - eyeDist * 0.32, -lensH * 0.02);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo( eyeDist / 2 + lensW / 2, -lensH * 0.1);
+    ctx.lineTo( eyeDist / 2 + lensW / 2 + eyeDist * 0.32, -lensH * 0.02);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  /* ---- 🐶 Dog ---- */
+  function fxDog(ctx, lm, P) {
+    const top   = P(LMK.FOREHEAD);
+    const chin  = P(LMK.CHIN);
+    const lc    = P(LMK.L_CHEEK);
+    const rc    = P(LMK.R_CHEEK);
+    const nose  = P(LMK.NOSE);
+    const mouthB= P(LMK.MOUTH_BOT);
+
+    const faceW = dist(lc, rc);
+    const faceH = dist(top, chin);
+
+    // ears
+    const drawEar = (cx, cy, dir) => {
+      const w = faceW * 0.32;
+      const h = faceH * 0.54;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(dir * 0.28);
+
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, "#8a5a30");
+      g.addColorStop(1, "#43260f");
+      ctx.fillStyle = g;
+
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.14, 0);
+      ctx.bezierCurveTo(-w * 0.72, h * 0.15, -w * 0.62, h * 0.86, -w * 0.08, h);
+      ctx.bezierCurveTo( w * 0.36, h * 0.86,  w * 0.44, h * 0.2,  w * 0.16, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(50,22,8,0.55)";
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.13);
+      ctx.bezierCurveTo(-w * 0.42, h * 0.26, -w * 0.36, h * 0.76, 0, h * 0.88);
+      ctx.bezierCurveTo( w * 0.22, h * 0.74,  w * 0.24, h * 0.28, 0, h * 0.13);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    };
+
+    const earY = top.y + faceH * 0.05;
+    drawEar(lc.x + faceW * 0.05, earY, -1);
+    drawEar(rc.x - faceW * 0.05, earY, +1);
+
+    // nose
+    const nx = nose.x;
+    const ny = nose.y + faceH * 0.035;
+    const nw = faceW * 0.17;
+    const nh = nw * 0.74;
+
+    ctx.save();
+    ctx.translate(nx, ny);
+
+    const ng = ctx.createRadialGradient(-nw * 0.16, -nh * 0.22, nh * 0.04, 0, 0, nw * 0.72);
+    ng.addColorStop(0, "#55555e");
+    ng.addColorStop(1, "#08080c");
+    ctx.fillStyle = ng;
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, nw / 2, nh / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.beginPath();
+    ctx.ellipse(-nw * 0.15, -nh * 0.2, nw * 0.11, nh * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // whisker dots
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    for (let s = -1; s <= 1; s += 2) {
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(
+          nx + s * nw * 0.62,
+          ny + (i - 1) * nh * 0.34 + nh * 0.12,
+          Math.max(1, nw * 0.045), 0, Math.PI * 2
+        );
+        ctx.fill();
+      }
+    }
+
+    // tongue
+    const tW = faceW * 0.14;
+    const tH = faceH * 0.14;
+    ctx.fillStyle = "#ff5b7a";
+    ctx.beginPath();
+    ctx.ellipse(mouthB.x, mouthB.y + tH * 0.32, tW / 2, tH / 2, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(150,20,50,0.7)";
+    ctx.lineWidth = Math.max(1, tW * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(mouthB.x, mouthB.y + tH * 0.32);
+    ctx.lineTo(mouthB.x, mouthB.y + tH * 0.82);
+    ctx.stroke();
+  }
+
+  /* ---- 👨 Mustache ---- */
+  function fxStache(ctx, lm, P) {
+    const ml = P(LMK.MOUTH_L);
+    const mr = P(LMK.MOUTH_R);
+    const c  = mid(ml, mr);
+    const mouthW = dist(ml, mr);
+    const ang = Math.atan2(mr.y - ml.y, mr.x - ml.x);
+
+    const w = mouthW * 1.2;
+    const h = mouthW * 0.36;
+
+    ctx.save();
+    ctx.translate(c.x, c.y - h * 0.5);
+    ctx.rotate(ang);
+
+    ctx.fillStyle = "#1a1210";
+    ctx.beginPath();
+    ctx.moveTo(0, -h * 0.05);
+    // left wing
+    ctx.bezierCurveTo(-w * 0.18, -h * 0.72, -w * 0.45, -h * 0.88, -w * 0.5, -h * 0.15);
+    ctx.bezierCurveTo(-w * 0.53,  h * 0.38, -w * 0.34,  h * 0.45, -w * 0.2, h * 0.05);
+    ctx.bezierCurveTo(-w * 0.12, -h * 0.16, -w * 0.06, -h * 0.06, 0, -h * 0.05);
+    // right wing
+    ctx.bezierCurveTo( w * 0.06, -h * 0.06,  w * 0.12, -h * 0.16,  w * 0.2, h * 0.05);
+    ctx.bezierCurveTo( w * 0.34,  h * 0.45,  w * 0.53,  h * 0.38,  w * 0.5, -h * 0.15);
+    ctx.bezierCurveTo( w * 0.45, -h * 0.88,  w * 0.18, -h * 0.72, 0, -h * 0.05);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(100,78,60,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(-w * 0.26, -h * 0.38, w * 0.12, h * 0.1, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse( w * 0.26, -h * 0.38, w * 0.12, h * 0.1,  0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  /* ---- 👑 Crown ---- */
+  function fxCrown(ctx, lm, P) {
+    const top = P(LMK.FOREHEAD);
+    const lc  = P(LMK.L_CHEEK);
+    const rc  = P(LMK.R_CHEEK);
+    const faceW = dist(lc, rc);
+    const faceH = dist(top, P(LMK.CHIN));
+
+    const lc2 = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
+    const rc2 = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
+    const tilt = Math.atan2(rc2.y - lc2.y, rc2.x - lc2.x) * 0.6;
+
+    const w = faceW * 0.9;
+    const h = w * 0.42;
+    const baseY = top.y - faceH * 0.02;
+
+    ctx.save();
+    ctx.translate(top.x, baseY);
+    ctx.rotate(tilt);
+
+    const x0 = -w / 2;
+
+    // Crown silhouette
+    ctx.beginPath();
+    ctx.moveTo(x0, 0);
+    ctx.lineTo(x0, -h * 0.16);
+    for (let i = 0; i < 5; i++) {
+      const sx = x0 + i * (w / 5);
+      const ex = sx + w / 5;
+      const peakH = -h * (i % 2 === 0 ? 1 : 0.74);
+      ctx.lineTo(sx + w / 10, peakH);
+      ctx.lineTo(ex, -h * 0.16);
+    }
+    ctx.lineTo(x0 + w, 0);
+    ctx.closePath();
+
+    const g = ctx.createLinearGradient(0, -h, 0, 0);
+    g.addColorStop(0,    "#ffe98a");
+    g.addColorStop(0.45, "#ffcb2e");
+    g.addColorStop(1,    "#c98600");
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    ctx.strokeStyle = "#8a5c00";
+    ctx.lineWidth = Math.max(1.5, w * 0.012);
+    ctx.stroke();
+
+    // band
+    ctx.fillStyle = "#b8791a";
+    ctx.fillRect(x0, -h * 0.16, w, h * 0.18);
+
+    // jewels
+    const jewels = ["#ff3b6b", "#4f8ef7", "#34d399", "#a78bfa", "#fbbf24"];
+    for (let i = 0; i < 5; i++) {
+      const jx = x0 + (i + 0.5) * (w / 5);
+      ctx.fillStyle = jewels[i];
+      ctx.beginPath();
+      ctx.arc(jx, -h * 0.06, w * 0.028, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.beginPath();
+      ctx.arc(jx - w * 0.01, -h * 0.075, w * 0.009, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // sparkles on tall spikes
+    for (let i = 0; i < 3; i++) {
+      const sx = x0 + (i * 2 + 0.5) * (w / 5);
+      drawSparkle(ctx, sx, -h * 0.98, w * 0.032, "rgba(255,255,240,0.95)");
+    }
+
+    ctx.restore();
+  }
+
+  /* ---- 🐰 Bunny ---- */
+  function fxBunny(ctx, lm, P) {
+    const top = P(LMK.FOREHEAD);
+    const lc  = P(LMK.L_CHEEK);
+    const rc  = P(LMK.R_CHEEK);
+    const faceW = dist(lc, rc);
+    const faceH = dist(top, P(LMK.CHIN));
+
+    const lc2 = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
+    const rc2 = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
+    const ang = Math.atan2(rc2.y - lc2.y, rc2.x - lc2.x);
+    const cx  = (lc2.x + rc2.x) / 2;
+
+    const drawEar = (offsetX, tilt) => {
+      const ew = faceW * 0.21;
+      const eh = faceH * 0.9;
+
+      ctx.save();
+      ctx.translate(cx + offsetX, top.y + faceH * 0.02);
+      ctx.rotate(ang + tilt);
+
+      // white outer
+      const g = ctx.createLinearGradient(0, 0, 0, -eh);
+      g.addColorStop(0, "#f2eef6");
+      g.addColorStop(1, "#ffffff");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(0, -eh / 2, ew / 2, eh / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(180,170,190,0.65)";
+      ctx.lineWidth = Math.max(1, ew * 0.05);
+      ctx.stroke();
+
+      // pink inner
+      ctx.fillStyle = "#ffb6c9";
+      ctx.beginPath();
+      ctx.ellipse(0, -eh / 2, ew * 0.28, eh * 0.36, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    };
+
+    const spread = faceW * 0.24;
+    drawEar(-spread, -0.2);
+    drawEar( spread,  0.2);
+  }
+
+  /* ---- 😍 Heart Eyes ---- */
+  function fxHeart(ctx, lm, P) {
+    const lEye = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
+    const rEye = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
+    const eyeDist = dist(lEye, rEye);
+    const base = eyeDist * 0.55;
+    const t = performance.now() / 520;
+
+    const drawHeart = (cx, cy, s, phase) => {
+      s *= 1 + Math.sin(t + phase) * 0.12;
+
+      ctx.save();
+      ctx.translate(cx, cy - s * 0.45);
+      ctx.shadowColor = "rgba(255,60,110,0.9)";
+      ctx.shadowBlur = s * 0.55;
+
+      const g = ctx.createLinearGradient(0, -s * 0.7, 0, s * 0.45);
+      g.addColorStop(0, "#ff4d79");
+      g.addColorStop(1, "#c9184a");
+      ctx.fillStyle = g;
+
+      const topCurve = s * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(0, topCurve);
+      ctx.bezierCurveTo(0, 0, -s / 2, 0, -s / 2, topCurve);
+      ctx.bezierCurveTo(-s / 2, (s + topCurve) / 2, 0, (s + topCurve) / 2, 0, s);
+      ctx.bezierCurveTo(0, (s + topCurve) / 2, s / 2, (s + topCurve) / 2, s / 2, topCurve);
+      ctx.bezierCurveTo(s / 2, 0, 0, 0, 0, topCurve);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.16, s * 0.28, s * 0.08, s * 0.06, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    };
+
+    drawHeart(lEye.x, lEye.y, base, 0);
+    drawHeart(rEye.x, rEye.y, base, Math.PI * 0.8);
+  }
+
+  /* ---- 🏴☠️ Pirate ---- */
+  function fxPirate(ctx, lm, P) {
+    const lEye = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
+    const rEye = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
+    const c    = mid(lEye, rEye);
+    const eyeDist = dist(lEye, rEye);
+    const ang = Math.atan2(rEye.y - lEye.y, rEye.x - lEye.x);
+
+    // patch goes on whichever eye sits on the left of the screen
+    const patchEye = lEye.x < rEye.x ? lEye : rEye;
+    const size = eyeDist * 0.52;
+
+    // strap across the head
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(ang);
+    ctx.strokeStyle = "#0a0a0a";
+    ctx.lineWidth = Math.max(3, eyeDist * 0.09);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-eyeDist * 1.05, -eyeDist * 0.04);
+    ctx.lineTo( eyeDist * 1.05,  eyeDist * 0.07);
+    ctx.stroke();
+    ctx.restore();
+
+    // the patch itself
+    ctx.save();
+    ctx.translate(patchEye.x, patchEye.y);
+    ctx.rotate(ang);
+
+    ctx.fillStyle = "#08080c";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size * 0.74, size * 0.86, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const g = ctx.createLinearGradient(-size * 0.5, -size * 0.5, size * 0.45, size * 0.45);
+    g.addColorStop(0,   "rgba(90,90,105,0.6)");
+    g.addColorStop(0.5, "rgba(20,20,26,0.2)");
+    g.addColorStop(1,   "rgba(0,0,0,0.45)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size * 0.74, size * 0.86, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
+    ctx.lineWidth = Math.max(1, size * 0.06);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  /* ---- Dispatcher ---- */
+  function drawFilterSet(ctx, lm, P) {
+    switch (state.filter) {
+      case "dog":    fxDog(ctx, lm, P);    break;
+      case "shades": fxShades(ctx, lm, P); break;
+      case "stache": fxStache(ctx, lm, P); break;
+      case "crown":  fxCrown(ctx, lm, P);  break;
+      case "bunny":  fxBunny(ctx, lm, P);  break;
+      case "heart":  fxHeart(ctx, lm, P);  break;
+      case "pirate": fxPirate(ctx, lm, P); break;
+    }
+  }
+
+  /* ============================================================
+     RENDER LOOP
+  ============================================================ */
+  let rafId = null;
+
+  function loop() {
+    rafId = requestAnimationFrame(loop);
+
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return;
+
+    resizeFx();
+    fxCtx.setTransform(fxDpr, 0, 0, fxDpr, 0, 0);
+    fxCtx.clearRect(0, 0, fxW, fxH);
+
+    if (state.filter === "none" || !stream) {
+      lastLandmarks = null;
+      return;
+    }
+
+    // Detection at ~30fps
+    const now = performance.now();
+    if (faceLandmarker && now - lastDetectAt > 28) {
+      lastDetectAt = now;
+      try {
+        const res = faceLandmarker.detectForVideo(video, now);
+        lastLandmarks = (res && res.faceLandmarks && res.faceLandmarks[0]) || null;
+      } catch (e) {
+        // video not ready / paused — keep previous landmarks
+      }
+    }
+
+    if (lastLandmarks) {
+      const project = makeProjector(vw, vh, fxW, fxH, !!state.mirrored);
+      drawFilterSet(fxCtx, lastLandmarks, project);
+    }
+  }
+
+  function startLoop() {
+    if (rafId == null) rafId = requestAnimationFrame(loop);
+  }
+  function stopLoop() {
+    if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+    fxCtx.setTransform(1, 0, 0, 1, 0, 0);
+    fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+  }
+
+  /* ============================================================
+     FILTER PICKER
+  ============================================================ */
+  FILTERS.forEach(f => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip";
+    btn.dataset.filter = f.id;
+    btn.innerHTML = '<span class="emoji">' + f.emoji + "</span>" + f.label;
+    btn.addEventListener("click", () => setFilter(f.id));
+    filterStrip.appendChild(btn);
+  });
+
+  function setFilter(id) {
+    state.filter = id;
+    filterStrip.querySelectorAll(".chip").forEach(c =>
+      c.classList.toggle("on", c.dataset.filter === id)
+    );
+    save();
+
+    if (id === "none") {
+      lastLandmarks = null;
+      updateFxStatus();
+      return;
+    }
+
+    updateFxStatus();
+    initFaceTracking();
+    startLoop();
+  }
+
+  /* ============================================================
+     SNAPSHOT (composited with filters)
+  ============================================================ */
+  function capture() {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!stream || !vw || !vh) return null;
+
+    const out = document.createElement("canvas");
+    out.width = vw;
+    out.height = vh;
+    const ctx = out.getContext("2d");
+
+    // 1. draw the frame (mirrored to match the preview)
+    ctx.save();
+    if (state.mirrored) { ctx.translate(vw, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(video, 0, 0, vw, vh);
+    ctx.restore();
+
+    // 2. draw the filter at full video resolution
+    if (state.filter !== "none" && lastLandmarks) {
+      const project = makeProjector(vw, vh, vw, vh, !!state.mirrored);
+      drawFilterSet(ctx, lastLandmarks, project);
+    }
+
+    return out.toDataURL("image/png");
   }
 
   function takeSnapshot() {
@@ -956,9 +1659,7 @@
   function normalizeUrl(raw) {
     let v = (raw || "").trim();
     if (!v) return "";
-    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) {
-      v = "https://" + v.replace(/^\/+/, "");
-    }
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) v = "https://" + v.replace(/^\/+/, "");
     return v;
   }
 
@@ -1008,10 +1709,7 @@
     if (c.mode !== "web" || !c.url) return;
     frame.dataset.src = "";
     frame.src = "about:blank";
-    setTimeout(() => {
-      frame.src = c.url;
-      frame.dataset.src = c.url;
-    }, 40);
+    setTimeout(() => { frame.src = c.url; frame.dataset.src = c.url; }, 40);
   });
 
   contentPane.querySelector('[data-act="open"]').addEventListener("click", () => {
@@ -1019,13 +1717,10 @@
     if (c.mode === "web" && c.url) window.open(c.url, "_blank", "noopener");
   });
 
-  note.addEventListener("input", () => {
-    state.content.note = note.value;
-    save();
-  });
+  note.addEventListener("input", () => { state.content.note = note.value; save(); });
 
   /* ============================================================
-     Camera control wiring
+     CAMERA CONTROLS
   ============================================================ */
   camToggle.addEventListener("click", toggleCamera);
   csBtn.addEventListener("click", () => startCamera(state.deviceId || ""));
@@ -1045,18 +1740,18 @@
   });
 
   btnFull.addEventListener("click", () => {
-    const el = video;
+    const el = camWrap;
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else if (el.requestFullscreen) {
       el.requestFullscreen().catch(() => {});
-    } else if (el.webkitEnterFullscreen) {
-      el.webkitEnterFullscreen();          // iOS Safari
+    } else if (video.webkitEnterFullscreen) {
+      video.webkitEnterFullscreen();
     }
   });
 
   /* ============================================================
-     Snapshot modal wiring
+     MODAL
   ============================================================ */
   document.getElementById("modalClose").addEventListener("click", closeModal);
   document.getElementById("modalDiscard").addEventListener("click", closeModal);
@@ -1065,19 +1760,19 @@
   modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
 
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && modal.classList.contains("show")) closeModal();
-    // Space or S = snapshot (when not typing)
+    if (e.key === "Escape" && modal.classList.contains("show")) { closeModal(); return; }
+
     const tag = (document.activeElement && document.activeElement.tagName) || "";
     const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-    if (!typing && !modal.classList.contains("show")) {
-      if (e.code === "Space" || e.key.toLowerCase() === "s") {
-        if (stream) { e.preventDefault(); takeSnapshot(); }
-      }
+    if (typing || modal.classList.contains("show")) return;
+
+    if (e.code === "Space" || e.key.toLowerCase() === "s") {
+      if (stream) { e.preventDefault(); takeSnapshot(); }
     }
   });
 
   /* ============================================================
-     Global buttons
+     GLOBAL CONTROLS
   ============================================================ */
   layoutBtn.addEventListener("click", () => {
     state.layout = state.layout === "vertical" ? "horizontal" : "vertical";
@@ -1096,6 +1791,7 @@
   resetBtn.addEventListener("click", () => {
     state = defaults();
     applyMirror();
+    setFilter("none");
     mountPanes();
     applyLayout();
     renderContent();
@@ -1104,23 +1800,28 @@
   });
 
   /* ============================================================
-     Visibility: pause preview when tab is hidden (saves battery)
+     LIFECYCLE
   ============================================================ */
   document.addEventListener("visibilitychange", () => {
     if (!stream) return;
     if (document.hidden) {
       video.pause();
+      stopLoop();
     } else {
       video.play().catch(() => {});
+      if (state.filter !== "none") startLoop();
     }
   });
 
+  window.addEventListener("resize", () => { resizeFx(); });
+
   window.addEventListener("beforeunload", () => {
     if (stream) stream.getTracks().forEach(t => t.stop());
+    stopLoop();
   });
 
   /* ============================================================
-     Init
+     INIT
   ============================================================ */
   mountPanes();
   applyLayout();
@@ -1128,8 +1829,21 @@
   renderContent();
   setLive(false);
 
-  // Auto-start the camera on load (browser will prompt for permission)
-  startCamera(state.deviceId || "");
+  // restore saved filter chip highlight
+  filterStrip.querySelectorAll(".chip").forEach(c =>
+    c.classList.toggle("on", c.dataset.filter === state.filter)
+  );
+
+  // Start camera, and kick off face tracking if a filter was saved
+  startCamera(state.deviceId || "").then(() => {
+    if (state.filter !== "none") {
+      initFaceTracking();
+      startLoop();
+    }
+    updateFxStatus();
+  });
+
+  startLoop();   // harmless while idle — it early-returns
 
 })();
 </script>
