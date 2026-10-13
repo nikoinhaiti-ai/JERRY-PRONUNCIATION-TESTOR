@@ -1,208 +1,410 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Split Screen + MP4 Recorder</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8" />
+<meta name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0b0f" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Mobile Split Screen</title>
+<style>
+  :root{
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px);
+  }
 
-    body {
-      height: 100vh;
-      overflow: hidden;
-      font-family: system-ui, sans-serif;
-      background: #111;
-    }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; overscroll-behavior:none; }
 
-    .split {
-      display: flex;
-      height: 100vh;
-      width: 100vw;
-    }
+  body{
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background:#0b0b0f;
+    color:#fff;
+    overflow:hidden;
+    touch-action: manipulation;
+  }
 
-    .pane {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-size: 2rem;
-      font-weight: 700;
-      text-align: center;
-      padding: 20px;
-    }
+  /* ---------- Split layout ---------- */
+  .split{
+    display:flex;
+    gap:8px;
+    height:100dvh;              /* dynamic vh: handles mobile URL bar */
+    padding-top:    calc(var(--safe-t) + 8px);
+    padding-right:  calc(var(--safe-r) + 8px);
+    padding-bottom: calc(var(--safe-b) + 78px);  /* room for dock */
+    padding-left:   calc(var(--safe-l) + 8px);
+  }
 
-    .left  { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
-    .right { background: linear-gradient(135deg, #7c2d12, #f97316); }
+  /* Portrait phone  -> stack vertically
+     Landscape / tablet -> side by side */
+  @media (orientation: portrait){
+    .split{ flex-direction: column; }
+  }
 
-    .record-btn {
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      padding: 14px 28px;
-      border: none;
-      border-radius: 999px;
-      background: #ef4444;
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-      transition: 0.2s;
-    }
+  .pane{
+    flex: 1 1 0;
+    min-width:0;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    border-radius:16px;
+    overflow:hidden;
+    position:relative;
+    background:#15151c;
+    box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  }
 
-    .record-btn:hover   { background: #dc2626; transform: translateX(-50%) scale(1.05); }
-    .record-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    .record-btn.recording { background: #111; animation: pulse 1.5s infinite; }
+  .pane.left  { background: linear-gradient(135deg,#1e3a8a,#3b82f6); }
+  .pane.right { background: linear-gradient(135deg,#7c2d12,#f97316); }
 
-    .record-btn .dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #fff;
-    }
+  .pane-head{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 10px;
+    background: rgba(0,0,0,.28);
+    backdrop-filter: blur(6px);
+    flex: 0 0 auto;
+  }
 
-    .record-btn.recording .dot { background: #ef4444; }
+  .pane-title{
+    font-size: clamp(.7rem, 2.6vw, .9rem);
+    font-weight:700;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    opacity:.9;
+    flex:1;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
 
-    @keyframes pulse {
-      0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-      70%  { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-    }
+  .mini{
+    border:0;
+    border-radius:8px;
+    background: rgba(255,255,255,.18);
+    color:#fff;
+    font-size:.72rem;
+    font-weight:600;
+    padding:7px 10px;
+    min-height:32px;
+    cursor:pointer;
+    transition: background .15s;
+  }
+  .mini:hover{ background: rgba(255,255,255,.3); }
 
-    .status {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #fff;
-      background: rgba(0, 0, 0, 0.65);
-      padding: 8px 16px;
-      border-radius: 999px;
-      font-size: 0.9rem;
-      z-index: 10;
-      display: none;
-    }
+  .pane-body{
+    flex:1 1 auto;
+    min-height:0;
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
 
-    .status.show { display: block; }
-  </style>
+  .pane-body iframe{
+    width:100%;
+    height:100%;
+    border:0;
+    background:#fff;
+    display:block;
+  }
+
+  .placeholder{
+    text-align:center;
+    padding:16px;
+    font-size: clamp(.85rem, 3.4vw, 1.1rem);
+    font-weight:600;
+    opacity:.85;
+    line-height:1.5;
+    user-select:none;
+  }
+  .placeholder small{
+    display:block;
+    margin-top:6px;
+    font-weight:400;
+    font-size:.75em;
+    opacity:.75;
+  }
+
+  /* ---------- Bottom dock ---------- */
+  .dock{
+    position:fixed;
+    left:50%;
+    transform: translateX(-50%);
+    bottom: calc(var(--safe-b) + 14px);
+    z-index:20;
+    display:flex;
+    gap:10px;
+    padding:8px;
+    border-radius:999px;
+    background: rgba(20,20,26,.82);
+    backdrop-filter: blur(14px);
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    max-width: calc(100vw - 24px);
+  }
+
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    border:0;
+    border-radius:999px;
+    padding:12px 18px;
+    min-height:46px;                 /* thumb-friendly */
+    font-size:.85rem;
+    font-weight:700;
+    color:#fff;
+    cursor:pointer;
+    white-space:nowrap;
+    transition: transform .12s, background .15s;
+  }
+  .btn:active{ transform: scale(.96); }
+  .btn:disabled{ opacity:.55; cursor:not-allowed; }
+
+  .btn.ghost{ background: rgba(255,255,255,.14); }
+  .btn.ghost:hover{ background: rgba(255,255,255,.24); }
+
+  .btn.rec{ background:#ef4444; }
+  .btn.rec:hover{ background:#dc2626; }
+  .btn.rec.recording{ background:#111; animation: pulse 1.6s infinite; }
+
+  .btn .dot{
+    width:11px; height:11px; border-radius:50%; background:#fff; flex:0 0 auto;
+  }
+  .btn.rec.recording .dot{ background:#ef4444; }
+
+  @keyframes pulse{
+    0%  { box-shadow:0 0 0 0 rgba(239,68,68,.7); }
+    70% { box-shadow:0 0 0 14px rgba(239,68,68,0); }
+    100%{ box-shadow:0 0 0 0 rgba(239,68,68,0); }
+  }
+
+  /* ---------- Status pill ---------- */
+  .status{
+    position:fixed;
+    top: calc(var(--safe-t) + 12px);
+    left:50%;
+    transform: translateX(-50%);
+    z-index:30;
+    padding:8px 16px;
+    border-radius:999px;
+    background: rgba(0,0,0,.75);
+    backdrop-filter: blur(8px);
+    font-size:.78rem;
+    font-weight:600;
+    white-space:nowrap;
+    display:none;
+  }
+  .status.show{ display:block; }
+
+  /* Tiny screens: compact dock */
+  @media (max-height: 380px){
+    .dock{ padding:6px; gap:6px; }
+    .btn{ padding:9px 14px; min-height:40px; font-size:.78rem; }
+  }
+</style>
 </head>
 <body>
 
-  <div class="split">
-    <div class="pane left">Left Screen</div>
-    <div class="pane right">Right Screen</div>
+  <div class="split" id="split">
+    <section class="pane left">
+      <header class="pane-head">
+        <span class="pane-title">Pane A</span>
+        <button class="mini" data-load="left">Load URL</button>
+        <button class="mini" data-clear="left">Clear</button>
+      </header>
+      <div class="pane-body" id="body-left">
+        <div class="placeholder">
+          Pane A<small>Tap “Load URL” to embed a site</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane right">
+      <header class="pane-head">
+        <span class="pane-title">Pane B</span>
+        <button class="mini" data-load="right">Load URL</button>
+        <button class="mini" data-clear="right">Clear</button>
+      </header>
+      <div class="pane-body" id="body-right">
+        <div class="placeholder">
+          Pane B<small>Tap “Load URL” to embed a site</small>
+        </div>
+      </div>
+    </section>
   </div>
 
   <div class="status" id="status">Recording…</div>
 
-  <button class="record-btn" id="recordBtn">
-    <span class="dot"></span>
-    <span id="btnText">Record Screen (MP4)</span>
-  </button>
+  <div class="dock">
+    <button class="btn ghost" id="fsBtn">⛶ Fullscreen</button>
+    <button class="btn rec" id="recBtn">
+      <span class="dot"></span><span id="recText">Record</span>
+    </button>
+  </div>
 
-  <!-- ffmpeg.wasm for webm -> mp4 conversion -->
+  <!-- ffmpeg.wasm (used only for webm -> mp4 conversion on desktop) -->
   <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
   <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 
   <script>
-    const { FFmpeg } = FFmpegWASM;
-    const { fetchFile } = FFmpegUtil;
+  /* =========================================================
+     1. Embed a website in a pane
+     ========================================================= */
+  const panes = {
+    left:  document.getElementById("body-left"),
+    right: document.getElementById("body-right"),
+  };
 
-    const recordBtn = document.getElementById("recordBtn");
-    const btnText   = document.getElementById("btnText");
-    const statusEl  = document.getElementById("status");
+  document.querySelectorAll("[data-load]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const side = btn.dataset.load;
+      const raw = prompt("Enter a website URL:", "https://example.com");
+      if (!raw) return;
 
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let stream = null;
-    let ffmpeg = null;
+      let url = raw.trim();
+      if (!/^https?:\/\//i.test(url)) url = "https://" + url;
 
-    // ---- Pick a supported MIME type, prefer MP4, fall back to WebM ----
-    function pickMimeType() {
-      const candidates = [
-        "video/mp4;codecs=avc1.42E01E,mp4a.40.2", // Safari MP4
-        "video/mp4",
-        "video/webm;codecs=vp9,opus",
-        "video/webm;codecs=vp8,opus",
-        "video/webm"
-      ];
-      for (const t of candidates) {
-        if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+      panes[side].innerHTML =
+        `<iframe src="${url}" allow="fullscreen; autoplay; clipboard-write"
+                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>`;
+    });
+  });
+
+  document.querySelectorAll("[data-clear]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const side = btn.dataset.clear;
+      const label = side === "left" ? "Pane A" : "Pane B";
+      panes[side].innerHTML =
+        `<div class="placeholder">${label}<small>Tap “Load URL” to embed a site</small></div>`;
+    });
+  });
+
+  /* =========================================================
+     2. Fullscreen toggle (useful on phone)
+     ========================================================= */
+  const fsBtn = document.getElementById("fsBtn");
+  const splitEl = document.getElementById("split");
+
+  fsBtn.addEventListener("click", async () => {
+    try {
+      if (!document.fullscreenElement) {
+        const el = splitEl.requestFullscreen
+          ? splitEl
+          : document.documentElement;
+        await el.requestFullscreen({ navigationUI: "hide" });
+      } else {
+        await document.exitFullscreen();
       }
-      return "";
+    } catch {
+      alert("Fullscreen isn't supported in this browser.");
     }
+  });
 
-    // ---- Load ffmpeg once (only if we need to convert webm -> mp4) ----
-    async function loadFFmpeg() {
-      if (ffmpeg) return ffmpeg;
-      statusEl.textContent = "Loading MP4 converter…";
-      statusEl.classList.add("show");
+  document.addEventListener("fullscreenchange", () => {
+    fsBtn.textContent = document.fullscreenElement ? "⛶ Exit" : "⛶ Fullscreen";
+  });
 
-      ffmpeg = new FFmpeg();
-      const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-      });
-      return ffmpeg;
+  /* =========================================================
+     3. Screen recorder (desktop browsers; MP4 output)
+     ========================================================= */
+  const { FFmpeg }  = FFmpegWASM;
+  const { fetchFile } = FFmpegUtil;
+
+  const recBtn  = document.getElementById("recBtn");
+  const recText = document.getElementById("recText");
+  const statusEl = document.getElementById("status");
+
+  let mediaRecorder = null;
+  let chunks = [];
+  let stream = null;
+  let ffmpeg = null;
+
+  const supportsRecording =
+    !!navigator.mediaDevices?.getDisplayMedia &&
+    typeof window.MediaRecorder !== "undefined";
+
+  if (!supportsRecording) {
+    recBtn.disabled = true;
+    recText.textContent = "No recording";
+    recBtn.title = "Screen recording isn't available on this device/browser.";
+  }
+
+  function pickMimeType() {
+    const list = [
+      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+      "video/mp4",
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+    ];
+    for (const t of list) {
+      if (MediaRecorder.isTypeSupported(t)) return t;
     }
+    return "";
+  }
 
-    // Helper: load a script URL as a same-origin blob (fixes CORS for worker/wasm)
-    async function toBlobURL(url, mimeType) {
-      const res = await fetch(url);
-      const buf = await res.arrayBuffer();
-      return URL.createObjectURL(new Blob([buf], { type: mimeType }));
-    }
+  async function toBlobURL(url, mime) {
+    const res = await fetch(url);
+    const buf = await res.arrayBuffer();
+    return URL.createObjectURL(new Blob([buf], { type: mime }));
+  }
 
-    // ---- Convert webm blob to mp4 using ffmpeg.wasm ----
-    async function convertToMp4(webmBlob) {
-      const ff = await loadFFmpeg();
+  async function loadFFmpeg() {
+    if (ffmpeg) return ffmpeg;
+    setStatus("Loading MP4 converter…");
+    ffmpeg = new FFmpeg();
+    const base = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, "application/wasm"),
+    });
+    return ffmpeg;
+  }
 
-      statusEl.textContent = "Converting to MP4…";
-      statusEl.classList.add("show");
+  async function convertToMp4(webmBlob) {
+    const ff = await loadFFmpeg();
+    setStatus("Converting to MP4…");
+    await ff.writeFile("in.webm", await fetchFile(webmBlob));
+    await ff.exec([
+      "-i","in.webm",
+      "-c:v","libx264","-preset","ultrafast","-crf","23",
+      "-c:a","aac","-b:a","128k",
+      "-movflags","+faststart",
+      "out.mp4",
+    ]);
+    const data = await ff.readFile("out.mp4");
+    await ff.deleteFile("in.webm");
+    await ff.deleteFile("out.mp4");
+    return new Blob([data.buffer], { type: "video/mp4" });
+  }
 
-      const inputName  = "input.webm";
-      const outputName = "output.mp4";
+  function download(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
 
-      await ff.writeFile(inputName, await fetchFile(webmBlob));
+  function setStatus(text) {
+    statusEl.textContent = text;
+    statusEl.classList.add("show");
+  }
+  function clearStatus() {
+    statusEl.classList.remove("show");
+  }
 
-      await ff.exec([
-        "-i", inputName,
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "23",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-movflags", "+faststart",
-        outputName
-      ]);
-
-      const data = await ff.readFile(outputName);
-      await ff.deleteFile(inputName);
-      await ff.deleteFile(outputName);
-
-      return new Blob([data.buffer], { type: "video/mp4" });
-    }
-
-    // ---- Download helper ----
-    function downloadBlob(blob, filename) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-
-    // ---- Main button handler ----
-    recordBtn.addEventListener("click", async () => {
-      // STOP
+  if (supportsRecording) {
+    recBtn.addEventListener("click", async () => {
+      /* --- STOP --- */
       if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
         return;
@@ -211,72 +413,58 @@
       try {
         stream = await navigator.mediaDevices.getDisplayMedia({
           video: { cursor: "always", frameRate: 30 },
-          audio: true
+          audio: true,
         });
 
-        const mimeType = pickMimeType();
-        mediaRecorder = new MediaRecorder(
-          stream,
-          mimeType ? { mimeType } : undefined
-        );
-
-        recordedChunks = [];
+        const mime = pickMimeType();
+        mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+        chunks = [];
 
         mediaRecorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+          if (e.data && e.data.size) chunks.push(e.data);
         };
 
         mediaRecorder.onstop = async () => {
-          const usedType = mediaRecorder.mimeType || mimeType || "video/webm";
-          const rawBlob = new Blob(recordedChunks, { type: usedType });
+          const used = mediaRecorder.mimeType || mime || "video/webm";
+          const raw = new Blob(chunks, { type: used });
 
           stream.getTracks().forEach((t) => t.stop());
-
-          recordBtn.disabled = true;
-          btnText.textContent = "Processing…";
+          recBtn.disabled = true;
+          recText.textContent = "Processing…";
 
           try {
-            let mp4Blob;
-            if (usedType.includes("mp4")) {
-              // Browser already produced MP4 (e.g. Safari)
-              mp4Blob = new Blob([rawBlob], { type: "video/mp4" });
-            } else {
-              // Convert webm -> mp4
-              mp4Blob = await convertToMp4(rawBlob);
-            }
-
-            downloadBlob(mp4Blob, `screen-recording-${Date.now()}.mp4`);
+            const mp4 = used.includes("mp4")
+              ? new Blob([raw], { type: "video/mp4" })
+              : await convertToMp4(raw);
+            download(mp4, `screen-${Date.now()}.mp4`);
           } catch (err) {
-            console.error("MP4 conversion failed:", err);
-            alert("MP4 conversion failed. Downloading original WebM instead.");
-            downloadBlob(rawBlob, `screen-recording-${Date.now()}.webm`);
+            console.error(err);
+            alert("MP4 conversion failed — saving WebM instead.");
+            download(raw, `screen-${Date.now()}.webm`);
           } finally {
-            recordBtn.disabled = false;
-            btnText.textContent = "Record Screen (MP4)";
-            recordBtn.classList.remove("recording");
-            statusEl.classList.remove("show");
+            recBtn.disabled = false;
+            recText.textContent = "Record";
+            recBtn.classList.remove("recording");
+            clearStatus();
             mediaRecorder = null;
           }
         };
 
-        // If user clicks browser's "Stop sharing"
         stream.getVideoTracks()[0].onended = () => {
-          if (mediaRecorder && mediaRecorder.state === "recording") {
-            mediaRecorder.stop();
-          }
+          if (mediaRecorder?.state === "recording") mediaRecorder.stop();
         };
 
-        mediaRecorder.start(1000); // collect chunks every second
-        btnText.textContent = "Stop Recording";
-        recordBtn.classList.add("recording");
-        statusEl.textContent = "Recording…";
-        statusEl.classList.add("show");
+        mediaRecorder.start(1000);
+        recText.textContent = "Stop";
+        recBtn.classList.add("recording");
+        setStatus("Recording…");
 
       } catch (err) {
-        console.error("Screen recording error:", err);
-        alert("Could not start screen recording. Please allow screen capture permissions.");
+        console.error(err);
+        alert("Could not start recording. Permission denied or unsupported.");
       }
     });
+  }
   </script>
 </body>
 </html>
