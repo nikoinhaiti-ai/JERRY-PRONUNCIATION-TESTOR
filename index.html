@@ -1,720 +1,1137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<meta name="theme-color" content="#0b0b0f" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<title>Split Screen + Apps</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Camera Split Screen</title>
 <style>
   :root{
-    --safe-t: env(safe-area-inset-top, 0px);
-    --safe-r: env(safe-area-inset-right, 0px);
-    --safe-b: env(safe-area-inset-bottom, 0px);
-    --safe-l: env(safe-area-inset-left, 0px);
+    --bg:#0b0f14;
+    --panel:#161b22;
+    --panel-2:#1a2029;
+    --border:#2a3038;
+    --text:#e6edf3;
+    --muted:#8b949e;
+    --accent:#4f8ef7;
+    --danger:#ef4444;
   }
-  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
-  html,body{ height:100%; overscroll-behavior:none; }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+
   body{
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    background:#0b0b0f; color:#fff; overflow:hidden;
-    touch-action: manipulation;
+    margin:0;
+    height:100vh;
+    height:100dvh;
+    overflow:hidden;
+    overscroll-behavior:none;
+    display:flex;
+    flex-direction:column;
+    background:var(--bg);
+    color:var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
   }
 
-  .split{
-    display:flex; gap:8px; height:100dvh;
-    padding-top:    calc(var(--safe-t) + 8px);
-    padding-right:  calc(var(--safe-r) + 8px);
-    padding-bottom: calc(var(--safe-b) + 78px);
-    padding-left:   calc(var(--safe-l) + 8px);
+  /* ============ Top bar ============ */
+  .topbar{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    height:54px;
+    padding:0 14px;
+    border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,#171d25,#12171e);
+    z-index:60;
   }
-  @media (orientation: portrait){ .split{ flex-direction: column; } }
+  .brand{
+    display:flex; align-items:center; gap:9px;
+    font-weight:650; font-size:14px; letter-spacing:.2px;
+    white-space:nowrap;
+  }
+  .brand .mark{
+    width:20px; height:20px; border-radius:6px;
+    background:linear-gradient(135deg,var(--accent),#8b5cf6);
+    box-shadow:0 0 0 1px #ffffff14 inset;
+  }
+  .spacer{ flex:1 1 auto; }
 
+  .btn{
+    display:inline-flex; align-items:center; gap:7px;
+    font:inherit; font-size:13px; color:var(--text);
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:7px 12px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:background .15s ease, border-color .15s ease, transform .05s ease, opacity .15s ease;
+  }
+  .btn:hover{ background:#232b35; border-color:#3a424d; }
+  .btn:active{ transform:translateY(1px); }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .btn .glyph{ font-size:14px; line-height:1; opacity:.9; }
+
+  /* ============ Stage ============ */
+  .stage{
+    flex:1 1 auto;
+    min-height:0; min-width:0;
+    display:grid;
+    padding:10px;
+    gap:0;
+  }
+  .stage[data-layout="vertical"]{
+    grid-template-columns: var(--a,50%) 12px minmax(0,1fr);
+    grid-template-rows: minmax(0,1fr);
+  }
+  .stage[data-layout="horizontal"]{
+    grid-template-columns: minmax(0,1fr);
+    grid-template-rows: var(--a,50%) 12px minmax(0,1fr);
+  }
+
+  /* ============ Divider ============ */
+  .divider{
+    display:flex; align-items:center; justify-content:center;
+    touch-action:none; outline:none; border-radius:99px;
+  }
+  .divider::before{
+    content:"";
+    background:var(--border);
+    border-radius:99px;
+    transition:background .15s ease;
+  }
+  .stage[data-layout="vertical"] .divider{ cursor:col-resize; }
+  .stage[data-layout="vertical"] .divider::before{ width:4px; height:64px; }
+  .stage[data-layout="horizontal"] .divider{ cursor:row-resize; }
+  .stage[data-layout="horizontal"] .divider::before{ width:64px; height:4px; }
+
+  .divider:hover::before,
+  .divider:focus-visible::before,
+  .divider.dragging::before{ background:var(--accent); }
+
+  /* ============ Pane ============ */
   .pane{
-    flex:1 1 0; min-width:0; min-height:0;
     display:flex; flex-direction:column;
-    border-radius:16px; overflow:hidden; position:relative;
-    background:#15151c; box-shadow: 0 6px 20px rgba(0,0,0,.35);
+    min-width:0; min-height:0;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    overflow:hidden;
   }
-  .pane-head{
-    display:flex; align-items:center; gap:6px;
-    padding:8px 10px;
-    background: rgba(0,0,0,.35);
-    backdrop-filter: blur(6px);
-    flex: 0 0 auto;
+
+  .pane-bar{
+    flex:0 0 auto;
+    display:flex; align-items:center; gap:8px;
+    padding:8px;
+    background:var(--panel-2);
+    border-bottom:1px solid var(--border);
   }
+
   .pane-title{
-    font-size: clamp(.7rem, 2.6vw, .9rem);
-    font-weight:700; letter-spacing:.02em;
-    text-transform:uppercase; opacity:.9; flex:1;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    display:flex; align-items:center; gap:8px;
+    font-size:12.5px; font-weight:600; color:#b9c2cd;
+    letter-spacing:.2px; white-space:nowrap;
+    padding-left:4px;
   }
-  .mini{
-    border:0; border-radius:8px;
-    background: rgba(255,255,255,.16); color:#fff;
-    font-size:.72rem; font-weight:600;
-    padding:7px 10px; min-height:32px;
-    cursor:pointer; transition: background .15s;
+  .rec-dot{
+    width:8px; height:8px; border-radius:50%;
+    background:#3a424d;
+    transition:background .2s ease, box-shadow .2s ease;
   }
-  .mini:hover{ background: rgba(255,255,255,.28); }
-  .mini.primary{ background:#3b82f6; }
-  .mini.primary:hover{ background:#2563eb; }
+  .rec-dot.on{
+    background:var(--danger);
+    box-shadow:0 0 0 3px rgba(239,68,68,.2);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.35; }
+  }
+
+  .seg{
+    display:flex; gap:2px; padding:2px;
+    background:#0b0f14;
+    border:1px solid var(--border);
+    border-radius:9px;
+    flex:0 0 auto;
+  }
+  .seg-btn{
+    font:inherit; font-size:12px; font-weight:550;
+    color:var(--muted);
+    background:transparent;
+    border:0; border-radius:7px;
+    padding:5px 10px;
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  .seg-btn:hover{ color:var(--text); }
+  .seg-btn.on{ background:var(--accent); color:#fff; }
+
+  .urlbar{ flex:1 1 auto; display:flex; gap:6px; min-width:0; }
+  .url-input{
+    flex:1 1 auto; min-width:0;
+    font:inherit; font-size:13px;
+    color:var(--text);
+    background:#0b0f14;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:6px 10px;
+    outline:none;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .url-input::placeholder{ color:#5c6672; }
+  .url-input:focus{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(79,142,247,.16);
+  }
+  .go{ padding:6px 12px; border-radius:8px; }
+
+  .icon{
+    width:30px; height:30px;
+    display:grid; place-items:center;
+    font:inherit; font-size:14px;
+    color:var(--muted);
+    background:transparent;
+    border:1px solid transparent;
+    border-radius:8px;
+    cursor:pointer;
+    flex:0 0 auto;
+    transition:background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .icon:hover{ color:var(--text); background:#222a34; border-color:var(--border); }
+  .icon.on{ color:#fff; background:var(--accent); border-color:var(--accent); }
+
+  /* select */
+  .select{
+    font:inherit; font-size:12.5px;
+    color:var(--text);
+    background:#0b0f14;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:6px 8px;
+    outline:none;
+    max-width:170px;
+    cursor:pointer;
+  }
+  .select:focus{ border-color:var(--accent); }
 
   .pane-body{
-    flex:1 1 auto; min-height:0; position:relative;
+    position:relative;
+    flex:1 1 auto;
+    min-height:0;
+    background:#05080b;
+  }
+
+  /* ============ Camera ============ */
+  .cam-wrap{
+    position:absolute; inset:0;
     display:flex; align-items:center; justify-content:center;
-    overflow:hidden; background:#0f0f14;
+    overflow:hidden;
+    background:#05080b;
   }
-  .pane-body iframe{
-    width:100%; height:100%; border:0;
-    background:#fff; display:block;
+  .cam-video{
+    width:100%; height:100%;
+    object-fit:cover;
+    display:block;
+    background:#000;
+    transition:opacity .25s ease;
   }
-  .placeholder{
-    text-align:center; padding:16px;
-    font-size: clamp(.85rem, 3.4vw, 1.05rem);
-    font-weight:600; opacity:.85; line-height:1.5;
-    user-select:none;
-  }
-  .placeholder small{
-    display:block; margin-top:6px;
-    font-weight:400; font-size:.75em; opacity:.75;
-  }
+  .cam-video.mirror{ transform:scaleX(-1); }
 
-  .dock{
-    position:fixed; left:50%; transform: translateX(-50%);
-    bottom: calc(var(--safe-b) + 14px); z-index:20;
-    display:flex; gap:10px; padding:8px;
-    border-radius:999px;
-    background: rgba(20,20,26,.82);
-    backdrop-filter: blur(14px);
-    border:1px solid rgba(255,255,255,.1);
-    box-shadow: 0 10px 30px rgba(0,0,0,.45);
-    max-width: calc(100vw - 24px);
+  .cam-overlay{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; justify-content:space-between;
+    pointer-events:none;
   }
-  .btn{
-    display:inline-flex; align-items:center; gap:8px;
-    border:0; border-radius:999px;
-    padding:12px 18px; min-height:46px;
-    font-size:.85rem; font-weight:700; color:#fff;
-    cursor:pointer; white-space:nowrap;
-    transition: transform .12s, background .15s;
+  .cam-top{
+    display:flex; justify-content:flex-end; gap:6px;
+    padding:10px;
   }
-  .btn:active{ transform: scale(.96); }
-  .btn:disabled{ opacity:.55; cursor:not-allowed; }
-  .btn.ghost{ background: rgba(255,255,255,.14); }
-  .btn.ghost:hover{ background: rgba(255,255,255,.24); }
-  .btn.rec{ background:#ef4444; }
-  .btn.rec:hover{ background:#dc2626; }
-  .btn.rec.recording{ background:#111; animation: pulse 1.6s infinite; }
-  .btn .dot{ width:11px; height:11px; border-radius:50%; background:#fff; flex: 0 0 auto; }
-  .btn.rec.recording .dot{ background:#ef4444; }
-  @keyframes pulse{
-    0%  { box-shadow:0 0 0 0 rgba(239,68,68,.7); }
-    70% { box-shadow:0 0 0 14px rgba(239,68,68,0); }
-    100%{ box-shadow:0 0 0 0 rgba(239,68,68,0); }
+  .cam-bottom{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px;
+    background:linear-gradient(to top, rgba(0,0,0,.62), transparent);
   }
+  .cam-overlay .icon,
+  .cam-overlay .btn{ pointer-events:auto; }
 
-  .status{
-    position:fixed; top: calc(var(--safe-t) + 12px);
-    left:50%; transform: translateX(-50%); z-index:30;
-    padding:8px 16px; border-radius:999px;
-    background: rgba(0,0,0,.75);
+  .cam-btn{
+    height:38px; min-width:38px;
+    display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    font:inherit; font-size:13px; font-weight:550;
+    color:#fff;
+    background:rgba(20,26,34,.72);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:10px;
+    padding:0 13px;
+    cursor:pointer;
     backdrop-filter: blur(8px);
-    font-size:.78rem; font-weight:600;
-    white-space:nowrap; display:none;
+    -webkit-backdrop-filter: blur(8px);
+    transition:background .15s ease, border-color .15s ease, transform .05s ease;
   }
-  .status.show{ display:block; }
+  .cam-btn:hover{ background:rgba(38,47,58,.85); border-color:rgba(255,255,255,.25); }
+  .cam-btn:active{ transform:translateY(1px); }
+  .cam-btn.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    box-shadow:0 6px 18px -6px rgba(79,142,247,.7);
+  }
+  .cam-btn.primary:hover{ background:#3f7de6; }
+  .cam-btn.on{ background:var(--accent); border-color:var(--accent); }
+  .cam-btn:disabled{ opacity:.4; cursor:not-allowed; }
 
-  /* ---------- App picker sheet ---------- */
-  .sheet-backdrop{
-    position:fixed; inset:0;
-    background: rgba(0,0,0,.6);
-    backdrop-filter: blur(4px);
-    z-index:40; opacity:0; pointer-events:none;
-    transition: opacity .2s;
+  /* camera off / error state */
+  .cam-state{
+    position:absolute; inset:0;
+    display:none;
+    place-items:center; text-align:center;
+    padding:26px;
+    background:#05080b;
+    z-index:3;
   }
-  .sheet-backdrop.open{ opacity:1; pointer-events:auto; }
+  .cam-state.show{ display:grid; }
+  .cam-state .cs-icon{ font-size:34px; margin-bottom:12px; opacity:.8; }
+  .cam-state p{ margin:0 0 14px; font-size:13px; color:var(--muted); line-height:1.6; max-width:330px; }
+  .cam-state .cs-err{ color:#fca5a5; }
 
-  .sheet{
-    position:fixed; left:0; right:0; bottom:0; z-index:50;
-    background:#16161d;
-    border-top-left-radius:22px; border-top-right-radius:22px;
-    border-top:1px solid rgba(255,255,255,.08);
-    box-shadow: 0 -12px 40px rgba(0,0,0,.6);
-    transform: translateY(110%);
-    transition: transform .28s cubic-bezier(.2,.8,.2,1);
-    padding-bottom: calc(var(--safe-b) + 12px);
-    max-height: 85dvh;
-    display:flex; flex-direction:column;
+  /* snapshot flash */
+  .flash{
+    position:absolute; inset:0;
+    background:#fff;
+    opacity:0;
+    pointer-events:none;
+    z-index:5;
   }
-  .sheet.open{ transform: translateY(0); }
-
-  .sheet-grab{
-    width:42px; height:4px;
-    background: rgba(255,255,255,.25);
-    border-radius:99px; margin: 10px auto 4px;
-    flex: 0 0 auto;
-  }
-  .sheet-head{
-    display:flex; align-items:center;
-    padding: 6px 16px 12px; flex: 0 0 auto;
-  }
-  .sheet-head h2{ font-size:1rem; font-weight:700; flex:1; }
-  .sheet-head .side-tag{
-    font-size:.7rem; text-transform:uppercase;
-    letter-spacing:.06em; padding:4px 10px;
-    border-radius:99px; background:#3b82f6; font-weight:700;
-  }
-  .sheet-head .side-tag.right{ background:#f97316; }
-
-  .sheet-body{
-    overflow-y:auto; -webkit-overflow-scrolling: touch;
-    padding: 0 14px 14px; flex: 1 1 auto;
+  .flash.fire{ animation:flash .42s ease-out; }
+  @keyframes flash{
+    0%{ opacity:.92; }
+    100%{ opacity:0; }
   }
 
-  /* Big native-picker button */
-  .native-btn{
-    width:100%;
-    display:flex; align-items:center; gap:14px;
-    border:0; border-radius:16px;
+  /* ============ Content pane ============ */
+  .frame, .note, .placeholder{ display:none; }
+
+  .frame{ width:100%; height:100%; border:0; background:#fff; }
+  .note{
+    width:100%; height:100%;
+    border:0; outline:none; resize:none;
     padding:16px 18px;
-    margin-bottom:14px;
-    background: linear-gradient(135deg,#3b82f6,#8b5cf6);
-    color:#fff; font-weight:700; font-size:1rem;
-    cursor:pointer; text-align:left;
-    box-shadow: 0 8px 22px rgba(59,130,246,.35);
-    transition: transform .12s;
+    background:#0f141a;
+    color:var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size:13.5px; line-height:1.65;
   }
-  .native-btn:active{ transform: scale(.98); }
-  .native-btn:disabled{ opacity:.55; cursor:not-allowed; }
-  .native-btn .nb-icon{
-    width:44px; height:44px; border-radius:12px;
-    background: rgba(255,255,255,.2);
-    display:flex; align-items:center; justify-content:center;
-    font-size:1.4rem; flex: 0 0 auto;
-  }
-  .native-btn .nb-text{ display:flex; flex-direction:column; gap:2px; }
-  .native-btn .nb-text small{
-    font-weight:400; font-size:.75rem; opacity:.85;
-  }
+  .note::placeholder{ color:#4f5865; }
 
-  .section-label{
-    font-size:.7rem; text-transform:uppercase;
-    letter-spacing:.08em; opacity:.55;
-    font-weight:700; padding: 14px 6px 6px;
+  .placeholder{
+    position:absolute; inset:0;
+    place-items:center; text-align:center;
+    padding:28px; color:var(--muted);
+    font-size:13px; line-height:1.6;
   }
+  .placeholder .ph-icon{ font-size:26px; margin-bottom:10px; opacity:.8; }
+  .placeholder p{ margin:0; }
+  .placeholder .ph-sub{ margin-top:8px; font-size:12px; color:#5c6672; max-width:330px; }
 
-  .app-grid{
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
-    gap:12px;
-    padding: 4px;
-  }
-  .app-tile{
-    display:flex; flex-direction:column; align-items:center; gap:6px;
-    padding:10px 6px; border:0; background:transparent;
-    color:#fff; border-radius:14px; cursor:pointer;
-    transition: background .15s, transform .1s;
-  }
-  .app-tile:hover{ background: rgba(255,255,255,.07); }
-  .app-tile:active{ transform: scale(.94); }
-  .app-icon{
-    width:52px; height:52px; border-radius:14px;
-    display:flex; align-items:center; justify-content:center;
-    font-size:1.5rem; font-weight:800; color:#fff;
-    box-shadow: 0 4px 12px rgba(0,0,0,.35);
-    flex: 0 0 auto;
-  }
-  .app-name{
-    font-size:.68rem; font-weight:600; text-align:center;
-    line-height:1.2; opacity:.9; max-width:100%;
-    overflow:hidden; text-overflow:ellipsis;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-  }
+  .pane.mode-web  .frame{ display:block; }
+  .pane.mode-note .note{ display:block; }
+  .pane.mode-note .urlbar,
+  .pane.mode-note .pane-actions [data-act="reload"]{ display:none; }
+  .pane-body.empty .frame{ display:none; }
+  .pane-body.empty .placeholder{ display:grid; }
 
-  .custom-row{ display:flex; gap:8px; padding: 4px 6px 8px; }
-  .custom-row input{
-    flex:1; background:#0f0f14;
-    border:1px solid rgba(255,255,255,.12);
-    border-radius:12px; padding:12px 14px;
-    color:#fff; font-size:.9rem; outline:none;
+  /* ============ Snapshot modal ============ */
+  .modal{
+    position:fixed; inset:0;
+    display:none;
+    place-items:center;
+    padding:20px;
+    background:rgba(3,6,10,.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index:200;
   }
-  .custom-row input:focus{ border-color:#3b82f6; }
-  .custom-row button{
-    border:0; border-radius:12px; background:#3b82f6;
-    color:#fff; font-weight:700; padding: 0 18px;
-    font-size:.85rem; cursor:pointer;
+  .modal.show{ display:grid; }
+  .modal-card{
+    width:min(560px, 100%);
+    max-height:88vh;
+    display:flex; flex-direction:column;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow:0 30px 70px -20px rgba(0,0,0,.95);
+    animation:pop .22s cubic-bezier(.2,.9,.3,1.2);
   }
-  .custom-row button:hover{ background:#2563eb; }
+  @keyframes pop{
+    from{ transform:scale(.94); opacity:0; }
+    to{ transform:scale(1); opacity:1; }
+  }
+  .modal-head{
+    display:flex; align-items:center; gap:10px;
+    padding:12px 14px;
+    border-bottom:1px solid var(--border);
+    font-size:13.5px; font-weight:600;
+  }
+  .modal-head .spacer{ flex:1; }
+  .modal-img{
+    width:100%;
+    max-height:62vh;
+    object-fit:contain;
+    background:#000;
+    display:block;
+  }
+  .modal-actions{
+    display:flex; gap:8px; justify-content:flex-end;
+    padding:12px 14px;
+    border-top:1px solid var(--border);
+    background:var(--panel-2);
+  }
+  .btn.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  .btn.primary:hover{ background:#3f7de6; border-color:#3f7de6; }
 
-  @media (max-height: 380px){
-    .dock{ padding:6px; gap:6px; }
-    .btn{ padding:9px 14px; min-height:40px; font-size:.78rem; }
+  /* ============ Responsive ============ */
+  @media (max-width:720px){
+    .btn .label{ display:none; }
+    .btn{ padding:7px 10px; }
+    .brand span{ display:none; }
+    .topbar{ padding:0 10px; gap:6px; }
+    .stage{ padding:8px; }
+    .pane-bar{ gap:6px; padding:6px; }
+    .seg-btn{ padding:5px 8px; }
+    .select{ max-width:110px; }
+    .cam-btn{ padding:0 10px; font-size:12px; }
   }
 </style>
 </head>
 <body>
 
-  <div class="split" id="split">
-    <section class="pane left">
-      <header class="pane-head">
-        <span class="pane-title">Pane A</span>
-        <button class="mini primary" data-apps="left">＋ App</button>
-        <button class="mini" data-load="left">URL</button>
-        <button class="mini" data-clear="left">✕</button>
-      </header>
-      <div class="pane-body" id="body-left">
-        <div class="placeholder">Pane A<small>Tap “＋ App” to add an app</small></div>
-      </div>
-    </section>
-
-    <section class="pane right">
-      <header class="pane-head">
-        <span class="pane-title">Pane B</span>
-        <button class="mini primary" data-apps="right">＋ App</button>
-        <button class="mini" data-load="right">URL</button>
-        <button class="mini" data-clear="right">✕</button>
-      </header>
-      <div class="pane-body" id="body-right">
-        <div class="placeholder">Pane B<small>Tap “＋ App” to add an app</small></div>
-      </div>
-    </section>
-  </div>
-
-  <div class="status" id="status">Recording…</div>
-
-  <div class="dock">
-    <button class="btn ghost" id="fsBtn">⛶ Fullscreen</button>
-    <button class="btn rec" id="recBtn">
-      <span class="dot"></span><span id="recText">Record</span>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark"></div><span>Camera Split</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="layout" title="Toggle layout">
+      <span class="glyph">▥</span><span class="label">Side by side</span>
     </button>
-  </div>
+    <button class="btn" data-act="swap" title="Swap panes">
+      <span class="glyph">⇄</span><span class="label">Swap</span>
+    </button>
+    <button class="btn" data-act="snapshot" title="Take snapshot">
+      <span class="glyph">◉</span><span class="label">Snapshot</span>
+    </button>
+    <button class="btn" data-act="reset" title="Reset">
+      <span class="glyph">↺</span><span class="label">Reset</span>
+    </button>
+  </header>
 
-  <!-- ---------- App picker sheet ---------- -->
-  <div class="sheet-backdrop" id="backdrop"></div>
-  <div class="sheet" id="sheet">
-    <div class="sheet-grab"></div>
-    <div class="sheet-head">
-      <h2>Choose an app</h2>
-      <span class="side-tag" id="sideTag">Pane A</span>
-    </div>
-    <div class="sheet-body">
+  <main class="stage" id="stage" data-layout="vertical">
 
-      <!-- NATIVE PHONE PICKER -->
-      <button class="native-btn" id="nativePicker">
-        <span class="nb-icon">📱</span>
-        <span class="nb-text">
-          Pick from my phone
-          <small>Opens your phone's app chooser</small>
-        </span>
-      </button>
+    <!-- ===================== CAMERA PANE ===================== -->
+    <section class="pane" id="camPane">
+      <div class="pane-bar">
+        <div class="pane-title">
+          <span class="rec-dot" id="recDot"></span>
+          Camera
+        </div>
+        <select class="select" id="camSelect" title="Select camera"></select>
+        <div class="spacer"></div>
+        <button class="icon" id="camToggle" title="Start / stop camera">⏻</button>
+      </div>
 
-      <div class="section-label">Or choose from list</div>
-      <div class="app-grid" id="appGrid"></div>
+      <div class="pane-body">
+        <div class="cam-wrap">
+          <video class="cam-video" id="video" playsinline autoplay muted></video>
+        </div>
 
-      <div class="section-label">Custom URL</div>
-      <div class="custom-row">
-        <input id="customUrl" type="url" placeholder="https://example.com" />
-        <button id="customGo">Open</button>
+        <div class="cam-overlay">
+          <div class="cam-top">
+            <button class="cam-btn" id="btnMirror" title="Mirror preview">⇋</button>
+          </div>
+          <div class="cam-bottom">
+            <button class="cam-btn" id="btnFlip" title="Switch camera">🔄</button>
+            <button class="cam-btn primary" id="btnSnap" title="Take snapshot">
+              <span style="font-size:16px;line-height:1">◉</span> Snapshot
+            </button>
+            <button class="cam-btn" id="btnFull" title="Fullscreen preview">⛶</button>
+          </div>
+        </div>
+
+        <div class="cam-state" id="camState">
+          <div>
+            <div class="cs-icon" id="csIcon">🎥</div>
+            <p id="csText">Camera is off.</p>
+            <button class="btn primary" id="csBtn">Start camera</button>
+          </div>
+        </div>
+
+        <div class="flash" id="flash"></div>
+      </div>
+    </section>
+
+    <!-- divider injected by JS -->
+
+    <!-- ===================== CONTENT PANE ===================== -->
+    <section class="pane mode-web" id="contentPane">
+      <div class="pane-bar">
+        <div class="seg">
+          <button type="button" class="seg-btn" data-mode="web">Web</button>
+          <button type="button" class="seg-btn" data-mode="note">Note</button>
+        </div>
+        <form class="urlbar" id="urlForm" autocomplete="off">
+          <input class="url-input" id="urlInput" type="text" list="url-presets"
+                 placeholder="Enter a URL…" spellcheck="false">
+          <button class="btn go" type="submit">Go</button>
+        </form>
+        <div class="pane-actions">
+          <button type="button" class="icon" data-act="reload" title="Reload">⟳</button>
+          <button type="button" class="icon" data-act="open" title="Open in new tab">↗</button>
+        </div>
+      </div>
+
+      <div class="pane-body" id="contentBody">
+        <iframe class="frame" id="frame" title="Web content" referrerpolicy="no-referrer"></iframe>
+        <textarea class="note" id="note" spellcheck="false" placeholder="Type your notes here…"></textarea>
+        <div class="placeholder">
+          <div>
+            <div class="ph-icon">🌐</div>
+            <p>Enter a URL above to load a page here.</p>
+            <p class="ph-sub">Some sites (Google, YouTube, X, banking…) block being embedded in a frame.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <datalist id="url-presets">
+    <option value="https://en.wikipedia.org/wiki/Main_Page"></option>
+    <option value="https://example.com"></option>
+    <option value="https://www.openstreetmap.org"></option>
+    <option value="https://news.ycombinator.com"></option>
+    <option value="https://developer.mozilla.org"></option>
+  </datalist>
+
+  <!-- ===================== SNAPSHOT MODAL ===================== -->
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <span>◉</span>
+        <span>Snapshot</span>
+        <span class="spacer"></span>
+        <button class="icon" id="modalClose" title="Close">✕</button>
+      </div>
+      <img class="modal-img" id="modalImg" alt="Snapshot preview">
+      <div class="modal-actions">
+        <button class="btn" id="modalDiscard">Discard</button>
+        <button class="btn primary" id="modalDownload">⬇ Download</button>
       </div>
     </div>
   </div>
 
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
-  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+<script>
+(() => {
+  "use strict";
 
-  <script>
-  /* =========================================================
-     1. App catalog
-     ========================================================= */
-  const APPS = [
-    { name:"WhatsApp",  icon:"💬", bg:"#25D366", scheme:"whatsapp://",   web:"https://web.whatsapp.com",  blocked:true },
-    { name:"YouTube",   icon:"▶",  bg:"#FF0000", scheme:"vnd.youtube://", web:"https://www.youtube.com/embed/dQw4w9WgXcQ" },
-    { name:"Instagram", icon:"📷", bg:"linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", scheme:"instagram://app", web:"https://www.instagram.com", blocked:true },
-    { name:"Facebook",  icon:"f",  bg:"#1877F2", scheme:"fb://",         web:"https://www.facebook.com",  blocked:true },
-    { name:"X",         icon:"𝕏",  bg:"#000",    scheme:"twitter://",    web:"https://twitter.com",       blocked:true },
-    { name:"TikTok",    icon:"♪",  bg:"#000",    scheme:"snssdk1233://", web:"https://www.tiktok.com",    blocked:true },
-    { name:"Spotify",   icon:"♫",  bg:"#1DB954", scheme:"spotify://",    web:"https://open.spotify.com" },
-    { name:"Maps",      icon:"📍", bg:"#34A853", scheme:"geo:0,0?q=",    web:"https://maps.google.com/maps?q=&output=embed" },
-    { name:"Gmail",     icon:"✉",  bg:"#EA4335", scheme:"googlegmail://", web:"https://mail.google.com",  blocked:true },
-    { name:"Phone",     icon:"📞", bg:"#22c55e", scheme:"tel:",          web:null },
-    { name:"Messages",  icon:"💬", bg:"#3b82f6", scheme:"sms:",          web:null },
-    { name:"Telegram",  icon:"✈",  bg:"#229ED9", scheme:"tg://",         web:"https://web.telegram.org",  blocked:true },
-    { name:"Reddit",    icon:"👽", bg:"#FF4500", scheme:"reddit://",     web:"https://www.reddit.com",    blocked:true },
-    { name:"Netflix",   icon:"N",  bg:"#E50914", scheme:"nflx://",       web:"https://www.netflix.com",   blocked:true },
-    { name:"Wikipedia", icon:"W",  bg:"#000",    scheme:"",              web:"https://en.m.wikipedia.org" },
-    { name:"GitHub",    icon:"🐙", bg:"#24292e", scheme:"",              web:"https://github.com" },
-    { name:"Weather",   icon:"⛅", bg:"#0ea5e9", scheme:"",              web:"https://wttr.in/" },
-  ];
+  /* ============================================================
+     Constants & helpers
+  ============================================================ */
+  const KEY = "camera-split-v1";
+  const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 
-  /* =========================================================
-     2. Panes + sheet
-     ========================================================= */
-  const bodies = {
-    left:  document.getElementById("body-left"),
-    right: document.getElementById("body-right"),
-  };
-  const sheet     = document.getElementById("sheet");
-  const backdrop  = document.getElementById("backdrop");
-  const sideTag   = document.getElementById("sideTag");
-  const appGrid   = document.getElementById("appGrid");
-  const customUrl = document.getElementById("customUrl");
-  const customGo  = document.getElementById("customGo");
-  const nativeBtn = document.getElementById("nativePicker");
-
-  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  let activeSide = "left";
-
-  function openSheet(side){
-    activeSide = side;
-    sideTag.textContent = side === "left" ? "Pane A" : "Pane B";
-    sideTag.classList.toggle("right", side === "right");
-    backdrop.classList.add("open");
-    sheet.classList.add("open");
-  }
-  function closeSheet(){
-    backdrop.classList.remove("open");
-    sheet.classList.remove("open");
-  }
-  backdrop.addEventListener("click", closeSheet);
-
-  document.querySelectorAll("[data-apps]").forEach(btn => {
-    btn.addEventListener("click", () => openSheet(btn.dataset.apps));
-  });
-
-  /* =========================================================
-     3. NATIVE PHONE PICKER
-     ---------------------------------------------------------
-     Strategy 1 (best): Web Share API — opens the OS share /
-       app chooser sheet with every compatible app. This is
-       the closest thing a website can do to "show me my apps".
-     Strategy 2 (Android fallback): intent:// URL that tells
-       Android to open the system chooser.
-     Strategy 3 (last resort): tell the user.
-     ========================================================= */
-  const canShare = typeof navigator.share === "function";
-
-  if (!canShare){
-    nativeBtn.disabled = true;
-    nativeBtn.querySelector(".nb-text small").textContent =
-      "Not supported in this browser";
-  }
-
-  nativeBtn.addEventListener("click", async () => {
-    /* --- Try Web Share API first: opens the real app sheet --- */
-    if (canShare){
-      try {
-        await navigator.share({
-          title: "Open in…",
-          text: "Choose an app to open this in",
-          url: "https://example.com",
-        });
-        return;
-      } catch (err){
-        /* user cancelled or share not available → try intent */
-        if (err && err.name === "AbortError") return;
+  /* ============================================================
+     State
+  ============================================================ */
+  function defaults() {
+    return {
+      layout: window.matchMedia("(max-width: 760px)").matches ? "horizontal" : "vertical",
+      ratio: 0.5,
+      camFirst: true,
+      mirrored: true,
+      deviceId: "",
+      content: {
+        mode: "web",
+        url: "https://en.wikipedia.org/wiki/Main_Page",
+        note: ""
       }
-    }
-
-    /* --- Android intent chooser --- */
-    if (/Android/i.test(navigator.userAgent)){
-      // Opens the system chooser for handling a plain https URL.
-      // The browser_fallback_url is used if no app can handle it.
-      const intentUrl =
-        "intent://example.com/#Intent;" +
-        "action=android.intent.action.VIEW;" +
-        "category=android.intent.category.BROWSABLE;" +
-        "scheme=https;" +
-        "S.browser_fallback_url=" + encodeURIComponent(location.href) + ";end";
-
-      try {
-        window.location.href = intentUrl;
-        return;
-      } catch {}
-    }
-
-    alert(
-      "Your phone's app chooser isn't available from this browser.\n\n" +
-      "Tip: use the list below to pick an app instead."
-    );
-  });
-
-  /* =========================================================
-     4. App grid
-     ========================================================= */
-  function buildGrid(){
-    appGrid.innerHTML = "";
-    APPS.forEach(app => {
-      const tile = document.createElement("button");
-      tile.className = "app-tile";
-      tile.innerHTML = `
-        <span class="app-icon" style="background:${app.bg}">${app.icon}</span>
-        <span class="app-name">${app.name}</span>`;
-      tile.addEventListener("click", () => launchApp(app));
-      appGrid.appendChild(tile);
-    });
-  }
-  buildGrid();
-
-  /* =========================================================
-     5. Launch logic
-     ========================================================= */
-  function launchApp(app){
-    closeSheet();
-
-    if (isMobile && app.scheme){
-      try {
-        const start = Date.now();
-        // Some schemes need a hidden iframe on iOS
-        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (isIOS){
-          const f = document.createElement("iframe");
-          f.style.display = "none";
-          f.src = app.scheme;
-          document.body.appendChild(f);
-          setTimeout(() => f.remove(), 1500);
-        } else {
-          window.location.href = app.scheme;
-        }
-
-        setTimeout(() => {
-          if (document.visibilityState === "visible" && Date.now() - start < 2500){
-            launchWeb(app);
-          }
-        }, 1200);
-        return;
-      } catch {}
-    }
-    launchWeb(app);
+    };
   }
 
-  function launchWeb(app){
-    if (!app.web){
-      renderPlaceholder(activeSide, app.name, "No web version — open it manually.");
-      return;
-    }
-    if (app.blocked){
-      renderBlocked(activeSide, app);
-      window.open(app.web, "_blank", "noopener");
-      return;
-    }
-    bodies[activeSide].innerHTML =
-      `<iframe src="${app.web}"
-               allow="fullscreen; autoplay; clipboard-write; encrypted-media"
-               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>`;
-  }
-
-  function renderPlaceholder(side, title, subtitle){
-    bodies[side].innerHTML =
-      `<div class="placeholder">${title}<small>${subtitle}</small></div>`;
-  }
-
-  function renderBlocked(side, app){
-    bodies[side].innerHTML = `
-      <div class="placeholder">
-        ${app.name}
-        <small>Opened in a new tab — this site can't be embedded.</small>
-        <small style="margin-top:14px">
-          <button class="mini primary" id="reopen-${side}">Open again</button>
-        </small>
-      </div>`;
-    document.getElementById(`reopen-${side}`)
-      .addEventListener("click", () => window.open(app.web, "_blank", "noopener"));
-  }
-
-  /* =========================================================
-     6. Custom URL
-     ========================================================= */
-  customGo.addEventListener("click", () => {
-    let url = customUrl.value.trim();
-    if (!url) return;
-    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-    bodies[activeSide].innerHTML =
-      `<iframe src="${url}"
-               allow="fullscreen; autoplay; clipboard-write"
-               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>`;
-    customUrl.value = "";
-    closeSheet();
-  });
-  customUrl.addEventListener("keydown", e => { if (e.key === "Enter") customGo.click(); });
-
-  /* =========================================================
-     7. Pane URL/clear buttons
-     ========================================================= */
-  document.querySelectorAll("[data-load]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const side = btn.dataset.load;
-      const raw = prompt("Enter a website URL:", "https://example.com");
-      if (!raw) return;
-      let url = raw.trim();
-      if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-      bodies[side].innerHTML =
-        `<iframe src="${url}"
-                 allow="fullscreen; autoplay; clipboard-write"
-                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>`;
-    });
-  });
-
-  document.querySelectorAll("[data-clear]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const side = btn.dataset.clear;
-      const label = side === "left" ? "Pane A" : "Pane B";
-      renderPlaceholder(side, label, "Tap “＋ App” to add an app");
-    });
-  });
-
-  /* =========================================================
-     8. Fullscreen
-     ========================================================= */
-  const fsBtn = document.getElementById("fsBtn");
-  const splitEl = document.getElementById("split");
-  fsBtn.addEventListener("click", async () => {
+  function load() {
+    const d = defaults();
     try {
-      if (!document.fullscreenElement){
-        const el = splitEl.requestFullscreen ? splitEl : document.documentElement;
-        await el.requestFullscreen({ navigationUI:"hide" });
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch { alert("Fullscreen isn't supported in this browser."); }
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return d;
+      const p = JSON.parse(raw);
+      return {
+        layout: (p.layout === "horizontal" || p.layout === "vertical") ? p.layout : d.layout,
+        ratio: Number.isFinite(+p.ratio) ? clamp(+p.ratio, 0.12, 0.88) : 0.5,
+        camFirst: p.camFirst !== false,
+        mirrored: p.mirrored !== false,
+        deviceId: typeof p.deviceId === "string" ? p.deviceId : "",
+        content: {
+          mode: p.content && p.content.mode === "note" ? "note" : "web",
+          url: p.content && typeof p.content.url === "string" ? p.content.url : d.content.url,
+          note: p.content && typeof p.content.note === "string" ? p.content.note : ""
+        }
+      };
+    } catch (e) {
+      return d;
+    }
+  }
+
+  let state = load();
+
+  let saveTimer = null;
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    }, 280);
+  }
+
+  /* ============================================================
+     DOM refs
+  ============================================================ */
+  const stage       = document.getElementById("stage");
+  const camPane     = document.getElementById("camPane");
+  const contentPane = document.getElementById("contentPane");
+
+  const video       = document.getElementById("video");
+  const recDot      = document.getElementById("recDot");
+  const camSelect   = document.getElementById("camSelect");
+  const camToggle   = document.getElementById("camToggle");
+  const camState    = document.getElementById("camState");
+  const csIcon      = document.getElementById("csIcon");
+  const csText      = document.getElementById("csText");
+  const csBtn       = document.getElementById("csBtn");
+  const flash       = document.getElementById("flash");
+
+  const btnMirror   = document.getElementById("btnMirror");
+  const btnFlip     = document.getElementById("btnFlip");
+  const btnSnap     = document.getElementById("btnSnap");
+  const btnFull     = document.getElementById("btnFull");
+
+  const contentBody = document.getElementById("contentBody");
+  const frame       = document.getElementById("frame");
+  const note        = document.getElementById("note");
+  const urlForm     = document.getElementById("urlForm");
+  const urlInput    = document.getElementById("urlInput");
+
+  const modal       = document.getElementById("modal");
+  const modalImg    = document.getElementById("modalImg");
+
+  const layoutBtn   = document.querySelector('[data-act="layout"]');
+  const swapBtn     = document.querySelector('[data-act="swap"]');
+  const snapTopBtn  = document.querySelector('[data-act="snapshot"]');
+  const resetBtn    = document.querySelector('[data-act="reset"]');
+
+  /* ============================================================
+     Divider
+  ============================================================ */
+  const divider = document.createElement("div");
+  divider.className = "divider";
+  divider.tabIndex = 0;
+  divider.setAttribute("role", "separator");
+  divider.setAttribute("aria-label", "Resize panes");
+  divider.title = "Drag to resize · double-click to reset";
+
+  /* ============================================================
+     Layout: order of panes + divider
+  ============================================================ */
+  function mountPanes() {
+    // Re-append in the right order
+    if (state.camFirst) {
+      stage.appendChild(camPane);
+      stage.appendChild(divider);
+      stage.appendChild(contentPane);
+    } else {
+      stage.appendChild(contentPane);
+      stage.appendChild(divider);
+      stage.appendChild(camPane);
+    }
+  }
+
+  function applyLayout() {
+    stage.dataset.layout = state.layout;
+    stage.style.setProperty("--a", (state.ratio * 100).toFixed(3) + "%");
+    divider.setAttribute(
+      "aria-orientation",
+      state.layout === "vertical" ? "vertical" : "horizontal"
+    );
+
+    const vert = state.layout === "vertical";
+    layoutBtn.querySelector(".glyph").textContent = vert ? "▥" : "▤";
+    layoutBtn.querySelector(".label").textContent = vert ? "Side by side" : "Stacked";
+    layoutBtn.title = vert ? "Switch to stacked layout" : "Switch to side-by-side layout";
+  }
+
+  /* ============================================================
+     Divider dragging
+  ============================================================ */
+  let dragging = false;
+
+  function setRatio(r) {
+    state.ratio = clamp(r, 0.12, 0.88);
+    stage.style.setProperty("--a", (state.ratio * 100).toFixed(3) + "%");
+  }
+
+  function ratioFromPointer(e) {
+    const s = stage.getBoundingClientRect();
+    const d = divider.getBoundingClientRect();
+    if (state.layout === "vertical") {
+      const avail = s.width - d.width;
+      return (e.clientX - s.left - d.width / 2) / avail;
+    }
+    const avail = s.height - d.height;
+    return (e.clientY - s.top - d.height / 2) / avail;
+  }
+
+  divider.addEventListener("pointerdown", e => {
+    dragging = true;
+    divider.setPointerCapture(e.pointerId);
+    divider.classList.add("dragging");
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = state.layout === "vertical" ? "col-resize" : "row-resize";
+    e.preventDefault();
   });
-  document.addEventListener("fullscreenchange", () => {
-    fsBtn.textContent = document.fullscreenElement ? "⛶ Exit" : "⛶ Fullscreen";
+
+  divider.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    setRatio(ratioFromPointer(e));
   });
 
-  /* =========================================================
-     9. Recorder (desktop, MP4)
-     ========================================================= */
-  const { FFmpeg }    = FFmpegWASM;
-  const { fetchFile } = FFmpegUtil;
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    divider.classList.remove("dragging");
+    document.body.style.userSelect = "";
+    document.body.style.cursor = "";
+    save();
+  }
+  divider.addEventListener("pointerup", endDrag);
+  divider.addEventListener("pointercancel", endDrag);
+  divider.addEventListener("dblclick", () => { setRatio(0.5); save(); });
 
-  const recBtn   = document.getElementById("recBtn");
-  const recText  = document.getElementById("recText");
-  const statusEl = document.getElementById("status");
+  divider.addEventListener("keydown", e => {
+    const step = e.shiftKey ? 0.05 : 0.02;
+    const fwd  = state.layout === "vertical" ? "ArrowRight" : "ArrowDown";
+    const back = state.layout === "vertical" ? "ArrowLeft"  : "ArrowUp";
+    if (e.key === fwd)        { setRatio(state.ratio + step); e.preventDefault(); save(); }
+    else if (e.key === back)  { setRatio(state.ratio - step); e.preventDefault(); save(); }
+    else if (e.key === "Home"){ setRatio(0.5); e.preventDefault(); save(); }
+  });
 
-  let mediaRecorder = null, chunks = [], stream = null, ffmpeg = null;
+  /* ============================================================
+     CAMERA
+  ============================================================ */
+  let stream = null;
+  let starting = false;
+  let devices = [];
 
-  const supportsRecording =
-    !!navigator.mediaDevices?.getDisplayMedia &&
-    typeof window.MediaRecorder !== "undefined";
-
-  if (!supportsRecording){
-    recBtn.disabled = true;
-    recText.textContent = "No recording";
+  function showState(icon, text, btnLabel, isError) {
+    csIcon.textContent = icon;
+    csText.textContent = text;
+    csText.className = isError ? "cs-err" : "";
+    csBtn.textContent = btnLabel || "Start camera";
+    csBtn.style.display = btnLabel === null ? "none" : "";
+    camState.classList.add("show");
+  }
+  function hideState() {
+    camState.classList.remove("show");
   }
 
-  function pickMimeType(){
-    const list = [
-      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-      "video/mp4",
-      "video/webm;codecs=vp9,opus",
-      "video/webm;codecs=vp8,opus",
-      "video/webm",
-    ];
-    for (const t of list) if (MediaRecorder.isTypeSupported(t)) return t;
-    return "";
+  function setLive(on) {
+    recDot.classList.toggle("on", on);
+    camToggle.classList.toggle("on", on);
+    camToggle.title = on ? "Stop camera" : "Start camera";
+    btnSnap.disabled = !on;
+    btnFlip.disabled = !on;
   }
 
-  async function toBlobURL(url, mime){
-    const res = await fetch(url);
-    const buf = await res.arrayBuffer();
-    return URL.createObjectURL(new Blob([buf], { type: mime }));
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    video.srcObject = null;
+    setLive(false);
   }
 
-  async function loadFFmpeg(){
-    if (ffmpeg) return ffmpeg;
-    setStatus("Loading MP4 converter…");
-    ffmpeg = new FFmpeg();
-    const base = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, "application/wasm"),
-    });
-    return ffmpeg;
+  function friendlyError(err) {
+    const n = err && err.name;
+    if (n === "NotAllowedError" || n === "SecurityError")
+      return "Camera permission was denied. Allow access in your browser settings and try again.";
+    if (n === "NotFoundError" || n === "DevicesNotFoundError")
+      return "No camera was found on this device.";
+    if (n === "NotReadableError" || n === "TrackStartError")
+      return "The camera is already in use by another app or tab.";
+    if (n === "OverconstrainedError")
+      return "The selected camera does not support the requested settings.";
+    return "Could not start the camera. " + (err && err.message ? err.message : "");
   }
 
-  async function convertToMp4(webmBlob){
-    const ff = await loadFFmpeg();
-    setStatus("Converting to MP4…");
-    await ff.writeFile("in.webm", await fetchFile(webmBlob));
-    await ff.exec([
-      "-i","in.webm",
-      "-c:v","libx264","-preset","ultrafast","-crf","23",
-      "-c:a","aac","-b:a","128k",
-      "-movflags","+faststart",
-      "out.mp4",
-    ]);
-    const data = await ff.readFile("out.mp4");
-    await ff.deleteFile("in.webm");
-    await ff.deleteFile("out.mp4");
-    return new Blob([data.buffer], { type:"video/mp4" });
-  }
+  async function startCamera(deviceId) {
+    if (starting) return;
+    starting = true;
+    hideState();
 
-  function download(blob, name){
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = name; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
-  }
-
-  function setStatus(t){ statusEl.textContent = t; statusEl.classList.add("show"); }
-  function clearStatus(){ statusEl.classList.remove("show"); }
-
-  if (supportsRecording){
-    recBtn.addEventListener("click", async () => {
-      if (mediaRecorder && mediaRecorder.state === "recording"){
-        mediaRecorder.stop(); return;
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Media devices are not supported in this browser.");
       }
-      try {
-        stream = await navigator.mediaDevices.getDisplayMedia({
-          video:{ cursor:"always", frameRate:30 }, audio:true,
+
+      stopCamera();
+
+      const constraints = {
+        audio: false,
+        video: deviceId
+          ? { deviceId: { exact: deviceId } }
+          : { facingMode: "user" }
+      };
+
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = stream;
+
+      // Wait for metadata so dimensions are known before first snapshot
+      if (video.readyState < 1) {
+        await new Promise(res => {
+          const done = () => { video.removeEventListener("loadedmetadata", done); res(); };
+          video.addEventListener("loadedmetadata", done);
+          setTimeout(res, 1200);
         });
-        const mime = pickMimeType();
-        mediaRecorder = new MediaRecorder(stream, mime ? { mimeType:mime } : undefined);
-        chunks = [];
-
-        mediaRecorder.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
-
-        mediaRecorder.onstop = async () => {
-          const used = mediaRecorder.mimeType || mime || "video/webm";
-          const raw  = new Blob(chunks, { type: used });
-          stream.getTracks().forEach(t => t.stop());
-          recBtn.disabled = true;
-          recText.textContent = "Processing…";
-          try {
-            const mp4 = used.includes("mp4")
-              ? new Blob([raw], { type:"video/mp4" })
-              : await convertToMp4(raw);
-            download(mp4, `screen-${Date.now()}.mp4`);
-          } catch (err){
-            console.error(err);
-            alert("MP4 conversion failed — saving WebM instead.");
-            download(raw, `screen-${Date.now()}.webm`);
-          } finally {
-            recBtn.disabled = false;
-            recText.textContent = "Record";
-            recBtn.classList.remove("recording");
-            clearStatus();
-            mediaRecorder = null;
-          }
-        };
-
-        stream.getVideoTracks()[0].onended = () => {
-          if (mediaRecorder?.state === "recording") mediaRecorder.stop();
-        };
-
-        mediaRecorder.start(1000);
-        recText.textContent = "Stop";
-        recBtn.classList.add("recording");
-        setStatus("Recording…");
-      } catch (err){
-        console.error(err);
-        alert("Could not start recording. Permission denied or unsupported.");
       }
-    });
+
+      try { await video.play(); } catch (e) {}
+
+      setLive(true);
+      hideState();
+
+      // Remember which device actually got used
+      const track = stream.getVideoTracks()[0];
+      const settings = track && track.getSettings ? track.getSettings() : {};
+      if (settings.deviceId) {
+        state.deviceId = settings.deviceId;
+        save();
+      }
+
+      // Labels are only available after permission is granted
+      await refreshDevices(settings.deviceId);
+
+    } catch (err) {
+      stopCamera();
+      showState("🚫", friendlyError(err), "Try again", true);
+      console.warn("[camera]", err);
+    } finally {
+      starting = false;
+    }
   }
-  </script>
+
+  async function refreshDevices(activeId) {
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      devices = all.filter(d => d.kind === "videoinput");
+
+      camSelect.innerHTML = "";
+
+      if (!devices.length) {
+        const o = document.createElement("option");
+        o.textContent = "No camera";
+        camSelect.appendChild(o);
+        camSelect.disabled = true;
+        btnFlip.disabled = true;
+        return;
+      }
+
+      camSelect.disabled = false;
+      devices.forEach((d, i) => {
+        const o = document.createElement("option");
+        o.value = d.deviceId;
+        o.textContent = d.label || ("Camera " + (i + 1));
+        camSelect.appendChild(o);
+      });
+
+      const pick = activeId || state.deviceId;
+      if (pick && devices.some(d => d.deviceId === pick)) {
+        camSelect.value = pick;
+      } else {
+        camSelect.value = devices[0].deviceId;
+      }
+
+      btnFlip.disabled = devices.length < 2;
+    } catch (e) {
+      camSelect.disabled = true;
+      btnFlip.disabled = true;
+    }
+  }
+
+  function toggleCamera() {
+    if (stream) {
+      stopCamera();
+      showState("🎥", "Camera is off.", "Start camera", false);
+      save();
+    } else {
+      startCamera(state.deviceId || "");
+    }
+  }
+
+  function flipCamera() {
+    if (!stream || devices.length < 2) return;
+    const current = camSelect.value;
+    let i = devices.findIndex(d => d.deviceId === current);
+    if (i === -1) i = 0;
+    const next = devices[(i + 1) % devices.length];
+    camSelect.value = next.deviceId;
+    state.deviceId = next.deviceId;
+    save();
+    startCamera(next.deviceId);
+  }
+
+  function applyMirror() {
+    video.classList.toggle("mirror", !!state.mirrored);
+    btnMirror.classList.toggle("on", !!state.mirrored);
+  }
+
+  /* ---------- Snapshot ---------- */
+  function capture() {
+    if (!stream || !video.videoWidth) return null;
+
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+
+    const ctx = c.getContext("2d");
+    if (state.mirrored) {
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, w, h);
+
+    return c.toDataURL("image/png");
+  }
+
+  function takeSnapshot() {
+    const data = capture();
+    if (!data) return;
+
+    flash.classList.remove("fire");
+    void flash.offsetWidth;
+    flash.classList.add("fire");
+
+    modalImg.src = data;
+    modal.classList.add("show");
+  }
+
+  function closeModal() {
+    modal.classList.remove("show");
+    modalImg.src = "";
+  }
+
+  function downloadSnapshot() {
+    const src = modalImg.src;
+    if (!src) return;
+    const a = document.createElement("a");
+    const d = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    const stamp =
+      d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" +
+      pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+    a.href = src;
+    a.download = "snapshot-" + stamp + ".png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  /* ============================================================
+     CONTENT PANE
+  ============================================================ */
+  function normalizeUrl(raw) {
+    let v = (raw || "").trim();
+    if (!v) return "";
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) {
+      v = "https://" + v.replace(/^\/+/, "");
+    }
+    return v;
+  }
+
+  function renderContent() {
+    const c = state.content;
+
+    contentPane.classList.toggle("mode-web",  c.mode === "web");
+    contentPane.classList.toggle("mode-note", c.mode === "note");
+
+    contentPane.querySelectorAll(".seg-btn").forEach(b =>
+      b.classList.toggle("on", b.dataset.mode === c.mode)
+    );
+
+    if (document.activeElement !== urlInput) urlInput.value = c.url || "";
+    if (document.activeElement !== note)     note.value     = c.note || "";
+
+    contentBody.classList.toggle("empty", c.mode === "web" && !c.url);
+
+    if (c.mode === "web" && c.url && frame.dataset.src !== c.url) {
+      frame.src = c.url;
+      frame.dataset.src = c.url;
+    }
+  }
+
+  contentPane.querySelectorAll(".seg-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.content.mode = btn.dataset.mode;
+      renderContent();
+      save();
+      if (btn.dataset.mode === "note") note.focus();
+    });
+  });
+
+  urlForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const url = normalizeUrl(urlInput.value);
+    if (!url) return;
+    state.content.url = url;
+    state.content.mode = "web";
+    urlInput.value = url;
+    renderContent();
+    save();
+  });
+
+  contentPane.querySelector('[data-act="reload"]').addEventListener("click", () => {
+    const c = state.content;
+    if (c.mode !== "web" || !c.url) return;
+    frame.dataset.src = "";
+    frame.src = "about:blank";
+    setTimeout(() => {
+      frame.src = c.url;
+      frame.dataset.src = c.url;
+    }, 40);
+  });
+
+  contentPane.querySelector('[data-act="open"]').addEventListener("click", () => {
+    const c = state.content;
+    if (c.mode === "web" && c.url) window.open(c.url, "_blank", "noopener");
+  });
+
+  note.addEventListener("input", () => {
+    state.content.note = note.value;
+    save();
+  });
+
+  /* ============================================================
+     Camera control wiring
+  ============================================================ */
+  camToggle.addEventListener("click", toggleCamera);
+  csBtn.addEventListener("click", () => startCamera(state.deviceId || ""));
+  btnSnap.addEventListener("click", takeSnapshot);
+  btnFlip.addEventListener("click", flipCamera);
+
+  btnMirror.addEventListener("click", () => {
+    state.mirrored = !state.mirrored;
+    applyMirror();
+    save();
+  });
+
+  camSelect.addEventListener("change", () => {
+    state.deviceId = camSelect.value;
+    save();
+    startCamera(state.deviceId);
+  });
+
+  btnFull.addEventListener("click", () => {
+    const el = video;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    } else if (el.webkitEnterFullscreen) {
+      el.webkitEnterFullscreen();          // iOS Safari
+    }
+  });
+
+  /* ============================================================
+     Snapshot modal wiring
+  ============================================================ */
+  document.getElementById("modalClose").addEventListener("click", closeModal);
+  document.getElementById("modalDiscard").addEventListener("click", closeModal);
+  document.getElementById("modalDownload").addEventListener("click", downloadSnapshot);
+
+  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && modal.classList.contains("show")) closeModal();
+    // Space or S = snapshot (when not typing)
+    const tag = (document.activeElement && document.activeElement.tagName) || "";
+    const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    if (!typing && !modal.classList.contains("show")) {
+      if (e.code === "Space" || e.key.toLowerCase() === "s") {
+        if (stream) { e.preventDefault(); takeSnapshot(); }
+      }
+    }
+  });
+
+  /* ============================================================
+     Global buttons
+  ============================================================ */
+  layoutBtn.addEventListener("click", () => {
+    state.layout = state.layout === "vertical" ? "horizontal" : "vertical";
+    applyLayout();
+    save();
+  });
+
+  swapBtn.addEventListener("click", () => {
+    state.camFirst = !state.camFirst;
+    mountPanes();
+    save();
+  });
+
+  snapTopBtn.addEventListener("click", takeSnapshot);
+
+  resetBtn.addEventListener("click", () => {
+    state = defaults();
+    applyMirror();
+    mountPanes();
+    applyLayout();
+    renderContent();
+    save();
+    startCamera(state.deviceId || "");
+  });
+
+  /* ============================================================
+     Visibility: pause preview when tab is hidden (saves battery)
+  ============================================================ */
+  document.addEventListener("visibilitychange", () => {
+    if (!stream) return;
+    if (document.hidden) {
+      video.pause();
+    } else {
+      video.play().catch(() => {});
+    }
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+  });
+
+  /* ============================================================
+     Init
+  ============================================================ */
+  mountPanes();
+  applyLayout();
+  applyMirror();
+  renderContent();
+  setLive(false);
+
+  // Auto-start the camera on load (browser will prompt for permission)
+  startCamera(state.deviceId || "");
+
+})();
+</script>
 </body>
 </html>
