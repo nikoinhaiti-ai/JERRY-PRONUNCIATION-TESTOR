@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Camera Split · Recorder</title>
+<title>Camera Split · Stage Recorder</title>
 <style>
   :root{
     --bg:#0b0f14;
@@ -16,6 +16,7 @@
     --danger:#ef4444;
     --flash:#fbbf24;
     --rec:#ef4444;
+    --stage:#8b5cf6;
   }
 
   *{ box-sizing:border-box; }
@@ -78,6 +79,10 @@
     animation:livePulse 2s ease-in-out infinite;
   }
   .btn.rec.live:hover{ background:#dc2626; border-color:#dc2626; }
+  .btn.rec.stage{
+    background:#1e1338; border-color:#4c2f7c; color:#c4b5fd;
+  }
+  .btn.rec.stage:hover{ background:#2c1c50; border-color:#6b46c1; }
   @keyframes livePulse{
     0%,100%{ box-shadow:0 0 0 0 rgba(239,68,68,.6); }
     50%    { box-shadow:0 0 0 6px rgba(239,68,68,0); }
@@ -95,6 +100,12 @@
   .stage[data-layout="horizontal"]{
     grid-template-columns: minmax(0,1fr);
     grid-template-rows: var(--a,50%) 12px minmax(0,1fr);
+  }
+  /* Visual cue while stage recording */
+  .stage.recording{
+    outline:2px solid rgba(239,68,68,.6);
+    outline-offset:-2px;
+    border-radius:14px;
   }
 
   /* ============ Divider ============ */
@@ -305,7 +316,7 @@
 
   .cam-bottom{
     display:flex; align-items:center; justify-content:center;
-    gap:20px; padding:0 12px;
+    gap:16px; padding:0 12px;
   }
 
   .cam-btn{
@@ -327,51 +338,45 @@
   .cam-btn.on{ background:var(--accent); border-color:var(--accent); }
   .cam-btn.on.flash{ background:var(--flash); border-color:var(--flash); color:#1a1400; }
   .cam-btn:disabled{ opacity:.35; cursor:not-allowed; }
-  .cam-btn.mic-off{ color:#9aa3ae; }
-  .cam-btn.mic-off .mic-bar{ display:block; }
 
-  /* mic slash overlay */
-  .mic-slashed{ position:relative; }
-  .mic-slashed::after{
-    content:"";
-    position:absolute; left:50%; top:50%;
-    width:22px; height:2px;
-    background:var(--danger);
-    border-radius:2px;
-    transform:translate(-50%,-50%) rotate(-45deg);
-    pointer-events:none;
-  }
-
-  /* record timer pill */
-  .rec-timer{
-    position:absolute;
-    top:10px; left:50%;
-    transform:translateX(-50%);
-    z-index:5;
-    display:none;
-    align-items:center; gap:8px;
-    padding:6px 14px;
-    font-size:13px; font-weight:700;
+  /* Source toggle (📷 / 🖥️) */
+  .src-btn{
+    width:50px; height:50px;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,.22);
+    background:rgba(20,26,34,.72);
     color:#fff;
-    background:rgba(15,5,5,.82);
-    border:1px solid rgba(239,68,68,.5);
-    border-radius:999px;
+    font-size:20px; line-height:1;
+    display:grid; place-items:center;
+    cursor:pointer;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    font-variant-numeric: tabular-nums;
-    letter-spacing:.5px;
-    pointer-events:none;
+    transition:background .15s ease, border-color .15s ease, transform .05s ease, box-shadow .15s ease;
+    pointer-events:auto;
+    position:relative;
   }
-  .rec-timer.show{ display:inline-flex; }
-  .rec-timer .blink{
-    width:9px; height:9px; border-radius:50%;
-    background:var(--rec);
-    animation:recBlink 1s steps(2,end) infinite;
+  .src-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.36); }
+  .src-btn:active{ transform:scale(.94); }
+  .src-btn.stage{
+    background:var(--stage);
+    border-color:var(--stage);
+    box-shadow: 0 6px 18px -6px rgba(139,92,246,.85);
   }
-  @keyframes recBlink{ 0%,49%{opacity:1} 50%,100%{opacity:.15} }
-  .rec-timer .mic-flag{ font-size:11px; color:#fca5a5; }
+  .src-btn.stage:hover{ background:#7c4ff0; border-color:#7c4ff0; }
 
-  /* big shutter + record button */
+  /* Small label under the source button */
+  .src-label{
+    position:absolute;
+    bottom:-18px; left:50%; transform:translateX(-50%);
+    font-size:9.5px; font-weight:700;
+    letter-spacing:.4px;
+    color:#c4b5fd;
+    white-space:nowrap;
+    pointer-events:none;
+    text-transform:uppercase;
+  }
+
+  /* big shutter */
   .shutter{
     width:66px; height:66px;
     border-radius:50%;
@@ -396,7 +401,6 @@
   .shutter:active::before{ transform:scale(.86); }
   .shutter:disabled{ opacity:.35; cursor:not-allowed; }
 
-  /* record button — turns into a red square while recording */
   .rec-btn{
     width:66px; height:66px;
     border-radius:50%;
@@ -419,17 +423,58 @@
   .rec-btn:hover::before{ background:#f87171; }
   .rec-btn:active{ transform:scale(.93); }
   .rec-btn:disabled{ opacity:.35; cursor:not-allowed; }
-
-  /* recording state → inner square */
   .rec-btn.live::before{
     width:28px; height:28px;
     border-radius:7px;
     background:#fff;
-    box-shadow: 0 4px 16px -4px rgba(0,0,0,.85);
   }
-  .rec-btn.live{ border-color:var(--rec); }
+  .rec-btn.live{ border-color:var(--rec); animation: livePulse 2s ease-in-out infinite; }
   .rec-btn.live:hover::before{ background:#fecaca; }
-  .rec-btn.live{ animation: livePulse 2s ease-in-out infinite; }
+
+  /* Stage-source record button gets purple accent */
+  .rec-btn.stage-src::before{
+    background:var(--stage);
+    box-shadow: 0 4px 16px -4px rgba(0,0,0,.85), 0 0 22px -4px rgba(139,92,246,.75);
+  }
+  .rec-btn.stage-src:hover::before{ background:#a78bfa; }
+  .rec-btn.stage-src.live{ border-color:var(--stage); }
+
+  /* record timer pill */
+  .rec-timer{
+    position:absolute;
+    top:10px; left:50%;
+    transform:translateX(-50%);
+    z-index:5;
+    display:none;
+    align-items:center; gap:8px;
+    padding:6px 14px;
+    font-size:13px; font-weight:700;
+    color:#fff;
+    background:rgba(15,5,5,.82);
+    border:1px solid rgba(239,68,68,.5);
+    border-radius:999px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-variant-numeric: tabular-nums;
+    letter-spacing:.5px;
+    pointer-events:none;
+  }
+  .rec-timer.show{ display:inline-flex; }
+  .rec-timer.stage{
+    background:rgba(20,10,40,.82);
+    border-color:rgba(139,92,246,.55);
+  }
+  .rec-timer .blink{
+    width:9px; height:9px; border-radius:50%;
+    background:var(--rec);
+    animation:recBlink 1s steps(2,end) infinite;
+  }
+  .rec-timer.stage .blink{ background:var(--stage); }
+  @keyframes recBlink{ 0%,49%{opacity:1} 50%,100%{opacity:.15} }
+  .rec-timer .src-flag,
+  .rec-timer .mic-flag{ font-size:12px; }
+  .rec-timer .src-flag{ color:#c4b5fd; }
+  .rec-timer .mic-flag{ color:#fca5a5; }
 
   /* status badge */
   .fx-status{
@@ -511,7 +556,7 @@
   .pane-body.empty .frame{ display:none; }
   .pane-body.empty .placeholder{ display:grid; }
 
-  /* ============ Snapshot / Recording preview modal ============ */
+  /* ============ Preview modal ============ */
   .modal{
     position:fixed; inset:0;
     display:none; place-items:center; padding:20px;
@@ -522,8 +567,8 @@
   }
   .modal.show{ display:grid; }
   .modal-card{
-    width:min(560px,100%);
-    max-height:88vh;
+    width:min(640px,100%);
+    max-height:90vh;
     display:flex; flex-direction:column;
     background:var(--panel);
     border:1px solid var(--border);
@@ -549,8 +594,8 @@
     background:#000; display:block;
   }
   .modal-meta{
-    display:flex; align-items:center; gap:12px;
-    padding:8px 14px;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:10px 14px;
     font-size:12px; color:var(--muted);
     border-top:1px solid var(--border);
     background:#0d1218;
@@ -561,6 +606,11 @@
     background:#1a2029;
     border:1px solid var(--border);
     border-radius:999px;
+  }
+  .modal-meta .tag.stage{
+    background:#1e1338;
+    border-color:#4c2f7c;
+    color:#c4b5fd;
   }
   .modal-actions{
     display:flex; gap:8px; justify-content:flex-end;
@@ -584,7 +634,8 @@
     .shutter, .rec-btn{ width:58px; height:58px; }
     .shutter::before, .rec-btn::before{ width:42px; height:42px; }
     .rec-btn.live::before{ width:24px; height:24px; border-radius:6px; }
-    .cam-bottom{ gap:14px; }
+    .src-btn{ width:44px; height:44px; font-size:17px; }
+    .cam-bottom{ gap:12px; }
   }
 </style>
 </head>
@@ -592,7 +643,7 @@
 
   <header class="topbar">
     <div class="brand">
-      <div class="mark"></div><span>Camera Split · Recorder</span>
+      <div class="mark"></div><span>Camera Split · Stage Rec</span>
     </div>
     <div class="spacer"></div>
     <button class="btn" data-act="layout" title="Toggle layout">
@@ -637,6 +688,7 @@
         <div class="rec-timer" id="recTimer">
           <span class="blink"></span>
           <span id="recTime">00:00</span>
+          <span class="src-flag" id="recSrcFlag"></span>
           <span class="mic-flag" id="recMicFlag"></span>
         </div>
 
@@ -658,6 +710,7 @@
           <div class="cam-bottom-group">
             <div class="filter-strip" id="filterStrip"></div>
             <div class="cam-bottom">
+              <button class="src-btn" id="btnSrc" title="Recording source">📷</button>
               <button class="shutter" id="btnSnap" title="Take snapshot"></button>
               <button class="rec-btn" id="btnRec" title="Start / stop recording"></button>
             </div>
@@ -717,7 +770,7 @@
     <option value="https://developer.mozilla.org"></option>
   </datalist>
 
-  <!-- ===================== PREVIEW MODAL (snapshot OR recording) ===================== -->
+  <!-- ===================== PREVIEW MODAL ===================== -->
   <div class="modal" id="modal">
     <div class="modal-card">
       <div class="modal-head">
@@ -731,9 +784,10 @@
       <video class="modal-video" id="modalVideo" controls playsinline style="display:none"></video>
 
       <div class="modal-meta" id="modalMeta" style="display:none">
+        <span class="tag" id="metaSource">📷 Camera pane</span>
         <span class="tag" id="metaDuration">⏱ 00:00</span>
         <span class="tag" id="metaSize">📦 0 MB</span>
-        <span class="tag" id="metaType">🎬</span>
+        <span class="tag" id="metaType">🎬 WebM</span>
       </div>
 
       <div class="modal-actions">
@@ -748,7 +802,7 @@
   "use strict";
 
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-  const KEY = "camera-split-fx-v3";
+  const KEY = "camera-split-fx-v4";
 
   /* ============================================================
      Filters
@@ -798,8 +852,9 @@
       filter: "none",
       beauty: 0,
       flash: false,
-      mic: false,          // microphone for recording
+      mic: false,
       recFps: 30,
+      recSource: "cam",   // "cam" | "stage"
       content: {
         mode: "web",
         url: "https://en.wikipedia.org/wiki/Main_Page",
@@ -825,6 +880,7 @@
         flash: p.flash === true,
         mic: p.mic === true,
         recFps: [24,30,60].includes(+p.recFps) ? +p.recFps : 30,
+        recSource: p.recSource === "stage" ? "stage" : "cam",
         content: {
           mode: p.content && p.content.mode === "note" ? "note" : "web",
           url: p.content && typeof p.content.url === "string" ? p.content.url : d.content.url,
@@ -870,6 +926,7 @@
   const filterStrip = document.getElementById("filterStrip");
   const recTimer    = document.getElementById("recTimer");
   const recTime     = document.getElementById("recTime");
+  const recSrcFlag  = document.getElementById("recSrcFlag");
   const recMicFlag  = document.getElementById("recMicFlag");
 
   const btnBeauty   = document.getElementById("btnBeauty");
@@ -878,6 +935,7 @@
   const btnFlip     = document.getElementById("btnFlip");
   const btnSnap     = document.getElementById("btnSnap");
   const btnRec      = document.getElementById("btnRec");
+  const btnSrc      = document.getElementById("btnSrc");
   const btnFull     = document.getElementById("btnFull");
 
   const contentBody = document.getElementById("contentBody");
@@ -892,6 +950,7 @@
   const modalMeta   = document.getElementById("modalMeta");
   const modalIcon   = document.getElementById("modalIcon");
   const modalTitle  = document.getElementById("modalTitle");
+  const metaSource  = document.getElementById("metaSource");
   const metaDuration= document.getElementById("metaDuration");
   const metaSize    = document.getElementById("metaSize");
   const metaType    = document.getElementById("metaType");
@@ -903,7 +962,7 @@
   const resetBtn    = document.querySelector('[data-act="reset"]');
 
   /* ============================================================
-     Divider
+     Divider & layout
   ============================================================ */
   const divider = document.createElement("div");
   divider.className = "divider";
@@ -947,6 +1006,7 @@
     return (e.clientY - s.top - d.height / 2) / avail;
   }
   divider.addEventListener("pointerdown", e => {
+    if (recorder.isRecording) return;   // freeze layout while recording
     dragging = true;
     divider.setPointerCapture(e.pointerId);
     divider.classList.add("dragging");
@@ -965,8 +1025,9 @@
   }
   divider.addEventListener("pointerup", endDrag);
   divider.addEventListener("pointercancel", endDrag);
-  divider.addEventListener("dblclick", () => { setRatio(0.5); save(); });
+  divider.addEventListener("dblclick", () => { if (!recorder.isRecording) { setRatio(0.5); save(); } });
   divider.addEventListener("keydown", e => {
+    if (recorder.isRecording) return;
     const step = e.shiftKey ? 0.05 : 0.02;
     const fwd  = state.layout === "vertical" ? "ArrowRight" : "ArrowDown";
     const back = state.layout === "vertical" ? "ArrowLeft"  : "ArrowUp";
@@ -1002,6 +1063,7 @@
     btnFlash.disabled = !on;
     btnBeauty.disabled = !on;
     btnRec.disabled = !on;
+    btnSrc.disabled = !on;
     recTopBtn.disabled = !on;
   }
 
@@ -1089,11 +1151,8 @@
       hideState();
 
       if (state.flash) {
-        if (hasTorch) {
-          await applyTorch(true);
-        } else {
-          screenFlash.classList.add("on");
-        }
+        if (hasTorch) await applyTorch(true);
+        else screenFlash.classList.add("on");
       }
       updateFlashUI();
       ensureLoop();
@@ -1134,9 +1193,7 @@
         ? pick : devices[0].deviceId;
 
       setLive(!!stream);
-    } catch (e) {
-      camSelect.disabled = true;
-    }
+    } catch (e) { camSelect.disabled = true; }
   }
 
   function toggleCamera() {
@@ -1151,7 +1208,7 @@
 
   function flipCamera() {
     if (!stream || devices.length < 2) return;
-    if (recorder.isRecording) return; // don't swap mid-recording
+    if (recorder.isRecording) return;
     let i = devices.findIndex(d => d.deviceId === camSelect.value);
     if (i === -1) i = 0;
     const next = devices[(i + 1) % devices.length];
@@ -1247,15 +1304,13 @@
       try {
         landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
           baseOptions: Object.assign({ delegate: "GPU" }, baseOpts),
-          runningMode: "VIDEO",
-          numFaces: 1
+          runningMode: "VIDEO", numFaces: 1
         });
       } catch (gpuErr) {
         console.warn("[filters] GPU delegate failed, falling back to CPU", gpuErr);
         landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
           baseOptions: Object.assign({ delegate: "CPU" }, baseOpts),
-          runningMode: "VIDEO",
-          numFaces: 1
+          runningMode: "VIDEO", numFaces: 1
         });
       }
 
@@ -1403,7 +1458,6 @@
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.globalAlpha = level >= 2 ? 0.20 : 0.12;
-
     for (const e of [lEye, rEye]) {
       const g = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, radius);
       g.addColorStop(0,    "rgba(255,251,242,0.95)");
@@ -1426,7 +1480,6 @@
     const c  = mid(lc, rc);
     const eyeDist = dist(lc, rc);
     const ang = Math.atan2(rc.y - lc.y, rc.x - lc.x);
-
     const lensW = eyeDist * 0.66;
     const lensH = lensW * 0.78;
     const gap   = eyeDist * 0.10;
@@ -1485,29 +1538,24 @@
     const rc    = P(LMK.R_CHEEK);
     const nose  = P(LMK.NOSE);
     const mouthB= P(LMK.MOUTH_BOT);
-
     const faceW = dist(lc, rc);
     const faceH = dist(top, chin);
 
     const drawEar = (cx, cy, dir) => {
-      const w = faceW * 0.32;
-      const h = faceH * 0.54;
+      const w = faceW * 0.32, h = faceH * 0.54;
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(dir * 0.28);
-
       const g = ctx.createLinearGradient(0, 0, 0, h);
       g.addColorStop(0, "#8a5a30");
       g.addColorStop(1, "#43260f");
       ctx.fillStyle = g;
-
       ctx.beginPath();
       ctx.moveTo(-w * 0.14, 0);
       ctx.bezierCurveTo(-w * 0.72, h * 0.15, -w * 0.62, h * 0.86, -w * 0.08, h);
       ctx.bezierCurveTo( w * 0.36, h * 0.86,  w * 0.44, h * 0.2,  w * 0.16, 0);
       ctx.closePath();
       ctx.fill();
-
       ctx.fillStyle = "rgba(50,22,8,0.55)";
       ctx.beginPath();
       ctx.moveTo(0, h * 0.13);
@@ -1522,10 +1570,8 @@
     drawEar(lc.x + faceW * 0.05, earY, -1);
     drawEar(rc.x - faceW * 0.05, earY, +1);
 
-    const nx = nose.x;
-    const ny = nose.y + faceH * 0.035;
-    const nw = faceW * 0.17;
-    const nh = nw * 0.74;
+    const nx = nose.x, ny = nose.y + faceH * 0.035;
+    const nw = faceW * 0.17, nh = nw * 0.74;
 
     ctx.save();
     ctx.translate(nx, ny);
@@ -1546,17 +1592,12 @@
     for (let s = -1; s <= 1; s += 2) {
       for (let i = 0; i < 3; i++) {
         ctx.beginPath();
-        ctx.arc(
-          nx + s * nw * 0.62,
-          ny + (i - 1) * nh * 0.34 + nh * 0.12,
-          Math.max(1, nw * 0.045), 0, Math.PI * 2
-        );
+        ctx.arc(nx + s * nw * 0.62, ny + (i - 1) * nh * 0.34 + nh * 0.12, Math.max(1, nw * 0.045), 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
-    const tW = faceW * 0.14;
-    const tH = faceH * 0.14;
+    const tW = faceW * 0.14, tH = faceH * 0.14;
     ctx.fillStyle = "#ff5b7a";
     ctx.beginPath();
     ctx.ellipse(mouthB.x, mouthB.y + tH * 0.32, tW / 2, tH / 2, 0, 0, Math.PI);
@@ -1575,14 +1616,11 @@
     const c  = mid(ml, mr);
     const mouthW = dist(ml, mr);
     const ang = Math.atan2(mr.y - ml.y, mr.x - ml.x);
-
-    const w = mouthW * 1.2;
-    const h = mouthW * 0.36;
+    const w = mouthW * 1.2, h = mouthW * 0.36;
 
     ctx.save();
     ctx.translate(c.x, c.y - h * 0.5);
     ctx.rotate(ang);
-
     ctx.fillStyle = "#1a1210";
     ctx.beginPath();
     ctx.moveTo(0, -h * 0.05);
@@ -1594,15 +1632,9 @@
     ctx.bezierCurveTo( w * 0.45, -h * 0.88,  w * 0.18, -h * 0.72, 0, -h * 0.05);
     ctx.closePath();
     ctx.fill();
-
     ctx.fillStyle = "rgba(100,78,60,0.35)";
-    ctx.beginPath();
-    ctx.ellipse(-w * 0.26, -h * 0.38, w * 0.12, h * 0.1, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse( w * 0.26, -h * 0.38, w * 0.12, h * 0.1,  0.3, 0, Math.PI * 2);
-    ctx.fill();
-
+    ctx.beginPath(); ctx.ellipse(-w * 0.26, -h * 0.38, w * 0.12, h * 0.1, -0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( w * 0.26, -h * 0.38, w * 0.12, h * 0.1,  0.3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
@@ -1612,19 +1644,15 @@
     const rc  = P(LMK.R_CHEEK);
     const faceW = dist(lc, rc);
     const faceH = dist(top, P(LMK.CHIN));
-
     const lc2 = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
     const rc2 = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
     const tilt = Math.atan2(rc2.y - lc2.y, rc2.x - lc2.x) * 0.6;
-
-    const w = faceW * 0.9;
-    const h = w * 0.42;
+    const w = faceW * 0.9, h = w * 0.42;
     const baseY = top.y - faceH * 0.02;
 
     ctx.save();
     ctx.translate(top.x, baseY);
     ctx.rotate(tilt);
-
     const x0 = -w / 2;
 
     ctx.beginPath();
@@ -1658,20 +1686,15 @@
     for (let i = 0; i < 5; i++) {
       const jx = x0 + (i + 0.5) * (w / 5);
       ctx.fillStyle = jewels[i];
-      ctx.beginPath();
-      ctx.arc(jx, -h * 0.06, w * 0.028, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(jx, -h * 0.06, w * 0.028, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "rgba(255,255,255,0.65)";
-      ctx.beginPath();
-      ctx.arc(jx - w * 0.01, -h * 0.075, w * 0.009, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(jx - w * 0.01, -h * 0.075, w * 0.009, 0, Math.PI * 2); ctx.fill();
     }
 
     for (let i = 0; i < 3; i++) {
       const sx = x0 + (i * 2 + 0.5) * (w / 5);
       drawSparkle(ctx, sx, -h * 0.98, w * 0.032, "rgba(255,255,240,0.95)");
     }
-
     ctx.restore();
   }
 
@@ -1681,37 +1704,26 @@
     const rc  = P(LMK.R_CHEEK);
     const faceW = dist(lc, rc);
     const faceH = dist(top, P(LMK.CHIN));
-
     const lc2 = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
     const rc2 = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
     const ang = Math.atan2(rc2.y - lc2.y, rc2.x - lc2.x);
     const cx  = (lc2.x + rc2.x) / 2;
 
     const drawEar = (offsetX, tilt) => {
-      const ew = faceW * 0.21;
-      const eh = faceH * 0.9;
-
+      const ew = faceW * 0.21, eh = faceH * 0.9;
       ctx.save();
       ctx.translate(cx + offsetX, top.y + faceH * 0.02);
       ctx.rotate(ang + tilt);
-
       const g = ctx.createLinearGradient(0, 0, 0, -eh);
       g.addColorStop(0, "#f2eef6");
       g.addColorStop(1, "#ffffff");
       ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(0, -eh / 2, ew / 2, eh / 2, 0, 0, Math.PI * 2);
-      ctx.fill();
-
+      ctx.beginPath(); ctx.ellipse(0, -eh / 2, ew / 2, eh / 2, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "rgba(180,170,190,0.65)";
       ctx.lineWidth = Math.max(1, ew * 0.05);
       ctx.stroke();
-
       ctx.fillStyle = "#ffb6c9";
-      ctx.beginPath();
-      ctx.ellipse(0, -eh / 2, ew * 0.28, eh * 0.36, 0, 0, Math.PI * 2);
-      ctx.fill();
-
+      ctx.beginPath(); ctx.ellipse(0, -eh / 2, ew * 0.28, eh * 0.36, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     };
 
@@ -1729,17 +1741,14 @@
 
     const drawHeart = (cx, cy, s, phase) => {
       s *= 1 + Math.sin(t + phase) * 0.12;
-
       ctx.save();
       ctx.translate(cx, cy - s * 0.45);
       ctx.shadowColor = "rgba(255,60,110,0.9)";
       ctx.shadowBlur = s * 0.55;
-
       const g = ctx.createLinearGradient(0, -s * 0.7, 0, s * 0.45);
       g.addColorStop(0, "#ff4d79");
       g.addColorStop(1, "#c9184a");
       ctx.fillStyle = g;
-
       const topCurve = s * 0.3;
       ctx.beginPath();
       ctx.moveTo(0, topCurve);
@@ -1749,13 +1758,11 @@
       ctx.bezierCurveTo(s / 2, 0, 0, 0, 0, topCurve);
       ctx.closePath();
       ctx.fill();
-
       ctx.shadowBlur = 0;
       ctx.fillStyle = "rgba(255,255,255,0.6)";
       ctx.beginPath();
       ctx.ellipse(-s * 0.16, s * 0.28, s * 0.08, s * 0.06, -0.5, 0, Math.PI * 2);
       ctx.fill();
-
       ctx.restore();
     };
 
@@ -1769,7 +1776,6 @@
     const c    = mid(lEye, rEye);
     const eyeDist = dist(lEye, rEye);
     const ang = Math.atan2(rEye.y - lEye.y, rEye.x - lEye.x);
-
     const patchEye = lEye.x < rEye.x ? lEye : rEye;
     const size = eyeDist * 0.52;
 
@@ -1788,25 +1794,17 @@
     ctx.save();
     ctx.translate(patchEye.x, patchEye.y);
     ctx.rotate(ang);
-
     ctx.fillStyle = "#08080c";
-    ctx.beginPath();
-    ctx.ellipse(0, 0, size * 0.74, size * 0.86, 0, 0, Math.PI * 2);
-    ctx.fill();
-
+    ctx.beginPath(); ctx.ellipse(0, 0, size * 0.74, size * 0.86, 0, 0, Math.PI * 2); ctx.fill();
     const g = ctx.createLinearGradient(-size * 0.5, -size * 0.5, size * 0.45, size * 0.45);
     g.addColorStop(0,   "rgba(90,90,105,0.6)");
     g.addColorStop(0.5, "rgba(20,20,26,0.2)");
     g.addColorStop(1,   "rgba(0,0,0,0.45)");
     ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, size * 0.74, size * 0.86, 0, 0, Math.PI * 2);
-    ctx.fill();
-
+    ctx.beginPath(); ctx.ellipse(0, 0, size * 0.74, size * 0.86, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,0.14)";
     ctx.lineWidth = Math.max(1, size * 0.06);
     ctx.stroke();
-
     ctx.restore();
   }
 
@@ -1823,25 +1821,30 @@
   }
 
   /* ============================================================
-     RECORDER CORE
+     RECORDER
   ============================================================ */
   const recorder = {
     mediaRecorder: null,
     chunks: [],
     canvas: null,
     canvasCtx: null,
-    audioStream: null,
     canvasStream: null,
+    audioStream: null,
     mimeType: "",
     fileExt: "webm",
     isRecording: false,
     startedAt: 0,
     timerInterval: null,
+    mode: null,          // "cam" | "stage"
     pendingBlob: null,
-    pendingMeta: null
+    pendingMeta: null,
+    // stage capture
+    stageStream: null,
+    stageVideo: null,
+    stageCanvasStream: null,
+    stageStopLoop: null
   };
 
-  /* Pick the best supported recording mime type for this browser */
   function pickMimeType() {
     const candidates = [
       { mime: "video/mp4;codecs=avc1.42E01E,mp4a.40.2", ext: "mp4" },
@@ -1855,27 +1858,23 @@
     ];
     if (typeof MediaRecorder === "undefined") return null;
     for (const c of candidates) {
-      try {
-        if (MediaRecorder.isTypeSupported(c.mime)) return c;
-      } catch (e) {}
+      try { if (MediaRecorder.isTypeSupported(c.mime)) return c; } catch (e) {}
     }
-    return { mime: "", ext: "webm" }; // let the browser choose
+    return { mime: "", ext: "webm" };
   }
 
   async function getMicStream() {
     if (!state.mic) return null;
     try {
-      const s = await navigator.mediaDevices.getUserMedia({
+      return await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
         }
       });
-      return s;
     } catch (err) {
       console.warn("[mic]", err);
-      // reflect failure in UI
       state.mic = false;
       save();
       updateMicUI();
@@ -1883,34 +1882,56 @@
     }
   }
 
-  /* Build a recording canvas at a resolution derived from the video feed */
+  function cleanupRecordStreams() {
+    if (recorder.audioStream) {
+      recorder.audioStream.getTracks().forEach(t => t.stop());
+      recorder.audioStream = null;
+    }
+    if (recorder.canvasStream) {
+      recorder.canvasStream.getTracks().forEach(t => t.stop());
+      recorder.canvasStream = null;
+    }
+    if (recorder.stageCanvasStream) {
+      recorder.stageCanvasStream.getTracks().forEach(t => t.stop());
+      recorder.stageCanvasStream = null;
+    }
+    if (recorder.stageStream) {
+      recorder.stageStream.getTracks().forEach(t => t.stop());
+      recorder.stageStream = null;
+    }
+    if (recorder.stageStopLoop) {
+      try { recorder.stageStopLoop(); } catch (e) {}
+      recorder.stageStopLoop = null;
+    }
+    if (recorder.stageVideo) {
+      try { recorder.stageVideo.pause(); } catch (e) {}
+      recorder.stageVideo.srcObject = null;
+      recorder.stageVideo = null;
+    }
+  }
+
+  /* ---------- CAMERA-ONLY recording (canvas composite of the camera pane) ---------- */
   function ensureRecordCanvas() {
     const vw = video.videoWidth || 1280;
     const vh = video.videoHeight || 720;
-
-    // Cap to a sane max (2160p) and keep even dimensions (some encoders need it)
     const maxDim = 2160;
     let w = vw, h = vh;
     if (Math.max(w, h) > maxDim) {
       const k = maxDim / Math.max(w, h);
-      w = Math.round(w * k);
-      h = Math.round(h * k);
+      w = Math.round(w * k); h = Math.round(h * k);
     }
     w = w - (w % 2);
     h = h - (h % 2);
-
     if (!recorder.canvas) {
       recorder.canvas = document.createElement("canvas");
       recorder.canvasCtx = recorder.canvas.getContext("2d", { alpha: false });
     }
     if (recorder.canvas.width !== w || recorder.canvas.height !== h) {
-      recorder.canvas.width = w;
-      recorder.canvas.height = h;
+      recorder.canvas.width = w; recorder.canvas.height = h;
     }
     return { w, h };
   }
 
-  /* Draw one composited frame at recording resolution */
   function drawRecordFrame() {
     const { w, h } = ensureRecordCanvas();
     const ctx = recorder.canvasCtx;
@@ -1920,17 +1941,16 @@
     const mirrored = !!state.mirrored;
     const r = coverRect(vw, vh, w, h);
 
-    // 1. base frame + color grade
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, w, h);
+
     ctx.save();
     if (state.beauty > 0 && "filter" in ctx) ctx.filter = BEAUTY_GRADE[state.beauty];
     if (mirrored) { ctx.translate(w, 0); ctx.scale(-1, 1); }
     ctx.drawImage(video, r.dx, r.dy, r.dw, r.dh);
     ctx.restore();
 
-    // 2. soft focus (uses a separate blur canvas)
     if (state.beauty > 0) {
       const bw = Math.max(1, Math.round(w / 3));
       const bh = Math.max(1, Math.round(h / 3));
@@ -1963,7 +1983,6 @@
       }
     }
 
-    // 3. face-driven effects
     if (lastLandmarks) {
       const P = makeProjector(vw, vh, w, h, mirrored);
       if (state.beauty > 0) drawEyeBrighten(ctx, lastLandmarks, P, state.beauty);
@@ -1971,27 +1990,20 @@
     }
   }
 
-  /* Draw loop while recording — grabs a canvas frame each animation tick */
   let recRaf = null;
   function recLoop() {
-    if (!recorder.isRecording) return;
+    if (!recorder.isRecording || recorder.mode !== "cam") return;
     drawRecordFrame();
     recRaf = requestAnimationFrame(recLoop);
   }
 
-  async function startRecording() {
-    if (recorder.isRecording || !stream) return;
-
+  /* ---------- START: camera-only ---------- */
+  async function startCameraRecording() {
     const pick = pickMimeType();
-    if (!pick) {
-      alert("Recording is not supported in this browser.");
-      return;
-    }
+    if (!pick) { alert("Recording is not supported in this browser."); return; }
 
-    // Make sure the frame is composited once before we start
     drawRecordFrame();
 
-    // Canvas stream carries the visual output (filters + beauty included)
     try {
       recorder.canvasStream = recorder.canvas.captureStream(state.recFps);
     } catch (e) {
@@ -2000,21 +2012,16 @@
       return;
     }
 
-    // Optional microphone audio
     recorder.audioStream = await getMicStream();
 
     const tracks = [...recorder.canvasStream.getVideoTracks()];
-    if (recorder.audioStream) {
-      tracks.push(...recorder.audioStream.getAudioTracks());
-    }
+    if (recorder.audioStream) tracks.push(...recorder.audioStream.getAudioTracks());
     const mixed = new MediaStream(tracks);
 
-    const opts = pick.mime ? { mimeType: pick.mime } : undefined;
     let mr;
     try {
-      mr = new MediaRecorder(mixed, opts);
+      mr = new MediaRecorder(mixed, pick.mime ? { mimeType: pick.mime } : undefined);
     } catch (e) {
-      console.warn("[record] fallback to default mime", e);
       mr = new MediaRecorder(mixed);
     }
 
@@ -2022,54 +2029,186 @@
     recorder.fileExt = recorder.mimeType.includes("mp4") ? "mp4" : "webm";
     recorder.chunks = [];
     recorder.mediaRecorder = mr;
+    recorder.mode = "cam";
 
-    mr.ondataavailable = e => {
-      if (e.data && e.data.size > 0) recorder.chunks.push(e.data);
-    };
-
-    mr.onerror = e => {
-      console.warn("[record] error", e);
-    };
-
+    mr.ondataavailable = e => { if (e.data && e.data.size > 0) recorder.chunks.push(e.data); };
+    mr.onerror = e => console.warn("[record] error", e);
     mr.onstop = () => {
       const blob = new Blob(recorder.chunks, { type: recorder.mimeType });
       const duration = (performance.now() - recorder.startedAt) / 1000;
       recorder.pendingBlob = blob;
       recorder.pendingMeta = {
-        duration,
-        size: blob.size,
-        mime: recorder.mimeType,
-        ext: recorder.fileExt
+        duration, size: blob.size, mime: recorder.mimeType,
+        ext: recorder.fileExt, source: "cam"
       };
-
-      // cleanup streams
-      if (recorder.audioStream) {
-        recorder.audioStream.getTracks().forEach(t => t.stop());
-        recorder.audioStream = null;
-      }
-      if (recorder.canvasStream) {
-        recorder.canvasStream.getTracks().forEach(t => t.stop());
-        recorder.canvasStream = null;
-      }
-
+      cleanupRecordStreams();
       showRecordingPreview();
     };
 
-    // Start capturing
-    mr.start(250);          // emit a chunk every 250ms
+    mr.start(250);
     recorder.isRecording = true;
     recorder.startedAt = performance.now();
-
-    // Kick off draw loop for recording
     recLoop();
+    enterRecordingUI("cam");
+  }
 
-    // UI
+  /* ---------- START: whole stage (left + right) ---------- */
+  async function startStageRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      alert("Screen recording is not supported in this browser.");
+      return;
+    }
+    const pick = pickMimeType();
+    if (!pick) { alert("Recording is not supported in this browser."); return; }
+
+    let displayStream;
+    try {
+      displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: { ideal: state.recFps }
+        },
+        audio: false,
+        preferCurrentTab: true,
+        selfBrowserSurface: "include",
+        surfaceSwitching: "exclude",
+        systemAudio: "exclude"
+      });
+    } catch (err) {
+      // user cancelled the picker
+      console.warn("[record] display capture cancelled", err);
+      return;
+    }
+
+    const capVideo = document.createElement("video");
+    capVideo.srcObject = displayStream;
+    capVideo.muted = true;
+    capVideo.playsInline = true;
+
+    try { await capVideo.play(); } catch (e) {}
+
+    await new Promise(res => {
+      if (capVideo.videoWidth) return res();
+      const done = () => { capVideo.removeEventListener("loadedmetadata", done); res(); };
+      capVideo.addEventListener("loadedmetadata", done);
+      setTimeout(res, 1500);
+    });
+
+    const vTrack = displayStream.getVideoTracks()[0];
+    const vSettings = (vTrack && vTrack.getSettings) ? vTrack.getSettings() : {};
+    const surface = vSettings.displaySurface;
+
+    const capW = capVideo.videoWidth || 1280;
+    const capH = capVideo.videoHeight || 720;
+
+    // Crop rect within the captured surface
+    let cx = 0, cy = 0, cw = capW, ch = capH;
+
+    if (surface === "browser") {
+      const innerW = Math.max(1, window.innerWidth);
+      const innerH = Math.max(1, window.innerHeight);
+      const scaleX = capW / innerW;
+      const scaleY = capH / innerH;
+      const sr = stage.getBoundingClientRect();
+
+      cx = Math.round(sr.left * scaleX);
+      cy = Math.round(sr.top * scaleY);
+      cw = Math.round(sr.width * scaleX);
+      ch = Math.round(sr.height * scaleY);
+
+      cx = Math.max(0, Math.min(capW - 4, cx));
+      cy = Math.max(0, Math.min(capH - 4, cy));
+      cw = Math.max(4, Math.min(capW - cx, cw));
+      ch = Math.max(4, Math.min(capH - cy, ch));
+    }
+
+    const recW = cw - (cw % 2);
+    const recH = ch - (ch % 2);
+
+    const recCanvas = document.createElement("canvas");
+    recCanvas.width = recW;
+    recCanvas.height = recH;
+    const recCtx = recCanvas.getContext("2d", { alpha: false });
+
+    let rafId = null;
+    function drawLoop() {
+      try {
+        recCtx.drawImage(capVideo, cx, cy, cw, ch, 0, 0, recW, recH);
+      } catch (e) {}
+      rafId = requestAnimationFrame(drawLoop);
+    }
+    drawLoop();
+
+    let canvasStream;
+    try {
+      canvasStream = recCanvas.captureStream(state.recFps);
+    } catch (e) {
+      console.warn("[record] captureStream failed", e);
+      displayStream.getTracks().forEach(t => t.stop());
+      if (rafId) cancelAnimationFrame(rafId);
+      alert("Could not capture the recording stream.");
+      return;
+    }
+
+    recorder.audioStream = await getMicStream();
+
+    const tracks = [...canvasStream.getVideoTracks()];
+    if (recorder.audioStream) tracks.push(...recorder.audioStream.getAudioTracks());
+    const mixed = new MediaStream(tracks);
+
+    let mr;
+    try {
+      mr = new MediaRecorder(mixed, pick.mime ? { mimeType: pick.mime } : undefined);
+    } catch (e) {
+      mr = new MediaRecorder(mixed);
+    }
+
+    recorder.mimeType = mr.mimeType || pick.mime || "video/webm";
+    recorder.fileExt = recorder.mimeType.includes("mp4") ? "mp4" : "webm";
+    recorder.chunks = [];
+    recorder.mediaRecorder = mr;
+    recorder.mode = "stage";
+    recorder.stageStream = displayStream;
+    recorder.stageVideo = capVideo;
+    recorder.stageCanvasStream = canvasStream;
+    recorder.stageStopLoop = () => { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } };
+
+    mr.ondataavailable = e => { if (e.data && e.data.size > 0) recorder.chunks.push(e.data); };
+    mr.onerror = e => console.warn("[record] error", e);
+    mr.onstop = () => {
+      const blob = new Blob(recorder.chunks, { type: recorder.mimeType });
+      const duration = (performance.now() - recorder.startedAt) / 1000;
+      recorder.pendingBlob = blob;
+      recorder.pendingMeta = {
+        duration, size: blob.size, mime: recorder.mimeType,
+        ext: recorder.fileExt, source: "stage"
+      };
+      cleanupRecordStreams();
+      showRecordingPreview();
+    };
+
+    // If user stops sharing from the browser bar
+    if (vTrack) {
+      vTrack.addEventListener("ended", () => {
+        if (recorder.isRecording && recorder.mode === "stage") stopRecording();
+      });
+    }
+
+    mr.start(250);
+    recorder.isRecording = true;
+    recorder.startedAt = performance.now();
+    enterRecordingUI("stage");
+  }
+
+  function enterRecordingUI(mode) {
     recTimer.classList.add("show");
+    recTimer.classList.toggle("stage", mode === "stage");
+    recSrcFlag.textContent = mode === "stage" ? "🖥️ Stage" : "📷 Cam";
     recMicFlag.textContent = recorder.audioStream ? "🎤" : "";
     btnRec.classList.add("live");
     recTopBtn.classList.add("live");
     recTopBtn.querySelector(".label").textContent = "Stop";
     recDot.classList.add("on");
+    stage.classList.toggle("recording", mode === "stage");
 
     updateRecTimer();
     recorder.timerInterval = setInterval(updateRecTimer, 250);
@@ -2077,20 +2216,29 @@
 
   function stopRecording() {
     if (!recorder.isRecording) return;
-
     recorder.isRecording = false;
+
+    // stop RAF loops
     if (recRaf != null) { cancelAnimationFrame(recRaf); recRaf = null; }
 
-    try { recorder.mediaRecorder && recorder.mediaRecorder.stop(); } catch (e) {}
+    try {
+      recorder.mediaRecorder && recorder.mediaRecorder.stop();
+    } catch (e) {
+      cleanupRecordStreams();
+    }
 
     clearInterval(recorder.timerInterval);
     recorder.timerInterval = null;
 
     recTimer.classList.remove("show");
+    recTimer.classList.remove("stage");
     btnRec.classList.remove("live");
     recTopBtn.classList.remove("live");
     recTopBtn.querySelector(".label").textContent = "Record";
     recDot.classList.toggle("on", !!stream);
+    stage.classList.remove("recording");
+
+    recorder.mode = null;
   }
 
   function updateRecTimer() {
@@ -2101,34 +2249,40 @@
     recTime.textContent = mm + ":" + ss;
   }
 
+  function startRecording() {
+    if (state.recSource === "stage") startStageRecording();
+    else startCameraRecording();
+  }
+
   function toggleRecording() {
     if (recorder.isRecording) stopRecording();
     else startRecording();
   }
 
   /* ============================================================
-     PREVIEW MODAL (handles both snapshot and recording)
+     PREVIEW MODAL
   ============================================================ */
   function showRecordingPreview() {
     const blob = recorder.pendingBlob;
     const meta = recorder.pendingMeta;
     if (!blob || !meta) return;
 
-    // Object URL for the video
     const url = URL.createObjectURL(blob);
 
-    // Swap modal to video mode
     modalImg.style.display = "none";
     modalVideo.style.display = "block";
     modalMeta.style.display = "flex";
     modalVideo.src = url;
     modalIcon.textContent = "●";
     modalTitle.textContent = "Recording";
+
+    const isStage = meta.source === "stage";
+    metaSource.textContent = isStage ? "🖥️ Whole stage" : "📷 Camera pane";
+    metaSource.classList.toggle("stage", isStage);
     metaDuration.textContent = "⏱ " + formatDuration(meta.duration);
     metaSize.textContent = "📦 " + formatSize(meta.size);
     metaType.textContent = "🎬 " + (meta.ext === "mp4" ? "MP4" : "WebM");
 
-    // Remember for download/discard
     modal.dataset.mode = "video";
     modal.dataset.url = url;
 
@@ -2136,8 +2290,7 @@
   }
 
   function showSnapshotPreview(dataUrl) {
-    // Swap modal to image mode
-    modalVideo.pause && modalVideo.pause();
+    try { modalVideo.pause(); } catch (e) {}
     modalVideo.style.display = "none";
     modalVideo.removeAttribute("src");
     modalImg.style.display = "block";
@@ -2162,16 +2315,13 @@
 
   function closeModal() {
     revokeModalUrl();
-
     modal.classList.remove("show");
     modalImg.src = "";
     try { modalVideo.pause(); } catch (e) {}
     modalVideo.removeAttribute("src");
     modalVideo.load && modalVideo.load();
-
     modal.dataset.mode = "";
     modal.dataset.url = "";
-
     recorder.pendingBlob = null;
     recorder.pendingMeta = null;
   }
@@ -2191,9 +2341,10 @@
     a.href = url;
 
     if (mode === "video") {
-      const ext = recorder.pendingMeta && recorder.pendingMeta.ext
-        ? recorder.pendingMeta.ext : "webm";
-      a.download = "recording-" + stamp + "." + ext;
+      const meta = recorder.pendingMeta;
+      const ext = meta && meta.ext ? meta.ext : "webm";
+      const prefix = meta && meta.source === "stage" ? "stage" : "camera";
+      a.download = prefix + "-" + stamp + "." + ext;
     } else {
       a.download = "snapshot-" + stamp + ".png";
     }
@@ -2218,14 +2369,28 @@
   }
 
   /* ============================================================
-     MIC UI
+     MIC + SOURCE UI
   ============================================================ */
   function updateMicUI() {
     micToggle.classList.toggle("on", !!state.mic);
-    micToggle.classList.toggle("mic-slashed", !state.mic);
     micToggle.title = state.mic
       ? "Microphone ON — audio will be recorded"
       : "Microphone OFF — tap to record with audio";
+  }
+
+  function updateSrcUI() {
+    const isStage = state.recSource === "stage";
+    btnSrc.textContent = isStage ? "🖥️" : "📷";
+    btnSrc.classList.toggle("stage", isStage);
+    btnSrc.title = isStage
+      ? "Recording source: whole stage (tap to switch to camera only)"
+      : "Recording source: camera pane (tap to record the whole stage)";
+
+    btnRec.classList.toggle("stage-src", isStage);
+    recTopBtn.classList.toggle("stage", isStage);
+    recTopBtn.title = isStage
+      ? "Record the whole stage (camera + content) — click to start"
+      : "Record the camera pane — click to start";
   }
 
   /* ============================================================
@@ -2274,14 +2439,11 @@
 
     let project = null;
     if (lastLandmarks) project = makeProjector(vw, vh, fxW, fxH, mirrored);
-
     if (project && beautyOn) drawEyeBrighten(fxCtx, lastLandmarks, project, state.beauty);
     if (project && filterOn) drawFilterSet(fxCtx, lastLandmarks, project);
   }
 
-  function startLoop() {
-    if (rafId == null) rafId = requestAnimationFrame(loop);
-  }
+  function startLoop() { if (rafId == null) rafId = requestAnimationFrame(loop); }
   function stopLoop() {
     if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
     fxCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2308,13 +2470,7 @@
       c.classList.toggle("on", c.dataset.filter === id)
     );
     save();
-
-    if (id === "none") {
-      lastLandmarks = null;
-      updateFxStatus();
-      return;
-    }
-
+    if (id === "none") { lastLandmarks = null; updateFxStatus(); return; }
     updateFxStatus();
     initFaceTracking();
     ensureLoop();
@@ -2384,17 +2540,14 @@
   function doCapture() {
     const data = capture();
     if (!data) return;
-
     flash.classList.remove("fire");
     void flash.offsetWidth;
     flash.classList.add("fire");
-
     showSnapshotPreview(data);
   }
 
   function takeSnapshot() {
     if (!stream) return;
-
     if (state.flash && !hasTorch) {
       screenFlash.classList.add("burst");
       setTimeout(() => {
@@ -2404,7 +2557,6 @@
       setTimeout(doCapture, 110);
       return;
     }
-
     doCapture();
   }
 
@@ -2420,19 +2572,14 @@
 
   function renderContent() {
     const c = state.content;
-
     contentPane.classList.toggle("mode-web",  c.mode === "web");
     contentPane.classList.toggle("mode-note", c.mode === "note");
-
     contentPane.querySelectorAll(".seg-btn").forEach(b =>
       b.classList.toggle("on", b.dataset.mode === c.mode)
     );
-
     if (document.activeElement !== urlInput) urlInput.value = c.url || "";
     if (document.activeElement !== note)     note.value     = c.note || "";
-
     contentBody.classList.toggle("empty", c.mode === "web" && !c.url);
-
     if (c.mode === "web" && c.url && frame.dataset.src !== c.url) {
       frame.src = c.url;
       frame.dataset.src = c.url;
@@ -2485,6 +2632,13 @@
   btnFlash.addEventListener("click", toggleFlash);
   btnBeauty.addEventListener("click", cycleBeauty);
 
+  btnSrc.addEventListener("click", () => {
+    if (recorder.isRecording) return;
+    state.recSource = state.recSource === "stage" ? "cam" : "stage";
+    save();
+    updateSrcUI();
+  });
+
   micToggle.addEventListener("click", () => {
     state.mic = !state.mic;
     save();
@@ -2498,10 +2652,7 @@
   });
 
   camSelect.addEventListener("change", () => {
-    if (recorder.isRecording) {
-      camSelect.value = state.deviceId;
-      return;
-    }
+    if (recorder.isRecording) { camSelect.value = state.deviceId; return; }
     state.deviceId = camSelect.value;
     save();
     startCamera(state.deviceId);
@@ -2524,7 +2675,6 @@
   document.getElementById("modalClose").addEventListener("click", closeModal);
   document.getElementById("modalDiscard").addEventListener("click", closeModal);
   document.getElementById("modalDownload").addEventListener("click", downloadCurrent);
-
   modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
 
   document.addEventListener("keydown", e => {
@@ -2572,6 +2722,7 @@
     updateBeautyUI();
     updateFlashUI();
     updateMicUI();
+    updateSrcUI();
     screenFlash.classList.remove("on", "burst");
     mountPanes();
     applyLayout();
@@ -2599,6 +2750,7 @@
   window.addEventListener("beforeunload", () => {
     if (recorder.isRecording) {
       try { recorder.mediaRecorder && recorder.mediaRecorder.stop(); } catch (e) {}
+      cleanupRecordStreams();
     }
     if (stream) {
       const track = stream.getVideoTracks()[0];
@@ -2617,6 +2769,7 @@
   updateBeautyUI();
   updateFlashUI();
   updateMicUI();
+  updateSrcUI();
   renderContent();
   setLive(false);
 
