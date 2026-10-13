@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#0b0b0f" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<title>Mobile Split Screen</title>
+<title>Split Screen + Apps</title>
 <style>
   :root{
     --safe-t: env(safe-area-inset-top, 0px);
@@ -15,132 +15,77 @@
     --safe-b: env(safe-area-inset-bottom, 0px);
     --safe-l: env(safe-area-inset-left, 0px);
   }
-
   *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
   html,body{ height:100%; overscroll-behavior:none; }
-
   body{
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    background:#0b0b0f;
-    color:#fff;
-    overflow:hidden;
+    background:#0b0b0f; color:#fff; overflow:hidden;
     touch-action: manipulation;
   }
 
-  /* ---------- Split layout ---------- */
   .split{
-    display:flex;
-    gap:8px;
-    height:100dvh;              /* dynamic vh: handles mobile URL bar */
+    display:flex; gap:8px; height:100dvh;
     padding-top:    calc(var(--safe-t) + 8px);
     padding-right:  calc(var(--safe-r) + 8px);
-    padding-bottom: calc(var(--safe-b) + 78px);  /* room for dock */
+    padding-bottom: calc(var(--safe-b) + 78px);
     padding-left:   calc(var(--safe-l) + 8px);
   }
-
-  /* Portrait phone  -> stack vertically
-     Landscape / tablet -> side by side */
-  @media (orientation: portrait){
-    .split{ flex-direction: column; }
-  }
+  @media (orientation: portrait){ .split{ flex-direction: column; } }
 
   .pane{
-    flex: 1 1 0;
-    min-width:0;
-    min-height:0;
-    display:flex;
-    flex-direction:column;
-    border-radius:16px;
-    overflow:hidden;
-    position:relative;
-    background:#15151c;
-    box-shadow: 0 6px 20px rgba(0,0,0,.35);
+    flex:1 1 0; min-width:0; min-height:0;
+    display:flex; flex-direction:column;
+    border-radius:16px; overflow:hidden; position:relative;
+    background:#15151c; box-shadow: 0 6px 20px rgba(0,0,0,.35);
   }
-
-  .pane.left  { background: linear-gradient(135deg,#1e3a8a,#3b82f6); }
-  .pane.right { background: linear-gradient(135deg,#7c2d12,#f97316); }
-
   .pane-head{
-    display:flex;
-    align-items:center;
-    gap:8px;
+    display:flex; align-items:center; gap:6px;
     padding:8px 10px;
-    background: rgba(0,0,0,.28);
+    background: rgba(0,0,0,.35);
     backdrop-filter: blur(6px);
     flex: 0 0 auto;
   }
-
   .pane-title{
     font-size: clamp(.7rem, 2.6vw, .9rem);
-    font-weight:700;
-    letter-spacing:.02em;
-    text-transform:uppercase;
-    opacity:.9;
-    flex:1;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
+    font-weight:700; letter-spacing:.02em;
+    text-transform:uppercase; opacity:.9; flex:1;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-
   .mini{
-    border:0;
-    border-radius:8px;
-    background: rgba(255,255,255,.18);
-    color:#fff;
-    font-size:.72rem;
-    font-weight:600;
-    padding:7px 10px;
-    min-height:32px;
-    cursor:pointer;
-    transition: background .15s;
+    border:0; border-radius:8px;
+    background: rgba(255,255,255,.16); color:#fff;
+    font-size:.72rem; font-weight:600;
+    padding:7px 10px; min-height:32px;
+    cursor:pointer; transition: background .15s;
   }
-  .mini:hover{ background: rgba(255,255,255,.3); }
+  .mini:hover{ background: rgba(255,255,255,.28); }
+  .mini.primary{ background:#3b82f6; }
+  .mini.primary:hover{ background:#2563eb; }
 
   .pane-body{
-    flex:1 1 auto;
-    min-height:0;
-    position:relative;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:hidden;
+    flex:1 1 auto; min-height:0; position:relative;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; background:#0f0f14;
   }
-
   .pane-body iframe{
-    width:100%;
-    height:100%;
-    border:0;
-    background:#fff;
-    display:block;
+    width:100%; height:100%; border:0;
+    background:#fff; display:block;
   }
-
   .placeholder{
-    text-align:center;
-    padding:16px;
-    font-size: clamp(.85rem, 3.4vw, 1.1rem);
-    font-weight:600;
-    opacity:.85;
-    line-height:1.5;
+    text-align:center; padding:16px;
+    font-size: clamp(.85rem, 3.4vw, 1.05rem);
+    font-weight:600; opacity:.85; line-height:1.5;
     user-select:none;
   }
   .placeholder small{
-    display:block;
-    margin-top:6px;
-    font-weight:400;
-    font-size:.75em;
-    opacity:.75;
+    display:block; margin-top:6px;
+    font-weight:400; font-size:.75em; opacity:.75;
   }
 
-  /* ---------- Bottom dock ---------- */
   .dock{
-    position:fixed;
-    left:50%;
-    transform: translateX(-50%);
-    bottom: calc(var(--safe-b) + 14px);
-    z-index:20;
-    display:flex;
-    gap:10px;
-    padding:8px;
+    position:fixed; left:50%; transform: translateX(-50%);
+    bottom: calc(var(--safe-b) + 14px); z-index:20;
+    display:flex; gap:10px; padding:8px;
     border-radius:999px;
     background: rgba(20,20,26,.82);
     backdrop-filter: blur(14px);
@@ -148,62 +93,162 @@
     box-shadow: 0 10px 30px rgba(0,0,0,.45);
     max-width: calc(100vw - 24px);
   }
-
   .btn{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    border:0;
-    border-radius:999px;
-    padding:12px 18px;
-    min-height:46px;                 /* thumb-friendly */
-    font-size:.85rem;
-    font-weight:700;
-    color:#fff;
-    cursor:pointer;
-    white-space:nowrap;
+    display:inline-flex; align-items:center; gap:8px;
+    border:0; border-radius:999px;
+    padding:12px 18px; min-height:46px;
+    font-size:.85rem; font-weight:700; color:#fff;
+    cursor:pointer; white-space:nowrap;
     transition: transform .12s, background .15s;
   }
   .btn:active{ transform: scale(.96); }
   .btn:disabled{ opacity:.55; cursor:not-allowed; }
-
   .btn.ghost{ background: rgba(255,255,255,.14); }
   .btn.ghost:hover{ background: rgba(255,255,255,.24); }
-
   .btn.rec{ background:#ef4444; }
   .btn.rec:hover{ background:#dc2626; }
   .btn.rec.recording{ background:#111; animation: pulse 1.6s infinite; }
-
-  .btn .dot{
-    width:11px; height:11px; border-radius:50%; background:#fff; flex:0 0 auto;
-  }
+  .btn .dot{ width:11px; height:11px; border-radius:50%; background:#fff; flex: 0 0 auto; }
   .btn.rec.recording .dot{ background:#ef4444; }
-
   @keyframes pulse{
     0%  { box-shadow:0 0 0 0 rgba(239,68,68,.7); }
     70% { box-shadow:0 0 0 14px rgba(239,68,68,0); }
     100%{ box-shadow:0 0 0 0 rgba(239,68,68,0); }
   }
 
-  /* ---------- Status pill ---------- */
   .status{
-    position:fixed;
-    top: calc(var(--safe-t) + 12px);
-    left:50%;
-    transform: translateX(-50%);
-    z-index:30;
-    padding:8px 16px;
-    border-radius:999px;
+    position:fixed; top: calc(var(--safe-t) + 12px);
+    left:50%; transform: translateX(-50%); z-index:30;
+    padding:8px 16px; border-radius:999px;
     background: rgba(0,0,0,.75);
     backdrop-filter: blur(8px);
-    font-size:.78rem;
-    font-weight:600;
-    white-space:nowrap;
-    display:none;
+    font-size:.78rem; font-weight:600;
+    white-space:nowrap; display:none;
   }
   .status.show{ display:block; }
 
-  /* Tiny screens: compact dock */
+  /* ---------- App picker sheet ---------- */
+  .sheet-backdrop{
+    position:fixed; inset:0;
+    background: rgba(0,0,0,.6);
+    backdrop-filter: blur(4px);
+    z-index:40; opacity:0; pointer-events:none;
+    transition: opacity .2s;
+  }
+  .sheet-backdrop.open{ opacity:1; pointer-events:auto; }
+
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:#16161d;
+    border-top-left-radius:22px; border-top-right-radius:22px;
+    border-top:1px solid rgba(255,255,255,.08);
+    box-shadow: 0 -12px 40px rgba(0,0,0,.6);
+    transform: translateY(110%);
+    transition: transform .28s cubic-bezier(.2,.8,.2,1);
+    padding-bottom: calc(var(--safe-b) + 12px);
+    max-height: 85dvh;
+    display:flex; flex-direction:column;
+  }
+  .sheet.open{ transform: translateY(0); }
+
+  .sheet-grab{
+    width:42px; height:4px;
+    background: rgba(255,255,255,.25);
+    border-radius:99px; margin: 10px auto 4px;
+    flex: 0 0 auto;
+  }
+  .sheet-head{
+    display:flex; align-items:center;
+    padding: 6px 16px 12px; flex: 0 0 auto;
+  }
+  .sheet-head h2{ font-size:1rem; font-weight:700; flex:1; }
+  .sheet-head .side-tag{
+    font-size:.7rem; text-transform:uppercase;
+    letter-spacing:.06em; padding:4px 10px;
+    border-radius:99px; background:#3b82f6; font-weight:700;
+  }
+  .sheet-head .side-tag.right{ background:#f97316; }
+
+  .sheet-body{
+    overflow-y:auto; -webkit-overflow-scrolling: touch;
+    padding: 0 14px 14px; flex: 1 1 auto;
+  }
+
+  /* Big native-picker button */
+  .native-btn{
+    width:100%;
+    display:flex; align-items:center; gap:14px;
+    border:0; border-radius:16px;
+    padding:16px 18px;
+    margin-bottom:14px;
+    background: linear-gradient(135deg,#3b82f6,#8b5cf6);
+    color:#fff; font-weight:700; font-size:1rem;
+    cursor:pointer; text-align:left;
+    box-shadow: 0 8px 22px rgba(59,130,246,.35);
+    transition: transform .12s;
+  }
+  .native-btn:active{ transform: scale(.98); }
+  .native-btn:disabled{ opacity:.55; cursor:not-allowed; }
+  .native-btn .nb-icon{
+    width:44px; height:44px; border-radius:12px;
+    background: rgba(255,255,255,.2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.4rem; flex: 0 0 auto;
+  }
+  .native-btn .nb-text{ display:flex; flex-direction:column; gap:2px; }
+  .native-btn .nb-text small{
+    font-weight:400; font-size:.75rem; opacity:.85;
+  }
+
+  .section-label{
+    font-size:.7rem; text-transform:uppercase;
+    letter-spacing:.08em; opacity:.55;
+    font-weight:700; padding: 14px 6px 6px;
+  }
+
+  .app-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap:12px;
+    padding: 4px;
+  }
+  .app-tile{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:10px 6px; border:0; background:transparent;
+    color:#fff; border-radius:14px; cursor:pointer;
+    transition: background .15s, transform .1s;
+  }
+  .app-tile:hover{ background: rgba(255,255,255,.07); }
+  .app-tile:active{ transform: scale(.94); }
+  .app-icon{
+    width:52px; height:52px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.5rem; font-weight:800; color:#fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,.35);
+    flex: 0 0 auto;
+  }
+  .app-name{
+    font-size:.68rem; font-weight:600; text-align:center;
+    line-height:1.2; opacity:.9; max-width:100%;
+    overflow:hidden; text-overflow:ellipsis;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  }
+
+  .custom-row{ display:flex; gap:8px; padding: 4px 6px 8px; }
+  .custom-row input{
+    flex:1; background:#0f0f14;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:12px; padding:12px 14px;
+    color:#fff; font-size:.9rem; outline:none;
+  }
+  .custom-row input:focus{ border-color:#3b82f6; }
+  .custom-row button{
+    border:0; border-radius:12px; background:#3b82f6;
+    color:#fff; font-weight:700; padding: 0 18px;
+    font-size:.85rem; cursor:pointer;
+  }
+  .custom-row button:hover{ background:#2563eb; }
+
   @media (max-height: 380px){
     .dock{ padding:6px; gap:6px; }
     .btn{ padding:9px 14px; min-height:40px; font-size:.78rem; }
@@ -216,26 +261,24 @@
     <section class="pane left">
       <header class="pane-head">
         <span class="pane-title">Pane A</span>
-        <button class="mini" data-load="left">Load URL</button>
-        <button class="mini" data-clear="left">Clear</button>
+        <button class="mini primary" data-apps="left">＋ App</button>
+        <button class="mini" data-load="left">URL</button>
+        <button class="mini" data-clear="left">✕</button>
       </header>
       <div class="pane-body" id="body-left">
-        <div class="placeholder">
-          Pane A<small>Tap “Load URL” to embed a site</small>
-        </div>
+        <div class="placeholder">Pane A<small>Tap “＋ App” to add an app</small></div>
       </div>
     </section>
 
     <section class="pane right">
       <header class="pane-head">
         <span class="pane-title">Pane B</span>
-        <button class="mini" data-load="right">Load URL</button>
-        <button class="mini" data-clear="right">Clear</button>
+        <button class="mini primary" data-apps="right">＋ App</button>
+        <button class="mini" data-load="right">URL</button>
+        <button class="mini" data-clear="right">✕</button>
       </header>
       <div class="pane-body" id="body-right">
-        <div class="placeholder">
-          Pane B<small>Tap “Load URL” to embed a site</small>
-        </div>
+        <div class="placeholder">Pane B<small>Tap “＋ App” to add an app</small></div>
       </div>
     </section>
   </div>
@@ -249,94 +292,320 @@
     </button>
   </div>
 
-  <!-- ffmpeg.wasm (used only for webm -> mp4 conversion on desktop) -->
+  <!-- ---------- App picker sheet ---------- -->
+  <div class="sheet-backdrop" id="backdrop"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-grab"></div>
+    <div class="sheet-head">
+      <h2>Choose an app</h2>
+      <span class="side-tag" id="sideTag">Pane A</span>
+    </div>
+    <div class="sheet-body">
+
+      <!-- NATIVE PHONE PICKER -->
+      <button class="native-btn" id="nativePicker">
+        <span class="nb-icon">📱</span>
+        <span class="nb-text">
+          Pick from my phone
+          <small>Opens your phone's app chooser</small>
+        </span>
+      </button>
+
+      <div class="section-label">Or choose from list</div>
+      <div class="app-grid" id="appGrid"></div>
+
+      <div class="section-label">Custom URL</div>
+      <div class="custom-row">
+        <input id="customUrl" type="url" placeholder="https://example.com" />
+        <button id="customGo">Open</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
   <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 
   <script>
   /* =========================================================
-     1. Embed a website in a pane
+     1. App catalog
      ========================================================= */
-  const panes = {
+  const APPS = [
+    { name:"WhatsApp",  icon:"💬", bg:"#25D366", scheme:"whatsapp://",   web:"https://web.whatsapp.com",  blocked:true },
+    { name:"YouTube",   icon:"▶",  bg:"#FF0000", scheme:"vnd.youtube://", web:"https://www.youtube.com/embed/dQw4w9WgXcQ" },
+    { name:"Instagram", icon:"📷", bg:"linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", scheme:"instagram://app", web:"https://www.instagram.com", blocked:true },
+    { name:"Facebook",  icon:"f",  bg:"#1877F2", scheme:"fb://",         web:"https://www.facebook.com",  blocked:true },
+    { name:"X",         icon:"𝕏",  bg:"#000",    scheme:"twitter://",    web:"https://twitter.com",       blocked:true },
+    { name:"TikTok",    icon:"♪",  bg:"#000",    scheme:"snssdk1233://", web:"https://www.tiktok.com",    blocked:true },
+    { name:"Spotify",   icon:"♫",  bg:"#1DB954", scheme:"spotify://",    web:"https://open.spotify.com" },
+    { name:"Maps",      icon:"📍", bg:"#34A853", scheme:"geo:0,0?q=",    web:"https://maps.google.com/maps?q=&output=embed" },
+    { name:"Gmail",     icon:"✉",  bg:"#EA4335", scheme:"googlegmail://", web:"https://mail.google.com",  blocked:true },
+    { name:"Phone",     icon:"📞", bg:"#22c55e", scheme:"tel:",          web:null },
+    { name:"Messages",  icon:"💬", bg:"#3b82f6", scheme:"sms:",          web:null },
+    { name:"Telegram",  icon:"✈",  bg:"#229ED9", scheme:"tg://",         web:"https://web.telegram.org",  blocked:true },
+    { name:"Reddit",    icon:"👽", bg:"#FF4500", scheme:"reddit://",     web:"https://www.reddit.com",    blocked:true },
+    { name:"Netflix",   icon:"N",  bg:"#E50914", scheme:"nflx://",       web:"https://www.netflix.com",   blocked:true },
+    { name:"Wikipedia", icon:"W",  bg:"#000",    scheme:"",              web:"https://en.m.wikipedia.org" },
+    { name:"GitHub",    icon:"🐙", bg:"#24292e", scheme:"",              web:"https://github.com" },
+    { name:"Weather",   icon:"⛅", bg:"#0ea5e9", scheme:"",              web:"https://wttr.in/" },
+  ];
+
+  /* =========================================================
+     2. Panes + sheet
+     ========================================================= */
+  const bodies = {
     left:  document.getElementById("body-left"),
     right: document.getElementById("body-right"),
   };
+  const sheet     = document.getElementById("sheet");
+  const backdrop  = document.getElementById("backdrop");
+  const sideTag   = document.getElementById("sideTag");
+  const appGrid   = document.getElementById("appGrid");
+  const customUrl = document.getElementById("customUrl");
+  const customGo  = document.getElementById("customGo");
+  const nativeBtn = document.getElementById("nativePicker");
 
-  document.querySelectorAll("[data-load]").forEach((btn) => {
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  let activeSide = "left";
+
+  function openSheet(side){
+    activeSide = side;
+    sideTag.textContent = side === "left" ? "Pane A" : "Pane B";
+    sideTag.classList.toggle("right", side === "right");
+    backdrop.classList.add("open");
+    sheet.classList.add("open");
+  }
+  function closeSheet(){
+    backdrop.classList.remove("open");
+    sheet.classList.remove("open");
+  }
+  backdrop.addEventListener("click", closeSheet);
+
+  document.querySelectorAll("[data-apps]").forEach(btn => {
+    btn.addEventListener("click", () => openSheet(btn.dataset.apps));
+  });
+
+  /* =========================================================
+     3. NATIVE PHONE PICKER
+     ---------------------------------------------------------
+     Strategy 1 (best): Web Share API — opens the OS share /
+       app chooser sheet with every compatible app. This is
+       the closest thing a website can do to "show me my apps".
+     Strategy 2 (Android fallback): intent:// URL that tells
+       Android to open the system chooser.
+     Strategy 3 (last resort): tell the user.
+     ========================================================= */
+  const canShare = typeof navigator.share === "function";
+
+  if (!canShare){
+    nativeBtn.disabled = true;
+    nativeBtn.querySelector(".nb-text small").textContent =
+      "Not supported in this browser";
+  }
+
+  nativeBtn.addEventListener("click", async () => {
+    /* --- Try Web Share API first: opens the real app sheet --- */
+    if (canShare){
+      try {
+        await navigator.share({
+          title: "Open in…",
+          text: "Choose an app to open this in",
+          url: "https://example.com",
+        });
+        return;
+      } catch (err){
+        /* user cancelled or share not available → try intent */
+        if (err && err.name === "AbortError") return;
+      }
+    }
+
+    /* --- Android intent chooser --- */
+    if (/Android/i.test(navigator.userAgent)){
+      // Opens the system chooser for handling a plain https URL.
+      // The browser_fallback_url is used if no app can handle it.
+      const intentUrl =
+        "intent://example.com/#Intent;" +
+        "action=android.intent.action.VIEW;" +
+        "category=android.intent.category.BROWSABLE;" +
+        "scheme=https;" +
+        "S.browser_fallback_url=" + encodeURIComponent(location.href) + ";end";
+
+      try {
+        window.location.href = intentUrl;
+        return;
+      } catch {}
+    }
+
+    alert(
+      "Your phone's app chooser isn't available from this browser.\n\n" +
+      "Tip: use the list below to pick an app instead."
+    );
+  });
+
+  /* =========================================================
+     4. App grid
+     ========================================================= */
+  function buildGrid(){
+    appGrid.innerHTML = "";
+    APPS.forEach(app => {
+      const tile = document.createElement("button");
+      tile.className = "app-tile";
+      tile.innerHTML = `
+        <span class="app-icon" style="background:${app.bg}">${app.icon}</span>
+        <span class="app-name">${app.name}</span>`;
+      tile.addEventListener("click", () => launchApp(app));
+      appGrid.appendChild(tile);
+    });
+  }
+  buildGrid();
+
+  /* =========================================================
+     5. Launch logic
+     ========================================================= */
+  function launchApp(app){
+    closeSheet();
+
+    if (isMobile && app.scheme){
+      try {
+        const start = Date.now();
+        // Some schemes need a hidden iframe on iOS
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (isIOS){
+          const f = document.createElement("iframe");
+          f.style.display = "none";
+          f.src = app.scheme;
+          document.body.appendChild(f);
+          setTimeout(() => f.remove(), 1500);
+        } else {
+          window.location.href = app.scheme;
+        }
+
+        setTimeout(() => {
+          if (document.visibilityState === "visible" && Date.now() - start < 2500){
+            launchWeb(app);
+          }
+        }, 1200);
+        return;
+      } catch {}
+    }
+    launchWeb(app);
+  }
+
+  function launchWeb(app){
+    if (!app.web){
+      renderPlaceholder(activeSide, app.name, "No web version — open it manually.");
+      return;
+    }
+    if (app.blocked){
+      renderBlocked(activeSide, app);
+      window.open(app.web, "_blank", "noopener");
+      return;
+    }
+    bodies[activeSide].innerHTML =
+      `<iframe src="${app.web}"
+               allow="fullscreen; autoplay; clipboard-write; encrypted-media"
+               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>`;
+  }
+
+  function renderPlaceholder(side, title, subtitle){
+    bodies[side].innerHTML =
+      `<div class="placeholder">${title}<small>${subtitle}</small></div>`;
+  }
+
+  function renderBlocked(side, app){
+    bodies[side].innerHTML = `
+      <div class="placeholder">
+        ${app.name}
+        <small>Opened in a new tab — this site can't be embedded.</small>
+        <small style="margin-top:14px">
+          <button class="mini primary" id="reopen-${side}">Open again</button>
+        </small>
+      </div>`;
+    document.getElementById(`reopen-${side}`)
+      .addEventListener("click", () => window.open(app.web, "_blank", "noopener"));
+  }
+
+  /* =========================================================
+     6. Custom URL
+     ========================================================= */
+  customGo.addEventListener("click", () => {
+    let url = customUrl.value.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    bodies[activeSide].innerHTML =
+      `<iframe src="${url}"
+               allow="fullscreen; autoplay; clipboard-write"
+               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>`;
+    customUrl.value = "";
+    closeSheet();
+  });
+  customUrl.addEventListener("keydown", e => { if (e.key === "Enter") customGo.click(); });
+
+  /* =========================================================
+     7. Pane URL/clear buttons
+     ========================================================= */
+  document.querySelectorAll("[data-load]").forEach(btn => {
     btn.addEventListener("click", () => {
       const side = btn.dataset.load;
       const raw = prompt("Enter a website URL:", "https://example.com");
       if (!raw) return;
-
       let url = raw.trim();
       if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-
-      panes[side].innerHTML =
-        `<iframe src="${url}" allow="fullscreen; autoplay; clipboard-write"
+      bodies[side].innerHTML =
+        `<iframe src="${url}"
+                 allow="fullscreen; autoplay; clipboard-write"
                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>`;
     });
   });
 
-  document.querySelectorAll("[data-clear]").forEach((btn) => {
+  document.querySelectorAll("[data-clear]").forEach(btn => {
     btn.addEventListener("click", () => {
       const side = btn.dataset.clear;
       const label = side === "left" ? "Pane A" : "Pane B";
-      panes[side].innerHTML =
-        `<div class="placeholder">${label}<small>Tap “Load URL” to embed a site</small></div>`;
+      renderPlaceholder(side, label, "Tap “＋ App” to add an app");
     });
   });
 
   /* =========================================================
-     2. Fullscreen toggle (useful on phone)
+     8. Fullscreen
      ========================================================= */
   const fsBtn = document.getElementById("fsBtn");
   const splitEl = document.getElementById("split");
-
   fsBtn.addEventListener("click", async () => {
     try {
-      if (!document.fullscreenElement) {
-        const el = splitEl.requestFullscreen
-          ? splitEl
-          : document.documentElement;
-        await el.requestFullscreen({ navigationUI: "hide" });
+      if (!document.fullscreenElement){
+        const el = splitEl.requestFullscreen ? splitEl : document.documentElement;
+        await el.requestFullscreen({ navigationUI:"hide" });
       } else {
         await document.exitFullscreen();
       }
-    } catch {
-      alert("Fullscreen isn't supported in this browser.");
-    }
+    } catch { alert("Fullscreen isn't supported in this browser."); }
   });
-
   document.addEventListener("fullscreenchange", () => {
     fsBtn.textContent = document.fullscreenElement ? "⛶ Exit" : "⛶ Fullscreen";
   });
 
   /* =========================================================
-     3. Screen recorder (desktop browsers; MP4 output)
+     9. Recorder (desktop, MP4)
      ========================================================= */
-  const { FFmpeg }  = FFmpegWASM;
+  const { FFmpeg }    = FFmpegWASM;
   const { fetchFile } = FFmpegUtil;
 
-  const recBtn  = document.getElementById("recBtn");
-  const recText = document.getElementById("recText");
+  const recBtn   = document.getElementById("recBtn");
+  const recText  = document.getElementById("recText");
   const statusEl = document.getElementById("status");
 
-  let mediaRecorder = null;
-  let chunks = [];
-  let stream = null;
-  let ffmpeg = null;
+  let mediaRecorder = null, chunks = [], stream = null, ffmpeg = null;
 
   const supportsRecording =
     !!navigator.mediaDevices?.getDisplayMedia &&
     typeof window.MediaRecorder !== "undefined";
 
-  if (!supportsRecording) {
+  if (!supportsRecording){
     recBtn.disabled = true;
     recText.textContent = "No recording";
-    recBtn.title = "Screen recording isn't available on this device/browser.";
   }
 
-  function pickMimeType() {
+  function pickMimeType(){
     const list = [
       "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
       "video/mp4",
@@ -344,19 +613,17 @@
       "video/webm;codecs=vp8,opus",
       "video/webm",
     ];
-    for (const t of list) {
-      if (MediaRecorder.isTypeSupported(t)) return t;
-    }
+    for (const t of list) if (MediaRecorder.isTypeSupported(t)) return t;
     return "";
   }
 
-  async function toBlobURL(url, mime) {
+  async function toBlobURL(url, mime){
     const res = await fetch(url);
     const buf = await res.arrayBuffer();
     return URL.createObjectURL(new Blob([buf], { type: mime }));
   }
 
-  async function loadFFmpeg() {
+  async function loadFFmpeg(){
     if (ffmpeg) return ffmpeg;
     setStatus("Loading MP4 converter…");
     ffmpeg = new FFmpeg();
@@ -368,7 +635,7 @@
     return ffmpeg;
   }
 
-  async function convertToMp4(webmBlob) {
+  async function convertToMp4(webmBlob){
     const ff = await loadFFmpeg();
     setStatus("Converting to MP4…");
     await ff.writeFile("in.webm", await fetchFile(webmBlob));
@@ -382,62 +649,46 @@
     const data = await ff.readFile("out.mp4");
     await ff.deleteFile("in.webm");
     await ff.deleteFile("out.mp4");
-    return new Blob([data.buffer], { type: "video/mp4" });
+    return new Blob([data.buffer], { type:"video/mp4" });
   }
 
-  function download(blob, name) {
+  function download(blob, name){
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
+    a.href = url; a.download = name; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
 
-  function setStatus(text) {
-    statusEl.textContent = text;
-    statusEl.classList.add("show");
-  }
-  function clearStatus() {
-    statusEl.classList.remove("show");
-  }
+  function setStatus(t){ statusEl.textContent = t; statusEl.classList.add("show"); }
+  function clearStatus(){ statusEl.classList.remove("show"); }
 
-  if (supportsRecording) {
+  if (supportsRecording){
     recBtn.addEventListener("click", async () => {
-      /* --- STOP --- */
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-        return;
+      if (mediaRecorder && mediaRecorder.state === "recording"){
+        mediaRecorder.stop(); return;
       }
-
       try {
         stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { cursor: "always", frameRate: 30 },
-          audio: true,
+          video:{ cursor:"always", frameRate:30 }, audio:true,
         });
-
         const mime = pickMimeType();
-        mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+        mediaRecorder = new MediaRecorder(stream, mime ? { mimeType:mime } : undefined);
         chunks = [];
 
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data && e.data.size) chunks.push(e.data);
-        };
+        mediaRecorder.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
 
         mediaRecorder.onstop = async () => {
           const used = mediaRecorder.mimeType || mime || "video/webm";
-          const raw = new Blob(chunks, { type: used });
-
-          stream.getTracks().forEach((t) => t.stop());
+          const raw  = new Blob(chunks, { type: used });
+          stream.getTracks().forEach(t => t.stop());
           recBtn.disabled = true;
           recText.textContent = "Processing…";
-
           try {
             const mp4 = used.includes("mp4")
-              ? new Blob([raw], { type: "video/mp4" })
+              ? new Blob([raw], { type:"video/mp4" })
               : await convertToMp4(raw);
             download(mp4, `screen-${Date.now()}.mp4`);
-          } catch (err) {
+          } catch (err){
             console.error(err);
             alert("MP4 conversion failed — saving WebM instead.");
             download(raw, `screen-${Date.now()}.webm`);
@@ -458,8 +709,7 @@
         recText.textContent = "Stop";
         recBtn.classList.add("recording");
         setStatus("Recording…");
-
-      } catch (err) {
+      } catch (err){
         console.error(err);
         alert("Could not start recording. Permission denied or unsupported.");
       }
