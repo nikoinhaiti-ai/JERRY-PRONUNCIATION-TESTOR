@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Camera Split · Filters + Flash + Beauty</title>
+<title>Camera Split · Recorder</title>
 <style>
   :root{
     --bg:#0b0f14;
@@ -15,6 +15,7 @@
     --accent:#4f8ef7;
     --danger:#ef4444;
     --flash:#fbbf24;
+    --rec:#ef4444;
   }
 
   *{ box-sizing:border-box; }
@@ -66,10 +67,21 @@
   .btn:active{ transform:translateY(1px); }
   .btn:disabled{ opacity:.45; cursor:not-allowed; }
   .btn .glyph{ font-size:14px; line-height:1; opacity:.9; }
-  .btn.primary{
-    background:var(--accent); border-color:var(--accent); color:#fff;
-  }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .btn.primary:hover{ background:#3f7de6; border-color:#3f7de6; }
+  .btn.rec{
+    background:#2a1416; border-color:#5c2a2e; color:#fca5a5;
+  }
+  .btn.rec:hover{ background:#3d1a1e; border-color:#7f3a3f; }
+  .btn.rec.live{
+    background:var(--rec); border-color:var(--rec); color:#fff;
+    animation:livePulse 2s ease-in-out infinite;
+  }
+  .btn.rec.live:hover{ background:#dc2626; border-color:#dc2626; }
+  @keyframes livePulse{
+    0%,100%{ box-shadow:0 0 0 0 rgba(239,68,68,.6); }
+    50%    { box-shadow:0 0 0 6px rgba(239,68,68,0); }
+  }
 
   /* ============ Stage ============ */
   .stage{
@@ -225,7 +237,6 @@
     pointer-events:none;
   }
 
-  /* warm screen fill light */
   .screen-flash{
     position:absolute; inset:0;
     z-index:3;
@@ -294,7 +305,7 @@
 
   .cam-bottom{
     display:flex; align-items:center; justify-content:center;
-    gap:14px; padding:0 12px;
+    gap:20px; padding:0 12px;
   }
 
   .cam-btn{
@@ -316,8 +327,51 @@
   .cam-btn.on{ background:var(--accent); border-color:var(--accent); }
   .cam-btn.on.flash{ background:var(--flash); border-color:var(--flash); color:#1a1400; }
   .cam-btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .cam-btn.mic-off{ color:#9aa3ae; }
+  .cam-btn.mic-off .mic-bar{ display:block; }
 
-  /* big shutter */
+  /* mic slash overlay */
+  .mic-slashed{ position:relative; }
+  .mic-slashed::after{
+    content:"";
+    position:absolute; left:50%; top:50%;
+    width:22px; height:2px;
+    background:var(--danger);
+    border-radius:2px;
+    transform:translate(-50%,-50%) rotate(-45deg);
+    pointer-events:none;
+  }
+
+  /* record timer pill */
+  .rec-timer{
+    position:absolute;
+    top:10px; left:50%;
+    transform:translateX(-50%);
+    z-index:5;
+    display:none;
+    align-items:center; gap:8px;
+    padding:6px 14px;
+    font-size:13px; font-weight:700;
+    color:#fff;
+    background:rgba(15,5,5,.82);
+    border:1px solid rgba(239,68,68,.5);
+    border-radius:999px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-variant-numeric: tabular-nums;
+    letter-spacing:.5px;
+    pointer-events:none;
+  }
+  .rec-timer.show{ display:inline-flex; }
+  .rec-timer .blink{
+    width:9px; height:9px; border-radius:50%;
+    background:var(--rec);
+    animation:recBlink 1s steps(2,end) infinite;
+  }
+  @keyframes recBlink{ 0%,49%{opacity:1} 50%,100%{opacity:.15} }
+  .rec-timer .mic-flag{ font-size:11px; color:#fca5a5; }
+
+  /* big shutter + record button */
   .shutter{
     width:66px; height:66px;
     border-radius:50%;
@@ -334,7 +388,7 @@
     width:48px; height:48px; border-radius:50%;
     background:#fff;
     box-shadow: 0 4px 16px -4px rgba(0,0,0,.85);
-    transition: background .15s ease, transform .1s ease;
+    transition: background .15s ease, transform .15s ease, border-radius .15s ease;
   }
   .shutter:hover{ border-color:#fff; }
   .shutter:hover::before{ background:#ffe9b0; }
@@ -342,10 +396,45 @@
   .shutter:active::before{ transform:scale(.86); }
   .shutter:disabled{ opacity:.35; cursor:not-allowed; }
 
+  /* record button — turns into a red square while recording */
+  .rec-btn{
+    width:66px; height:66px;
+    border-radius:50%;
+    border:3px solid rgba(255,255,255,.85);
+    background:transparent;
+    display:grid; place-items:center;
+    cursor:pointer; padding:0;
+    position:relative;
+    transition: transform .1s ease, border-color .15s ease, background .15s ease;
+    pointer-events:auto;
+  }
+  .rec-btn::before{
+    content:"";
+    width:48px; height:48px; border-radius:50%;
+    background:var(--rec);
+    box-shadow: 0 4px 16px -4px rgba(0,0,0,.85), 0 0 22px -4px rgba(239,68,68,.7);
+    transition: background .15s ease, transform .2s ease, border-radius .2s ease;
+  }
+  .rec-btn:hover{ border-color:#fff; }
+  .rec-btn:hover::before{ background:#f87171; }
+  .rec-btn:active{ transform:scale(.93); }
+  .rec-btn:disabled{ opacity:.35; cursor:not-allowed; }
+
+  /* recording state → inner square */
+  .rec-btn.live::before{
+    width:28px; height:28px;
+    border-radius:7px;
+    background:#fff;
+    box-shadow: 0 4px 16px -4px rgba(0,0,0,.85);
+  }
+  .rec-btn.live{ border-color:var(--rec); }
+  .rec-btn.live:hover::before{ background:#fecaca; }
+  .rec-btn.live{ animation: livePulse 2s ease-in-out infinite; }
+
   /* status badge */
   .fx-status{
     position:absolute;
-    top:10px; left:10px;
+    bottom:10px; left:10px;
     z-index:5;
     display:none;
     align-items:center; gap:7px;
@@ -383,7 +472,6 @@
   .cam-state p{ margin:0 0 14px; font-size:13px; color:var(--muted); line-height:1.6; max-width:330px; }
   .cam-state .cs-err{ color:#fca5a5; }
 
-  /* snapshot white flash */
   .flash{
     position:absolute; inset:0;
     z-index:7;
@@ -423,7 +511,7 @@
   .pane-body.empty .frame{ display:none; }
   .pane-body.empty .placeholder{ display:grid; }
 
-  /* ============ Snapshot modal ============ */
+  /* ============ Snapshot / Recording preview modal ============ */
   .modal{
     position:fixed; inset:0;
     display:none; place-items:center; padding:20px;
@@ -456,6 +544,24 @@
     width:100%; max-height:62vh;
     object-fit:contain; background:#000; display:block;
   }
+  .modal-video{
+    width:100%; max-height:62vh;
+    background:#000; display:block;
+  }
+  .modal-meta{
+    display:flex; align-items:center; gap:12px;
+    padding:8px 14px;
+    font-size:12px; color:var(--muted);
+    border-top:1px solid var(--border);
+    background:#0d1218;
+  }
+  .modal-meta .tag{
+    display:inline-flex; align-items:center; gap:5px;
+    padding:3px 9px;
+    background:#1a2029;
+    border:1px solid var(--border);
+    border-radius:999px;
+  }
   .modal-actions{
     display:flex; gap:8px; justify-content:flex-end;
     padding:12px 14px;
@@ -475,8 +581,10 @@
     .select{ max-width:110px; }
     .cam-btn{ padding:0 10px; font-size:12px; height:36px; min-width:36px; }
     .chip{ height:34px; padding:0 12px; font-size:12px; }
-    .shutter{ width:60px; height:60px; }
-    .shutter::before{ width:44px; height:44px; }
+    .shutter, .rec-btn{ width:58px; height:58px; }
+    .shutter::before, .rec-btn::before{ width:42px; height:42px; }
+    .rec-btn.live::before{ width:24px; height:24px; border-radius:6px; }
+    .cam-bottom{ gap:14px; }
   }
 </style>
 </head>
@@ -484,7 +592,7 @@
 
   <header class="topbar">
     <div class="brand">
-      <div class="mark"></div><span>Camera Split · FX</span>
+      <div class="mark"></div><span>Camera Split · Recorder</span>
     </div>
     <div class="spacer"></div>
     <button class="btn" data-act="layout" title="Toggle layout">
@@ -495,6 +603,9 @@
     </button>
     <button class="btn" data-act="snapshot" title="Take snapshot">
       <span class="glyph">◉</span><span class="label">Snapshot</span>
+    </button>
+    <button class="btn rec" data-act="record" id="recTopBtn" title="Start / stop recording">
+      <span class="glyph">●</span><span class="label">Record</span>
     </button>
     <button class="btn" data-act="reset" title="Reset">
       <span class="glyph">↺</span><span class="label">Reset</span>
@@ -512,6 +623,7 @@
         </div>
         <select class="select" id="camSelect" title="Select camera"></select>
         <div class="spacer"></div>
+        <button class="icon" id="micToggle" title="Microphone for recording">🎤</button>
         <button class="icon" id="camToggle" title="Start / stop camera">⏻</button>
       </div>
 
@@ -522,12 +634,18 @@
           <div class="screen-flash" id="screenFlash"></div>
         </div>
 
+        <div class="rec-timer" id="recTimer">
+          <span class="blink"></span>
+          <span id="recTime">00:00</span>
+          <span class="mic-flag" id="recMicFlag"></span>
+        </div>
+
         <div class="fx-status" id="fxStatus"></div>
 
         <div class="cam-overlay">
           <div class="cam-top">
             <div class="cam-top-group">
-              <button class="cam-btn" id="btnBeauty" title="Beauty filter (off / soft / smooth)">✨</button>
+              <button class="cam-btn" id="btnBeauty" title="Beauty filter">✨</button>
               <button class="cam-btn flash" id="btnFlash" title="Flash">⚡</button>
             </div>
             <div class="cam-top-group">
@@ -541,6 +659,7 @@
             <div class="filter-strip" id="filterStrip"></div>
             <div class="cam-bottom">
               <button class="shutter" id="btnSnap" title="Take snapshot"></button>
+              <button class="rec-btn" id="btnRec" title="Start / stop recording"></button>
             </div>
           </div>
         </div>
@@ -598,15 +717,25 @@
     <option value="https://developer.mozilla.org"></option>
   </datalist>
 
-  <!-- ===================== SNAPSHOT MODAL ===================== -->
+  <!-- ===================== PREVIEW MODAL (snapshot OR recording) ===================== -->
   <div class="modal" id="modal">
     <div class="modal-card">
       <div class="modal-head">
-        <span>◉</span><span>Snapshot</span>
+        <span id="modalIcon">◉</span>
+        <span id="modalTitle">Snapshot</span>
         <span class="spacer"></span>
         <button class="icon" id="modalClose" title="Close">✕</button>
       </div>
+
       <img class="modal-img" id="modalImg" alt="Snapshot preview">
+      <video class="modal-video" id="modalVideo" controls playsinline style="display:none"></video>
+
+      <div class="modal-meta" id="modalMeta" style="display:none">
+        <span class="tag" id="metaDuration">⏱ 00:00</span>
+        <span class="tag" id="metaSize">📦 0 MB</span>
+        <span class="tag" id="metaType">🎬</span>
+      </div>
+
       <div class="modal-actions">
         <button class="btn" id="modalDiscard">Discard</button>
         <button class="btn primary" id="modalDownload">⬇ Download</button>
@@ -619,7 +748,7 @@
   "use strict";
 
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-  const KEY = "camera-split-fx-v2";
+  const KEY = "camera-split-fx-v3";
 
   /* ============================================================
      Filters
@@ -644,14 +773,12 @@
     MOUTH_L: 61, MOUTH_R: 291, MOUTH_TOP: 13, MOUTH_BOT: 14
   };
 
-  /* Beauty levels: 0 = off, 1 = soft, 2 = smooth */
   const BEAUTY_LABELS = ["✨", "✨¹", "✨²"];
   const BEAUTY_TITLES = [
     "Beauty: off",
     "Beauty: soft (skin smoothing)",
     "Beauty: smooth (extra glow + eye light)"
   ];
-  /* Color grade applied per level */
   const BEAUTY_GRADE = [
     "none",
     "brightness(1.05) contrast(1.02) saturate(1.05)",
@@ -671,6 +798,8 @@
       filter: "none",
       beauty: 0,
       flash: false,
+      mic: false,          // microphone for recording
+      recFps: 30,
       content: {
         mode: "web",
         url: "https://en.wikipedia.org/wiki/Main_Page",
@@ -694,6 +823,8 @@
         filter: FILTERS.some(f => f.id === p.filter) ? p.filter : "none",
         beauty: [0,1,2].includes(+p.beauty) ? +p.beauty : 0,
         flash: p.flash === true,
+        mic: p.mic === true,
+        recFps: [24,30,60].includes(+p.recFps) ? +p.recFps : 30,
         content: {
           mode: p.content && p.content.mode === "note" ? "note" : "web",
           url: p.content && typeof p.content.url === "string" ? p.content.url : d.content.url,
@@ -729,6 +860,7 @@
   const recDot      = document.getElementById("recDot");
   const camSelect   = document.getElementById("camSelect");
   const camToggle   = document.getElementById("camToggle");
+  const micToggle   = document.getElementById("micToggle");
   const camState    = document.getElementById("camState");
   const csIcon      = document.getElementById("csIcon");
   const csText      = document.getElementById("csText");
@@ -736,12 +868,16 @@
   const flash       = document.getElementById("flash");
   const fxStatus    = document.getElementById("fxStatus");
   const filterStrip = document.getElementById("filterStrip");
+  const recTimer    = document.getElementById("recTimer");
+  const recTime     = document.getElementById("recTime");
+  const recMicFlag  = document.getElementById("recMicFlag");
 
   const btnBeauty   = document.getElementById("btnBeauty");
   const btnFlash    = document.getElementById("btnFlash");
   const btnMirror   = document.getElementById("btnMirror");
   const btnFlip     = document.getElementById("btnFlip");
   const btnSnap     = document.getElementById("btnSnap");
+  const btnRec      = document.getElementById("btnRec");
   const btnFull     = document.getElementById("btnFull");
 
   const contentBody = document.getElementById("contentBody");
@@ -752,10 +888,18 @@
 
   const modal       = document.getElementById("modal");
   const modalImg    = document.getElementById("modalImg");
+  const modalVideo  = document.getElementById("modalVideo");
+  const modalMeta   = document.getElementById("modalMeta");
+  const modalIcon   = document.getElementById("modalIcon");
+  const modalTitle  = document.getElementById("modalTitle");
+  const metaDuration= document.getElementById("metaDuration");
+  const metaSize    = document.getElementById("metaSize");
+  const metaType    = document.getElementById("metaType");
 
   const layoutBtn   = document.querySelector('[data-act="layout"]');
   const swapBtn     = document.querySelector('[data-act="swap"]');
   const snapTopBtn  = document.querySelector('[data-act="snapshot"]');
+  const recTopBtn   = document.getElementById("recTopBtn");
   const resetBtn    = document.querySelector('[data-act="reset"]');
 
   /* ============================================================
@@ -850,13 +994,15 @@
   function hideState() { camState.classList.remove("show"); }
 
   function setLive(on) {
-    recDot.classList.toggle("on", on);
+    recDot.classList.toggle("on", on && !recorder.isRecording);
     camToggle.classList.toggle("on", on);
     camToggle.title = on ? "Stop camera" : "Start camera";
     btnSnap.disabled = !on;
     btnFlip.disabled = !on || devices.length < 2;
     btnFlash.disabled = !on;
     btnBeauty.disabled = !on;
+    btnRec.disabled = !on;
+    recTopBtn.disabled = !on;
   }
 
   async function applyTorch(on) {
@@ -866,12 +1012,12 @@
     try {
       await track.applyConstraints({ advanced: [{ torch: !!on }] });
       return true;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   }
 
   function stopCamera() {
+    if (recorder.isRecording) stopRecording();
+
     if (stream) {
       const track = stream.getVideoTracks()[0];
       if (track) { try { track.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) {} }
@@ -929,7 +1075,6 @@
 
       try { await video.play(); } catch (e) {}
 
-      // Torch support?
       const track = stream.getVideoTracks()[0];
       try {
         const caps = track && track.getCapabilities ? track.getCapabilities() : {};
@@ -943,7 +1088,6 @@
       setLive(true);
       hideState();
 
-      // Re-apply flash state for the new camera
       if (state.flash) {
         if (hasTorch) {
           await applyTorch(true);
@@ -952,6 +1096,7 @@
         }
       }
       updateFlashUI();
+      ensureLoop();
 
     } catch (err) {
       stopCamera();
@@ -1006,6 +1151,7 @@
 
   function flipCamera() {
     if (!stream || devices.length < 2) return;
+    if (recorder.isRecording) return; // don't swap mid-recording
     let i = devices.findIndex(d => d.deviceId === camSelect.value);
     if (i === -1) i = 0;
     const next = devices[(i + 1) % devices.length];
@@ -1022,39 +1168,24 @@
 
   /* ============================================================
      FLASH
-     - Rear camera w/ torch  → physical LED
-     - Front / no torch      → warm screen fill light
   ============================================================ */
   function updateFlashUI() {
     btnFlash.classList.toggle("on", !!state.flash);
-
-    if (!stream) {
-      btnFlash.title = "Flash (start the camera first)";
-      return;
-    }
-    if (hasTorch) {
-      btnFlash.title = state.flash ? "Flash: LED on (tap to turn off)" : "Flash: tap to turn on LED";
-    } else {
-      btnFlash.title = state.flash
-        ? "Fill light: on (screen flash) — tap to turn off"
-        : "Fill light: tap to use the screen as a warm flash";
-    }
+    if (!stream) { btnFlash.title = "Flash (start the camera first)"; return; }
+    btnFlash.title = hasTorch
+      ? (state.flash ? "Flash: LED on (tap to turn off)" : "Flash: tap to turn on LED")
+      : (state.flash ? "Fill light: on (screen flash)" : "Fill light: tap to use the screen as a warm flash");
   }
 
   async function toggleFlash() {
     if (!stream) return;
-
     state.flash = !state.flash;
     save();
 
     if (state.flash) {
       if (hasTorch) {
         const ok = await applyTorch(true);
-        if (!ok) {
-          // Torch claimed to exist but failed — fall back to screen
-          hasTorch = false;
-          screenFlash.classList.add("on");
-        }
+        if (!ok) { hasTorch = false; screenFlash.classList.add("on"); }
       } else {
         screenFlash.classList.add("on");
       }
@@ -1107,12 +1238,12 @@
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
       );
 
-      let landmarker;
       const baseOpts = {
         modelAssetPath:
           "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
       };
 
+      let landmarker;
       try {
         landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
           baseOptions: Object.assign({ delegate: "GPU" }, baseOpts),
@@ -1163,7 +1294,6 @@
     };
   }
 
-  /* Cover rect for drawing video into a target of size tw × th */
   function coverRect(vw, vh, tw, th) {
     const scale = Math.max(tw / vw, th / vh);
     const dw = vw * scale, dh = vh * scale;
@@ -1222,24 +1352,22 @@
   }
 
   /* ============================================================
-     BEAUTY: soft-focus skin smoothing + highlight glow
+     BEAUTY
   ============================================================ */
   function drawSoftFocus(ctx, tw, th, level, mirrored) {
     if (level <= 0) return;
     const vw = video.videoWidth, vh = video.videoHeight;
     if (!vw || !vh) return;
 
-    // Downscaled canvas → upscale gives natural diffusion
     const bw = Math.max(1, Math.round(tw / 3));
     const bh = Math.max(1, Math.round(th / 3));
 
     if (blurCanvas.width !== bw || blurCanvas.height !== bh) {
-      blurCanvas.width = bw;
-      blurCanvas.height = bh;
+      blurCanvas.width = bw; blurCanvas.height = bh;
     }
 
     const r = coverRect(vw, vh, tw, th);
-    const s = bw / tw;   // uniform scale
+    const s = bw / tw;
 
     blurCtx.setTransform(1, 0, 0, 1, 0, 0);
     blurCtx.clearRect(0, 0, bw, bh);
@@ -1248,7 +1376,6 @@
     blurCtx.drawImage(video, r.dx * s, r.dy * s, r.dw * s, r.dh * s);
     blurCtx.restore();
 
-    // --- skin smoothing: soft blurred layer over the sharp frame ---
     ctx.save();
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
@@ -1256,7 +1383,6 @@
     ctx.drawImage(blurCanvas, 0, 0, bw, bh, 0, 0, tw, th);
     ctx.restore();
 
-    // --- level 2: extra dreamy highlight glow ---
     if (level >= 2) {
       ctx.save();
       ctx.imageSmoothingEnabled = true;
@@ -1268,7 +1394,6 @@
     }
   }
 
-  /* Brighten the eye area when landmarks are available */
   function drawEyeBrighten(ctx, lm, P, level) {
     const lEye = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
     const rEye = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
@@ -1293,7 +1418,7 @@
   }
 
   /* ============================================================
-     FACE FILTER RENDERERS
+     FILTER RENDERERS
   ============================================================ */
   function fxShades(ctx, lm, P) {
     const lc = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
@@ -1404,16 +1529,13 @@
 
     ctx.save();
     ctx.translate(nx, ny);
-
     const ng = ctx.createRadialGradient(-nw * 0.16, -nh * 0.22, nh * 0.04, 0, 0, nw * 0.72);
     ng.addColorStop(0, "#55555e");
     ng.addColorStop(1, "#08080c");
     ctx.fillStyle = ng;
-
     ctx.beginPath();
     ctx.ellipse(0, 0, nw / 2, nh / 2, 0, 0, Math.PI * 2);
     ctx.fill();
-
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.beginPath();
     ctx.ellipse(-nw * 0.15, -nh * 0.2, nw * 0.11, nh * 0.09, 0, 0, Math.PI * 2);
@@ -1701,7 +1823,413 @@
   }
 
   /* ============================================================
-     RENDER LOOP
+     RECORDER CORE
+  ============================================================ */
+  const recorder = {
+    mediaRecorder: null,
+    chunks: [],
+    canvas: null,
+    canvasCtx: null,
+    audioStream: null,
+    canvasStream: null,
+    mimeType: "",
+    fileExt: "webm",
+    isRecording: false,
+    startedAt: 0,
+    timerInterval: null,
+    pendingBlob: null,
+    pendingMeta: null
+  };
+
+  /* Pick the best supported recording mime type for this browser */
+  function pickMimeType() {
+    const candidates = [
+      { mime: "video/mp4;codecs=avc1.42E01E,mp4a.40.2", ext: "mp4" },
+      { mime: "video/mp4;codecs=avc1.42E01E", ext: "mp4" },
+      { mime: "video/mp4", ext: "mp4" },
+      { mime: "video/webm;codecs=vp9,opus", ext: "webm" },
+      { mime: "video/webm;codecs=vp8,opus", ext: "webm" },
+      { mime: "video/webm;codecs=vp9", ext: "webm" },
+      { mime: "video/webm;codecs=vp8", ext: "webm" },
+      { mime: "video/webm", ext: "webm" }
+    ];
+    if (typeof MediaRecorder === "undefined") return null;
+    for (const c of candidates) {
+      try {
+        if (MediaRecorder.isTypeSupported(c.mime)) return c;
+      } catch (e) {}
+    }
+    return { mime: "", ext: "webm" }; // let the browser choose
+  }
+
+  async function getMicStream() {
+    if (!state.mic) return null;
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      return s;
+    } catch (err) {
+      console.warn("[mic]", err);
+      // reflect failure in UI
+      state.mic = false;
+      save();
+      updateMicUI();
+      return null;
+    }
+  }
+
+  /* Build a recording canvas at a resolution derived from the video feed */
+  function ensureRecordCanvas() {
+    const vw = video.videoWidth || 1280;
+    const vh = video.videoHeight || 720;
+
+    // Cap to a sane max (2160p) and keep even dimensions (some encoders need it)
+    const maxDim = 2160;
+    let w = vw, h = vh;
+    if (Math.max(w, h) > maxDim) {
+      const k = maxDim / Math.max(w, h);
+      w = Math.round(w * k);
+      h = Math.round(h * k);
+    }
+    w = w - (w % 2);
+    h = h - (h % 2);
+
+    if (!recorder.canvas) {
+      recorder.canvas = document.createElement("canvas");
+      recorder.canvasCtx = recorder.canvas.getContext("2d", { alpha: false });
+    }
+    if (recorder.canvas.width !== w || recorder.canvas.height !== h) {
+      recorder.canvas.width = w;
+      recorder.canvas.height = h;
+    }
+    return { w, h };
+  }
+
+  /* Draw one composited frame at recording resolution */
+  function drawRecordFrame() {
+    const { w, h } = ensureRecordCanvas();
+    const ctx = recorder.canvasCtx;
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return;
+
+    const mirrored = !!state.mirrored;
+    const r = coverRect(vw, vh, w, h);
+
+    // 1. base frame + color grade
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, h);
+    ctx.save();
+    if (state.beauty > 0 && "filter" in ctx) ctx.filter = BEAUTY_GRADE[state.beauty];
+    if (mirrored) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(video, r.dx, r.dy, r.dw, r.dh);
+    ctx.restore();
+
+    // 2. soft focus (uses a separate blur canvas)
+    if (state.beauty > 0) {
+      const bw = Math.max(1, Math.round(w / 3));
+      const bh = Math.max(1, Math.round(h / 3));
+      if (blurCanvas.width !== bw || blurCanvas.height !== bh) {
+        blurCanvas.width = bw; blurCanvas.height = bh;
+      }
+      const s = bw / w;
+      blurCtx.setTransform(1, 0, 0, 1, 0, 0);
+      blurCtx.clearRect(0, 0, bw, bh);
+      blurCtx.save();
+      if (mirrored) { blurCtx.translate(bw, 0); blurCtx.scale(-1, 1); }
+      blurCtx.drawImage(video, r.dx * s, r.dy * s, r.dw * s, r.dh * s);
+      blurCtx.restore();
+
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.globalAlpha = state.beauty === 1 ? 0.40 : 0.58;
+      ctx.drawImage(blurCanvas, 0, 0, bw, bh, 0, 0, w, h);
+      ctx.restore();
+
+      if (state.beauty >= 2) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.16;
+        ctx.drawImage(blurCanvas, 0, 0, bw, bh, 0, 0, w, h);
+        ctx.restore();
+      }
+    }
+
+    // 3. face-driven effects
+    if (lastLandmarks) {
+      const P = makeProjector(vw, vh, w, h, mirrored);
+      if (state.beauty > 0) drawEyeBrighten(ctx, lastLandmarks, P, state.beauty);
+      if (state.filter !== "none") drawFilterSet(ctx, lastLandmarks, P);
+    }
+  }
+
+  /* Draw loop while recording — grabs a canvas frame each animation tick */
+  let recRaf = null;
+  function recLoop() {
+    if (!recorder.isRecording) return;
+    drawRecordFrame();
+    recRaf = requestAnimationFrame(recLoop);
+  }
+
+  async function startRecording() {
+    if (recorder.isRecording || !stream) return;
+
+    const pick = pickMimeType();
+    if (!pick) {
+      alert("Recording is not supported in this browser.");
+      return;
+    }
+
+    // Make sure the frame is composited once before we start
+    drawRecordFrame();
+
+    // Canvas stream carries the visual output (filters + beauty included)
+    try {
+      recorder.canvasStream = recorder.canvas.captureStream(state.recFps);
+    } catch (e) {
+      console.warn("[record] captureStream failed", e);
+      alert("Could not capture the video stream for recording.");
+      return;
+    }
+
+    // Optional microphone audio
+    recorder.audioStream = await getMicStream();
+
+    const tracks = [...recorder.canvasStream.getVideoTracks()];
+    if (recorder.audioStream) {
+      tracks.push(...recorder.audioStream.getAudioTracks());
+    }
+    const mixed = new MediaStream(tracks);
+
+    const opts = pick.mime ? { mimeType: pick.mime } : undefined;
+    let mr;
+    try {
+      mr = new MediaRecorder(mixed, opts);
+    } catch (e) {
+      console.warn("[record] fallback to default mime", e);
+      mr = new MediaRecorder(mixed);
+    }
+
+    recorder.mimeType = mr.mimeType || pick.mime || "video/webm";
+    recorder.fileExt = recorder.mimeType.includes("mp4") ? "mp4" : "webm";
+    recorder.chunks = [];
+    recorder.mediaRecorder = mr;
+
+    mr.ondataavailable = e => {
+      if (e.data && e.data.size > 0) recorder.chunks.push(e.data);
+    };
+
+    mr.onerror = e => {
+      console.warn("[record] error", e);
+    };
+
+    mr.onstop = () => {
+      const blob = new Blob(recorder.chunks, { type: recorder.mimeType });
+      const duration = (performance.now() - recorder.startedAt) / 1000;
+      recorder.pendingBlob = blob;
+      recorder.pendingMeta = {
+        duration,
+        size: blob.size,
+        mime: recorder.mimeType,
+        ext: recorder.fileExt
+      };
+
+      // cleanup streams
+      if (recorder.audioStream) {
+        recorder.audioStream.getTracks().forEach(t => t.stop());
+        recorder.audioStream = null;
+      }
+      if (recorder.canvasStream) {
+        recorder.canvasStream.getTracks().forEach(t => t.stop());
+        recorder.canvasStream = null;
+      }
+
+      showRecordingPreview();
+    };
+
+    // Start capturing
+    mr.start(250);          // emit a chunk every 250ms
+    recorder.isRecording = true;
+    recorder.startedAt = performance.now();
+
+    // Kick off draw loop for recording
+    recLoop();
+
+    // UI
+    recTimer.classList.add("show");
+    recMicFlag.textContent = recorder.audioStream ? "🎤" : "";
+    btnRec.classList.add("live");
+    recTopBtn.classList.add("live");
+    recTopBtn.querySelector(".label").textContent = "Stop";
+    recDot.classList.add("on");
+
+    updateRecTimer();
+    recorder.timerInterval = setInterval(updateRecTimer, 250);
+  }
+
+  function stopRecording() {
+    if (!recorder.isRecording) return;
+
+    recorder.isRecording = false;
+    if (recRaf != null) { cancelAnimationFrame(recRaf); recRaf = null; }
+
+    try { recorder.mediaRecorder && recorder.mediaRecorder.stop(); } catch (e) {}
+
+    clearInterval(recorder.timerInterval);
+    recorder.timerInterval = null;
+
+    recTimer.classList.remove("show");
+    btnRec.classList.remove("live");
+    recTopBtn.classList.remove("live");
+    recTopBtn.querySelector(".label").textContent = "Record";
+    recDot.classList.toggle("on", !!stream);
+  }
+
+  function updateRecTimer() {
+    if (!recorder.isRecording) return;
+    const s = Math.floor((performance.now() - recorder.startedAt) / 1000);
+    const mm = String(Math.floor(s / 60)).padStart(2, "0");
+    const ss = String(s % 60).padStart(2, "0");
+    recTime.textContent = mm + ":" + ss;
+  }
+
+  function toggleRecording() {
+    if (recorder.isRecording) stopRecording();
+    else startRecording();
+  }
+
+  /* ============================================================
+     PREVIEW MODAL (handles both snapshot and recording)
+  ============================================================ */
+  function showRecordingPreview() {
+    const blob = recorder.pendingBlob;
+    const meta = recorder.pendingMeta;
+    if (!blob || !meta) return;
+
+    // Object URL for the video
+    const url = URL.createObjectURL(blob);
+
+    // Swap modal to video mode
+    modalImg.style.display = "none";
+    modalVideo.style.display = "block";
+    modalMeta.style.display = "flex";
+    modalVideo.src = url;
+    modalIcon.textContent = "●";
+    modalTitle.textContent = "Recording";
+    metaDuration.textContent = "⏱ " + formatDuration(meta.duration);
+    metaSize.textContent = "📦 " + formatSize(meta.size);
+    metaType.textContent = "🎬 " + (meta.ext === "mp4" ? "MP4" : "WebM");
+
+    // Remember for download/discard
+    modal.dataset.mode = "video";
+    modal.dataset.url = url;
+
+    modal.classList.add("show");
+  }
+
+  function showSnapshotPreview(dataUrl) {
+    // Swap modal to image mode
+    modalVideo.pause && modalVideo.pause();
+    modalVideo.style.display = "none";
+    modalVideo.removeAttribute("src");
+    modalImg.style.display = "block";
+    modalMeta.style.display = "none";
+    modalImg.src = dataUrl;
+    modalIcon.textContent = "◉";
+    modalTitle.textContent = "Snapshot";
+
+    modal.dataset.mode = "image";
+    modal.dataset.url = dataUrl;
+
+    modal.classList.add("show");
+  }
+
+  function revokeModalUrl() {
+    const mode = modal.dataset.mode;
+    const url = modal.dataset.url;
+    if (mode === "video" && url && url.startsWith("blob:")) {
+      try { URL.revokeObjectURL(url); } catch (e) {}
+    }
+  }
+
+  function closeModal() {
+    revokeModalUrl();
+
+    modal.classList.remove("show");
+    modalImg.src = "";
+    try { modalVideo.pause(); } catch (e) {}
+    modalVideo.removeAttribute("src");
+    modalVideo.load && modalVideo.load();
+
+    modal.dataset.mode = "";
+    modal.dataset.url = "";
+
+    recorder.pendingBlob = null;
+    recorder.pendingMeta = null;
+  }
+
+  function downloadCurrent() {
+    const mode = modal.dataset.mode;
+    const url = modal.dataset.url;
+    if (!url) return;
+
+    const pad = n => String(n).padStart(2, "0");
+    const d = new Date();
+    const stamp =
+      d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" +
+      pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+
+    const a = document.createElement("a");
+    a.href = url;
+
+    if (mode === "video") {
+      const ext = recorder.pendingMeta && recorder.pendingMeta.ext
+        ? recorder.pendingMeta.ext : "webm";
+      a.download = "recording-" + stamp + "." + ext;
+    } else {
+      a.download = "snapshot-" + stamp + ".png";
+    }
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function formatDuration(sec) {
+    sec = Math.max(0, Math.round(sec));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+  }
+
+  /* ============================================================
+     MIC UI
+  ============================================================ */
+  function updateMicUI() {
+    micToggle.classList.toggle("on", !!state.mic);
+    micToggle.classList.toggle("mic-slashed", !state.mic);
+    micToggle.title = state.mic
+      ? "Microphone ON — audio will be recorded"
+      : "Microphone OFF — tap to record with audio";
+  }
+
+  /* ============================================================
+     RENDER LOOP (screen preview)
   ============================================================ */
   let rafId = null;
 
@@ -1719,23 +2247,21 @@
     const filterOn = state.filter !== "none";
     const needsCanvas = beautyOn || filterOn;
 
-    // Face detection (only when a filter needs it)
     const now = performance.now();
     if (filterOn && faceLandmarker && now - lastDetectAt > 28) {
       lastDetectAt = now;
       try {
         const res = faceLandmarker.detectForVideo(video, now);
         lastLandmarks = (res && res.faceLandmarks && res.faceLandmarks[0]) || null;
-      } catch (e) { /* video not ready */ }
+      } catch (e) {}
     }
     if (!filterOn) lastLandmarks = null;
 
-    if (!needsCanvas) return;   // canvas stays transparent → video shows through
+    if (!needsCanvas) return;
 
     const mirrored = !!state.mirrored;
     const r = coverRect(vw, vh, fxW, fxH);
 
-    // ----- 1. Base frame (with color grade) -----
     fxCtx.save();
     fxCtx.fillStyle = "#05080b";
     fxCtx.fillRect(0, 0, fxW, fxH);
@@ -1744,10 +2270,8 @@
     fxCtx.drawImage(video, r.dx, r.dy, r.dw, r.dh);
     fxCtx.restore();
 
-    // ----- 2. Beauty soft-focus -----
     if (beautyOn) drawSoftFocus(fxCtx, fxW, fxH, state.beauty, mirrored);
 
-    // ----- 3. Face-driven enhancements + filters -----
     let project = null;
     if (lastLandmarks) project = makeProjector(vw, vh, fxW, fxH, mirrored);
 
@@ -1763,6 +2287,7 @@
     fxCtx.setTransform(1, 0, 0, 1, 0, 0);
     fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
   }
+  function ensureLoop() { if (rafId == null) startLoop(); }
 
   /* ============================================================
      FILTER PICKER
@@ -1792,11 +2317,11 @@
 
     updateFxStatus();
     initFaceTracking();
-    startLoop();
+    ensureLoop();
   }
 
   /* ============================================================
-     SNAPSHOT (composited: color grade + beauty + filters)
+     SNAPSHOT
   ============================================================ */
   function renderFull(vw, vh) {
     const out = document.createElement("canvas");
@@ -1804,7 +2329,6 @@
     const octx = out.getContext("2d");
     const mirrored = !!state.mirrored;
 
-    // 1. base frame
     octx.save();
     octx.fillStyle = "#000";
     octx.fillRect(0, 0, vw, vh);
@@ -1813,7 +2337,6 @@
     octx.drawImage(video, 0, 0, vw, vh);
     octx.restore();
 
-    // 2. soft focus
     if (state.beauty > 0) {
       const bw = Math.max(1, Math.round(vw / 3));
       const bh = Math.max(1, Math.round(vh / 3));
@@ -1843,7 +2366,6 @@
       }
     }
 
-    // 3. landmarks-driven effects
     if (lastLandmarks) {
       const P = makeProjector(vw, vh, vw, vh, mirrored);
       if (state.beauty > 0) drawEyeBrighten(octx, lastLandmarks, P, state.beauty);
@@ -1867,14 +2389,12 @@
     void flash.offsetWidth;
     flash.classList.add("fire");
 
-    modalImg.src = data;
-    modal.classList.add("show");
+    showSnapshotPreview(data);
   }
 
   function takeSnapshot() {
     if (!stream) return;
 
-    // Screen-fill-light mode: burst the warm light, let the sensor see it, then capture
     if (state.flash && !hasTorch) {
       screenFlash.classList.add("burst");
       setTimeout(() => {
@@ -1886,27 +2406,6 @@
     }
 
     doCapture();
-  }
-
-  function closeModal() {
-    modal.classList.remove("show");
-    modalImg.src = "";
-  }
-
-  function downloadSnapshot() {
-    const src = modalImg.src;
-    if (!src) return;
-    const a = document.createElement("a");
-    const d = new Date();
-    const pad = n => String(n).padStart(2, "0");
-    const stamp =
-      d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" +
-      pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
-    a.href = src;
-    a.download = "snapshot-" + stamp + ".png";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
   }
 
   /* ============================================================
@@ -1981,9 +2480,16 @@
   camToggle.addEventListener("click", toggleCamera);
   csBtn.addEventListener("click", () => startCamera(state.deviceId || ""));
   btnSnap.addEventListener("click", takeSnapshot);
+  btnRec.addEventListener("click", toggleRecording);
   btnFlip.addEventListener("click", flipCamera);
   btnFlash.addEventListener("click", toggleFlash);
   btnBeauty.addEventListener("click", cycleBeauty);
+
+  micToggle.addEventListener("click", () => {
+    state.mic = !state.mic;
+    save();
+    updateMicUI();
+  });
 
   btnMirror.addEventListener("click", () => {
     state.mirrored = !state.mirrored;
@@ -1992,6 +2498,10 @@
   });
 
   camSelect.addEventListener("change", () => {
+    if (recorder.isRecording) {
+      camSelect.value = state.deviceId;
+      return;
+    }
     state.deviceId = camSelect.value;
     save();
     startCamera(state.deviceId);
@@ -2013,18 +2523,25 @@
   ============================================================ */
   document.getElementById("modalClose").addEventListener("click", closeModal);
   document.getElementById("modalDiscard").addEventListener("click", closeModal);
-  document.getElementById("modalDownload").addEventListener("click", downloadSnapshot);
+  document.getElementById("modalDownload").addEventListener("click", downloadCurrent);
 
   modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
 
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && modal.classList.contains("show")) { closeModal(); return; }
+    if (e.key === "Escape") {
+      if (modal.classList.contains("show")) { closeModal(); return; }
+      if (recorder.isRecording) { stopRecording(); return; }
+    }
 
     const tag = (document.activeElement && document.activeElement.tagName) || "";
     const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
     if (typing || modal.classList.contains("show")) return;
 
-    if (e.code === "Space" || e.key.toLowerCase() === "s") {
+    if (e.code === "Space") {
+      if (stream) { e.preventDefault(); takeSnapshot(); }
+    } else if (e.key.toLowerCase() === "r") {
+      if (stream) { e.preventDefault(); toggleRecording(); }
+    } else if (e.key.toLowerCase() === "s") {
       if (stream) { e.preventDefault(); takeSnapshot(); }
     }
   });
@@ -2045,13 +2562,16 @@
   });
 
   snapTopBtn.addEventListener("click", takeSnapshot);
+  recTopBtn.addEventListener("click", toggleRecording);
 
   resetBtn.addEventListener("click", () => {
+    if (recorder.isRecording) stopRecording();
     state = defaults();
     applyMirror();
     setFilter("none");
     updateBeautyUI();
     updateFlashUI();
+    updateMicUI();
     screenFlash.classList.remove("on", "burst");
     mountPanes();
     applyLayout();
@@ -2077,6 +2597,9 @@
   window.addEventListener("resize", () => { resizeFx(); });
 
   window.addEventListener("beforeunload", () => {
+    if (recorder.isRecording) {
+      try { recorder.mediaRecorder && recorder.mediaRecorder.stop(); } catch (e) {}
+    }
     if (stream) {
       const track = stream.getVideoTracks()[0];
       if (track) { try { track.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) {} }
@@ -2093,6 +2616,7 @@
   applyMirror();
   updateBeautyUI();
   updateFlashUI();
+  updateMicUI();
   renderContent();
   setLive(false);
 
@@ -2103,13 +2627,13 @@
   startCamera(state.deviceId || "").then(() => {
     if (state.filter !== "none") {
       initFaceTracking();
-      startLoop();
+      ensureLoop();
     }
     updateFxStatus();
     updateFlashUI();
   });
 
-  startLoop();
+  ensureLoop();
 
 })();
 </script>
