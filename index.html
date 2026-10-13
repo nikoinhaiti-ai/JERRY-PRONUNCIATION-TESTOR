@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Camera Split · Stage Recorder</title>
+<title>Camera Split · Rich Notes</title>
 <style>
   :root{
     --bg:#0b0f14;
@@ -101,7 +101,6 @@
     grid-template-columns: minmax(0,1fr);
     grid-template-rows: var(--a,50%) 12px minmax(0,1fr);
   }
-  /* Visual cue while stage recording */
   .stage.recording{
     outline:2px solid rgba(239,68,68,.6);
     outline-offset:-2px;
@@ -143,6 +142,7 @@
     padding:8px;
     background:var(--panel-2);
     border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
   }
 
   .pane-title{
@@ -364,19 +364,6 @@
   }
   .src-btn.stage:hover{ background:#7c4ff0; border-color:#7c4ff0; }
 
-  /* Small label under the source button */
-  .src-label{
-    position:absolute;
-    bottom:-18px; left:50%; transform:translateX(-50%);
-    font-size:9.5px; font-weight:700;
-    letter-spacing:.4px;
-    color:#c4b5fd;
-    white-space:nowrap;
-    pointer-events:none;
-    text-transform:uppercase;
-  }
-
-  /* big shutter */
   .shutter{
     width:66px; height:66px;
     border-radius:50%;
@@ -393,7 +380,7 @@
     width:48px; height:48px; border-radius:50%;
     background:#fff;
     box-shadow: 0 4px 16px -4px rgba(0,0,0,.85);
-    transition: background .15s ease, transform .15s ease, border-radius .15s ease;
+    transition: background .15s ease, transform .15s ease;
   }
   .shutter:hover{ border-color:#fff; }
   .shutter:hover::before{ background:#ffe9b0; }
@@ -409,7 +396,7 @@
     display:grid; place-items:center;
     cursor:pointer; padding:0;
     position:relative;
-    transition: transform .1s ease, border-color .15s ease, background .15s ease;
+    transition: transform .1s ease, border-color .15s ease;
     pointer-events:auto;
   }
   .rec-btn::before{
@@ -431,7 +418,6 @@
   .rec-btn.live{ border-color:var(--rec); animation: livePulse 2s ease-in-out infinite; }
   .rec-btn.live:hover::before{ background:#fecaca; }
 
-  /* Stage-source record button gets purple accent */
   .rec-btn.stage-src::before{
     background:var(--stage);
     box-shadow: 0 4px 16px -4px rgba(0,0,0,.85), 0 0 22px -4px rgba(139,92,246,.75);
@@ -439,7 +425,6 @@
   .rec-btn.stage-src:hover::before{ background:#a78bfa; }
   .rec-btn.stage-src.live{ border-color:var(--stage); }
 
-  /* record timer pill */
   .rec-timer{
     position:absolute;
     top:10px; left:50%;
@@ -476,7 +461,6 @@
   .rec-timer .src-flag{ color:#c4b5fd; }
   .rec-timer .mic-flag{ color:#fca5a5; }
 
-  /* status badge */
   .fx-status{
     position:absolute;
     bottom:10px; left:10px;
@@ -503,7 +487,6 @@
   }
   @keyframes spin{ to{ transform:rotate(360deg); } }
 
-  /* camera off / error state */
   .cam-state{
     position:absolute; inset:0;
     z-index:6;
@@ -527,17 +510,8 @@
   @keyframes flash{ 0%{opacity:.92} 100%{opacity:0} }
 
   /* ============ Content pane ============ */
-  .frame, .note, .placeholder{ display:none; }
+  .frame, .note-wrap, .placeholder{ display:none; }
   .frame{ width:100%; height:100%; border:0; background:#fff; }
-  .note{
-    width:100%; height:100%;
-    border:0; outline:none; resize:none;
-    padding:16px 18px;
-    background:#0f141a; color:var(--text);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size:13.5px; line-height:1.65;
-  }
-  .note::placeholder{ color:#4f5865; }
 
   .placeholder{
     position:absolute; inset:0;
@@ -550,11 +524,214 @@
   .placeholder .ph-sub{ margin-top:8px; font-size:12px; color:#5c6672; max-width:330px; }
 
   .pane.mode-web  .frame{ display:block; }
-  .pane.mode-note .note{ display:block; }
+  .pane.mode-note .note-wrap{ display:flex; }
   .pane.mode-note .urlbar,
   .pane.mode-note .pane-actions [data-act="reload"]{ display:none; }
+  .pane.mode-web .note-toolbar{ display:none; }
   .pane-body.empty .frame{ display:none; }
   .pane-body.empty .placeholder{ display:grid; }
+
+  /* ============ Rich note editor ============ */
+  .note-wrap{
+    position:absolute; inset:0;
+    flex-direction:column;
+    background:
+      radial-gradient(900px 500px at 100% -10%, #131a24 0%, transparent 60%),
+      #0f141a;
+    overflow:hidden;
+  }
+
+  .note-toolbar{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:3px;
+    flex-wrap:wrap;
+    padding:8px 10px;
+    background:linear-gradient(180deg,#0e141c,#0b1018);
+    border-bottom:1px solid var(--border);
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .note-toolbar::-webkit-scrollbar{ display:none; }
+
+  .tb-btn{
+    min-width:30px; height:30px;
+    padding:0 8px;
+    display:inline-flex; align-items:center; justify-content:center;
+    font:inherit; font-size:13.5px; line-height:1;
+    color:#b9c2cd;
+    background:transparent;
+    border:1px solid transparent;
+    border-radius:8px;
+    cursor:pointer;
+    transition:background .13s ease, color .13s ease, border-color .13s ease;
+    user-select:none;
+    flex:0 0 auto;
+  }
+  .tb-btn:hover{ color:var(--text); background:#1d2631; border-color:#2f3742; }
+  .tb-btn:active{ transform:translateY(1px); }
+  .tb-btn.on{
+    color:#fff;
+    background:var(--accent);
+    border-color:var(--accent);
+  }
+  .tb-btn b, .tb-btn strong{ font-weight:800; font-size:15px; }
+  .tb-btn i{ font-style:italic; font-family: Georgia, serif; font-size:15px; }
+  .tb-btn u{ text-decoration:underline; font-size:14px; }
+  .tb-btn.hl{
+    position:relative;
+    color:#fde68a;
+  }
+  .tb-btn.hl::after{
+    content:"";
+    position:absolute;
+    inset:auto 7px 6px 7px;
+    height:3px;
+    border-radius:2px;
+    background:#fbbf24;
+    opacity:.75;
+  }
+
+  .tb-div{
+    width:1px; height:20px;
+    background:var(--border);
+    margin:0 4px;
+    flex:0 0 auto;
+  }
+
+  .tb-select{
+    height:30px;
+    font:inherit; font-size:12.5px;
+    color:var(--text);
+    background:#0b0f14;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:0 6px;
+    outline:none;
+    cursor:pointer;
+    flex:0 0 auto;
+    max-width:130px;
+  }
+  .tb-select:focus{ border-color:var(--accent); }
+  .tb-select option{ background:#0b0f14; color:var(--text); }
+
+  .note-editor{
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    padding:26px 30px 60px;
+    outline:none;
+    color:#e8eef5;
+    font-family:'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size:15px;
+    line-height:1.75;
+    letter-spacing:.1px;
+    word-wrap:break-word;
+    overflow-wrap:anywhere;
+    caret-color:var(--accent);
+  }
+  .note-editor::-webkit-scrollbar{ width:10px; }
+  .note-editor::-webkit-scrollbar-thumb{
+    background:#2a3038; border-radius:10px; border:2px solid #0f141a;
+  }
+  .note-editor::-webkit-scrollbar-thumb:hover{ background:#3a424d; }
+
+  .note-editor:empty::before{
+    content: attr(data-placeholder);
+    color:#4f5865;
+    pointer-events:none;
+    display:block;
+  }
+
+  /* Typography for the note content */
+  .note-editor p{ margin:0 0 .85em; }
+  .note-editor h1{
+    font-size:2em;
+    font-weight:800;
+    letter-spacing:-.025em;
+    line-height:1.2;
+    margin:1.1em 0 .45em;
+    color:#ffffff;
+  }
+  .note-editor h1:first-child{ margin-top:0; }
+  .note-editor h2{
+    font-size:1.5em;
+    font-weight:750;
+    letter-spacing:-.015em;
+    line-height:1.3;
+    margin:1em 0 .4em;
+    color:#f3f7fc;
+  }
+  .note-editor h3{
+    font-size:1.18em;
+    font-weight:700;
+    letter-spacing:0;
+    line-height:1.35;
+    margin:.9em 0 .35em;
+    color:#e6edf3;
+  }
+  .note-editor h1:first-child,
+  .note-editor h2:first-child,
+  .note-editor h3:first-child{ margin-top:0; }
+
+  .note-editor b,
+  .note-editor strong{ font-weight:800; color:#ffffff; }
+  .note-editor i,
+  .note-editor em{ font-style:italic; }
+  .note-editor u{ text-decoration:underline; text-decoration-color: var(--accent); text-underline-offset:3px; }
+
+  .note-editor ul,
+  .note-editor ol{
+    margin:0 0 .9em;
+    padding-left:1.6em;
+  }
+  .note-editor li{ margin:.2em 0; }
+  .note-editor ul li::marker{ color:var(--accent); }
+  .note-editor ol li::marker{ color:var(--accent); font-weight:600; }
+
+  .note-editor a{
+    color:var(--accent);
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+
+  .note-editor blockquote{
+    margin:.8em 0;
+    padding:.5em 0 .5em 1em;
+    border-left:3px solid var(--accent);
+    color:#b9c2cd;
+    font-style:italic;
+  }
+
+  .note-editor code{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size:.92em;
+    background:#1a2029;
+    padding:.15em .45em;
+    border-radius:5px;
+    color:#e6edf3;
+  }
+
+  .note-editor hr{
+    border:0;
+    height:1px;
+    background:linear-gradient(90deg, transparent, #2a3038, transparent);
+    margin:1.4em 0;
+  }
+
+  .note-editor ::selection{
+    background:rgba(79,142,247,.35);
+    color:#fff;
+  }
+
+  .note-editor font[size="1"]{ font-size:11px; }
+  .note-editor font[size="2"]{ font-size:13px; }
+  .note-editor font[size="3"]{ font-size:15px; }
+  .note-editor font[size="4"]{ font-size:17px; }
+  .note-editor font[size="5"]{ font-size:20px; }
+  .note-editor font[size="6"]{ font-size:24px; }
+  .note-editor font[size="7"]{ font-size:28px; }
 
   /* ============ Preview modal ============ */
   .modal{
@@ -636,6 +813,10 @@
     .rec-btn.live::before{ width:24px; height:24px; border-radius:6px; }
     .src-btn{ width:44px; height:44px; font-size:17px; }
     .cam-bottom{ gap:12px; }
+
+    .note-editor{ padding:18px 18px 40px; font-size:14.5px; }
+    .tb-select{ max-width:90px; font-size:12px; }
+    .tb-btn{ min-width:28px; height:28px; padding:0 6px; font-size:12.5px; }
   }
 </style>
 </head>
@@ -643,7 +824,7 @@
 
   <header class="topbar">
     <div class="brand">
-      <div class="mark"></div><span>Camera Split · Stage Rec</span>
+      <div class="mark"></div><span>Camera Split · Rich Notes</span>
     </div>
     <div class="spacer"></div>
     <button class="btn" data-act="layout" title="Toggle layout">
@@ -736,11 +917,65 @@
           <button type="button" class="seg-btn" data-mode="web">Web</button>
           <button type="button" class="seg-btn" data-mode="note">Note</button>
         </div>
+
+        <!-- URL bar (Web mode only) -->
         <form class="urlbar" id="urlForm" autocomplete="off">
           <input class="url-input" id="urlInput" type="text" list="url-presets"
                  placeholder="Enter a URL…" spellcheck="false">
           <button class="btn go" type="submit">Go</button>
         </form>
+
+        <!-- Rich-text toolbar (Note mode only) -->
+        <div class="note-toolbar" id="noteToolbar">
+          <button type="button" class="tb-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button type="button" class="tb-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button type="button" class="tb-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+
+          <span class="tb-div"></span>
+
+          <button type="button" class="tb-btn" data-block="h1" title="Heading 1">H1</button>
+          <button type="button" class="tb-btn" data-block="h2" title="Heading 2">H2</button>
+          <button type="button" class="tb-btn" data-block="h3" title="Heading 3">H3</button>
+          <button type="button" class="tb-btn" data-block="p" title="Normal paragraph">¶</button>
+
+          <span class="tb-div"></span>
+
+          <select class="tb-select" id="fontFamily" title="Font family">
+            <option value="'Inter', ui-sans-serif, system-ui, sans-serif">Inter</option>
+            <option value="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">System</option>
+            <option value="Georgia, 'Times New Roman', serif">Serif</option>
+            <option value="'Times New Roman', Times, serif">Times</option>
+            <option value="'Courier New', ui-monospace, Menlo, monospace">Mono</option>
+            <option value="'Comic Sans MS', 'Chalkboard SE', cursive">Playful</option>
+            <option value="'Brush Script MT', 'Segoe Script', cursive">Script</option>
+          </select>
+
+          <select class="tb-select" id="fontSize" title="Font size">
+            <option value="1">Tiny</option>
+            <option value="2">Small</option>
+            <option value="3" selected>Normal</option>
+            <option value="4">Medium</option>
+            <option value="5">Large</option>
+            <option value="6">Huge</option>
+            <option value="7">Giant</option>
+          </select>
+
+          <span class="tb-div"></span>
+
+          <button type="button" class="tb-btn" data-cmd="insertUnorderedList" title="Bullet list">•&nbsp;≡</button>
+          <button type="button" class="tb-btn" data-cmd="insertOrderedList" title="Numbered list">1.&nbsp;≡</button>
+
+          <span class="tb-div"></span>
+
+          <button type="button" class="tb-btn hl" data-hilite="rgba(251,191,36,.55)" title="Yellow highlight">▮</button>
+          <button type="button" class="tb-btn hl" data-hilite="rgba(52,211,153,.45)" title="Green highlight">▮</button>
+          <button type="button" class="tb-btn hl" data-hilite="rgba(244,114,182,.45)" title="Pink highlight">▮</button>
+
+          <span class="tb-div"></span>
+
+          <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear formatting">✕</button>
+        </div>
+
         <div class="pane-actions">
           <button type="button" class="icon" data-act="reload" title="Reload">⟳</button>
           <button type="button" class="icon" data-act="open" title="Open in new tab">↗</button>
@@ -749,7 +984,12 @@
 
       <div class="pane-body" id="contentBody">
         <iframe class="frame" id="frame" title="Web content" referrerpolicy="no-referrer"></iframe>
-        <textarea class="note" id="note" spellcheck="false" placeholder="Type your notes here…"></textarea>
+
+        <div class="note-wrap">
+          <div class="note-editor" id="noteEditor" contenteditable="true" spellcheck="true"
+               data-placeholder="Write your notes here… select text and hit B, H1, or highlight."></div>
+        </div>
+
         <div class="placeholder">
           <div>
             <div class="ph-icon">🌐</div>
@@ -802,7 +1042,7 @@
   "use strict";
 
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-  const KEY = "camera-split-fx-v4";
+  const KEY = "camera-split-fx-v5";
 
   /* ============================================================
      Filters
@@ -842,6 +1082,13 @@
   /* ============================================================
      State
   ============================================================ */
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
   function defaults() {
     return {
       layout: window.matchMedia("(max-width: 760px)").matches ? "horizontal" : "vertical",
@@ -854,11 +1101,11 @@
       flash: false,
       mic: false,
       recFps: 30,
-      recSource: "cam",   // "cam" | "stage"
+      recSource: "cam",
       content: {
         mode: "web",
         url: "https://en.wikipedia.org/wiki/Main_Page",
-        note: ""
+        noteHtml: ""
       }
     };
   }
@@ -869,6 +1116,17 @@
       const raw = localStorage.getItem(KEY);
       if (!raw) return d;
       const p = JSON.parse(raw);
+
+      // Migrate legacy plain-text note → HTML
+      let noteHtml = "";
+      if (p.content) {
+        if (typeof p.content.noteHtml === "string") {
+          noteHtml = p.content.noteHtml;
+        } else if (typeof p.content.note === "string" && p.content.note) {
+          noteHtml = escapeHtml(p.content.note).replace(/\n/g, "<br>");
+        }
+      }
+
       return {
         layout: (p.layout === "horizontal" || p.layout === "vertical") ? p.layout : d.layout,
         ratio: Number.isFinite(+p.ratio) ? clamp(+p.ratio, 0.12, 0.88) : 0.5,
@@ -884,7 +1142,7 @@
         content: {
           mode: p.content && p.content.mode === "note" ? "note" : "web",
           url: p.content && typeof p.content.url === "string" ? p.content.url : d.content.url,
-          note: p.content && typeof p.content.note === "string" ? p.content.note : ""
+          noteHtml
         }
       };
     } catch (e) { return d; }
@@ -940,9 +1198,13 @@
 
   const contentBody = document.getElementById("contentBody");
   const frame       = document.getElementById("frame");
-  const note        = document.getElementById("note");
   const urlForm     = document.getElementById("urlForm");
   const urlInput    = document.getElementById("urlInput");
+
+  const noteEditor  = document.getElementById("noteEditor");
+  const noteToolbar = document.getElementById("noteToolbar");
+  const fontFamily  = document.getElementById("fontFamily");
+  const fontSize    = document.getElementById("fontSize");
 
   const modal       = document.getElementById("modal");
   const modalImg    = document.getElementById("modalImg");
@@ -1006,7 +1268,7 @@
     return (e.clientY - s.top - d.height / 2) / avail;
   }
   divider.addEventListener("pointerdown", e => {
-    if (recorder.isRecording) return;   // freeze layout while recording
+    if (recorder.isRecording) return;
     dragging = true;
     divider.setPointerCapture(e.pointerId);
     divider.classList.add("dragging");
@@ -1835,10 +2097,9 @@
     isRecording: false,
     startedAt: 0,
     timerInterval: null,
-    mode: null,          // "cam" | "stage"
+    mode: null,
     pendingBlob: null,
     pendingMeta: null,
-    // stage capture
     stageStream: null,
     stageVideo: null,
     stageCanvasStream: null,
@@ -1910,7 +2171,6 @@
     }
   }
 
-  /* ---------- CAMERA-ONLY recording (canvas composite of the camera pane) ---------- */
   function ensureRecordCanvas() {
     const vw = video.videoWidth || 1280;
     const vh = video.videoHeight || 720;
@@ -1997,7 +2257,6 @@
     recRaf = requestAnimationFrame(recLoop);
   }
 
-  /* ---------- START: camera-only ---------- */
   async function startCameraRecording() {
     const pick = pickMimeType();
     if (!pick) { alert("Recording is not supported in this browser."); return; }
@@ -2052,7 +2311,6 @@
     enterRecordingUI("cam");
   }
 
-  /* ---------- START: whole stage (left + right) ---------- */
   async function startStageRecording() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
       alert("Screen recording is not supported in this browser.");
@@ -2064,9 +2322,7 @@
     let displayStream;
     try {
       displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          frameRate: { ideal: state.recFps }
-        },
+        video: { frameRate: { ideal: state.recFps } },
         audio: false,
         preferCurrentTab: true,
         selfBrowserSurface: "include",
@@ -2074,7 +2330,6 @@
         systemAudio: "exclude"
       });
     } catch (err) {
-      // user cancelled the picker
       console.warn("[record] display capture cancelled", err);
       return;
     }
@@ -2100,7 +2355,6 @@
     const capW = capVideo.videoWidth || 1280;
     const capH = capVideo.videoHeight || 720;
 
-    // Crop rect within the captured surface
     let cx = 0, cy = 0, cw = capW, ch = capH;
 
     if (surface === "browser") {
@@ -2186,7 +2440,6 @@
       showRecordingPreview();
     };
 
-    // If user stops sharing from the browser bar
     if (vTrack) {
       vTrack.addEventListener("ended", () => {
         if (recorder.isRecording && recorder.mode === "stage") stopRecording();
@@ -2218,7 +2471,6 @@
     if (!recorder.isRecording) return;
     recorder.isRecording = false;
 
-    // stop RAF loops
     if (recRaf != null) { cancelAnimationFrame(recRaf); recRaf = null; }
 
     try {
@@ -2394,6 +2646,167 @@
   }
 
   /* ============================================================
+     RICH NOTE EDITOR
+  ============================================================ */
+  let savedRange = null;
+
+  function saveEditorSelection() {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (noteEditor.contains(range.commonAncestorContainer)) {
+      savedRange = range.cloneRange();
+    }
+  }
+
+  function restoreEditorSelection() {
+    if (!savedRange) { noteEditor.focus(); return; }
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+    noteEditor.focus();
+  }
+
+  function exec(cmd, value) {
+    restoreEditorSelection();
+    try {
+      document.execCommand("styleWithCSS", false, true);
+      document.execCommand(cmd, false, value || null);
+    } catch (e) {
+      console.warn("[note] exec failed", cmd, e);
+    }
+    saveEditorSelection();
+    syncToolbarState();
+    persistNote();
+  }
+
+  function persistNote() {
+    state.content.noteHtml = noteEditor.innerHTML;
+    save();
+  }
+
+  /* Keep track of caret as the user clicks around the editor */
+  noteEditor.addEventListener("keyup", saveEditorSelection);
+  noteEditor.addEventListener("mouseup", saveEditorSelection);
+  noteEditor.addEventListener("focus", saveEditorSelection);
+  noteEditor.addEventListener("blur", saveEditorSelection);
+
+  /* Save content */
+  let noteSaveTimer = null;
+  noteEditor.addEventListener("input", () => {
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(persistNote, 300);
+  });
+
+  /* Paste as plain text to keep the note clean */
+  noteEditor.addEventListener("paste", e => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+    if (!text) return;
+    document.execCommand("insertText", false, text);
+  });
+
+  /* Sanitize on blur: strip scripts/iframes that may slip in */
+  noteEditor.addEventListener("blur", () => {
+    let dirty = false;
+    noteEditor.querySelectorAll("script, iframe, object, embed, style, link, meta").forEach(el => {
+      el.remove();
+      dirty = true;
+    });
+    if (dirty) persistNote();
+  });
+
+  /* Toolbar: buttons (mousedown prevents losing caret) */
+  noteToolbar.querySelectorAll(".tb-btn").forEach(btn => {
+    btn.addEventListener("mousedown", e => e.preventDefault());
+    btn.addEventListener("click", () => {
+      const cmd = btn.dataset.cmd;
+      const block = btn.dataset.block;
+      const hilite = btn.dataset.hilite;
+
+      if (block) {
+        exec("formatBlock", block === "p" ? "p" : block);
+      } else if (hilite) {
+        exec("hiliteColor", hilite);
+      } else if (cmd) {
+        exec(cmd);
+      }
+    });
+  });
+
+  /* Font family */
+  fontFamily.addEventListener("mousedown", saveEditorSelection);
+  fontFamily.addEventListener("change", () => {
+    exec("fontName", fontFamily.value);
+  });
+
+  /* Font size */
+  fontSize.addEventListener("mousedown", saveEditorSelection);
+  fontSize.addEventListener("change", () => {
+    exec("fontSize", fontSize.value);
+  });
+
+  /* Native keyboard shortcuts (Ctrl/Cmd+B/I/U) are handled by the browser
+     inside contenteditable, but we still persist afterwards. */
+  noteEditor.addEventListener("keydown", e => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod) return;
+    const k = e.key.toLowerCase();
+    if (k === "b" || k === "i" || k === "u") {
+      setTimeout(() => { syncToolbarState(); persistNote(); }, 0);
+    }
+  });
+
+  /* Reflect active formatting in the toolbar */
+  function syncToolbarState() {
+    const check = (cmd) => {
+      try { return document.queryCommandState(cmd); } catch (e) { return false; }
+    };
+    noteToolbar.querySelectorAll(".tb-btn[data-cmd]").forEach(b => {
+      const c = b.dataset.cmd;
+      if (c === "bold" || c === "italic" || c === "underline" ||
+          c === "insertUnorderedList" || c === "insertOrderedList") {
+        b.classList.toggle("on", check(c));
+      }
+    });
+
+    /* Block level */
+    let block = "";
+    try { block = (document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch (e) {}
+    noteToolbar.querySelectorAll(".tb-btn[data-block]").forEach(b => {
+      b.classList.toggle("on", b.dataset.block === block);
+    });
+
+    /* Font family / size */
+    try {
+      const fname = document.queryCommandValue("fontName") || "";
+      if (fname) {
+        const opts = [...fontFamily.options];
+        const found = opts.find(o =>
+          fname.toLowerCase().includes(o.value.split(",")[0].replace(/['"]/g, "").toLowerCase())
+        );
+        if (found) fontFamily.value = found.value;
+      }
+    } catch (e) {}
+
+    try {
+      const fsize = document.queryCommandValue("fontSize") || "";
+      if (fsize && [...fontSize.options].some(o => o.value === fsize)) {
+        fontSize.value = fsize;
+      }
+    } catch (e) {}
+  }
+
+  document.addEventListener("selectionchange", () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    if (noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      saveEditorSelection();
+      syncToolbarState();
+    }
+  });
+
+  /* ============================================================
      RENDER LOOP (screen preview)
   ============================================================ */
   let rafId = null;
@@ -2561,7 +2974,7 @@
   }
 
   /* ============================================================
-     CONTENT PANE
+     CONTENT PANE (web + note)
   ============================================================ */
   function normalizeUrl(raw) {
     let v = (raw || "").trim();
@@ -2577,9 +2990,18 @@
     contentPane.querySelectorAll(".seg-btn").forEach(b =>
       b.classList.toggle("on", b.dataset.mode === c.mode)
     );
+
     if (document.activeElement !== urlInput) urlInput.value = c.url || "";
-    if (document.activeElement !== note)     note.value     = c.note || "";
+
+    /* Load note HTML only if the editor isn't focused (avoid caret jump) */
+    if (document.activeElement !== noteEditor) {
+      if (noteEditor.innerHTML !== (c.noteHtml || "")) {
+        noteEditor.innerHTML = c.noteHtml || "";
+      }
+    }
+
     contentBody.classList.toggle("empty", c.mode === "web" && !c.url);
+
     if (c.mode === "web" && c.url && frame.dataset.src !== c.url) {
       frame.src = c.url;
       frame.dataset.src = c.url;
@@ -2588,10 +3010,13 @@
 
   contentPane.querySelectorAll(".seg-btn").forEach(btn => {
     btn.addEventListener("click", () => {
+      persistNote();                 // commit current note state
       state.content.mode = btn.dataset.mode;
       renderContent();
       save();
-      if (btn.dataset.mode === "note") note.focus();
+      if (btn.dataset.mode === "note") {
+        setTimeout(() => noteEditor.focus(), 30);
+      }
     });
   });
 
@@ -2618,8 +3043,6 @@
     const c = state.content;
     if (c.mode === "web" && c.url) window.open(c.url, "_blank", "noopener");
   });
-
-  note.addEventListener("input", () => { state.content.note = note.value; save(); });
 
   /* ============================================================
      CAMERA CONTROLS
@@ -2683,8 +3106,10 @@
       if (recorder.isRecording) { stopRecording(); return; }
     }
 
-    const tag = (document.activeElement && document.activeElement.tagName) || "";
-    const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    const ae = document.activeElement;
+    const tag = (ae && ae.tagName) || "";
+    const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||
+                   (ae && ae.isContentEditable);
     if (typing || modal.classList.contains("show")) return;
 
     if (e.code === "Space") {
@@ -2726,6 +3151,7 @@
     screenFlash.classList.remove("on", "burst");
     mountPanes();
     applyLayout();
+    noteEditor.innerHTML = "";
     renderContent();
     save();
     startCamera(state.deviceId || "");
@@ -2770,7 +3196,11 @@
   updateFlashUI();
   updateMicUI();
   updateSrcUI();
+
+  /* Load note HTML before first render */
+  noteEditor.innerHTML = state.content.noteHtml || "";
   renderContent();
+
   setLive(false);
 
   filterStrip.querySelectorAll(".chip").forEach(c =>
