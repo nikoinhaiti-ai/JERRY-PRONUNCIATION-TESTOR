@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Camera Split · Screen Recorder</title>
+<title>Camera Split · PiP + Colors</title>
 <style>
   :root{
     --bg:#0b0f14;
@@ -72,9 +72,7 @@
   .btn .glyph{ font-size:14px; line-height:1; opacity:.9; }
   .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .btn.primary:hover{ background:#3f7de6; border-color:#3f7de6; }
-  .btn.rec{
-    background:#2a1416; border-color:#5c2a2e; color:#fca5a5;
-  }
+  .btn.rec{ background:#2a1416; border-color:#5c2a2e; color:#fca5a5; }
   .btn.rec:hover{ background:#3d1a1e; border-color:#7f3a3f; }
   .btn.rec.live{
     background:var(--rec); border-color:var(--rec); color:#fff;
@@ -93,16 +91,110 @@
   /* ============ Stage ============ */
   .stage{
     flex:1 1 auto; min-height:0; min-width:0;
-    display:grid; padding:10px;
+    display:grid; place-items:center;
+    padding:10px;
+    position:relative;
   }
-  .stage[data-layout="vertical"]{
+
+  .stage-inner{
+    display:grid;
+    width:100%; height:100%;
+    min-width:0; min-height:0;
+    position:relative;
+  }
+
+  .stage[data-layout="vertical"] .stage-inner{
     grid-template-columns: var(--a,50%) 12px minmax(0,1fr);
     grid-template-rows: minmax(0,1fr);
   }
-  .stage[data-layout="horizontal"]{
+  .stage[data-layout="horizontal"] .stage-inner{
     grid-template-columns: minmax(0,1fr);
     grid-template-rows: var(--a,50%) 12px minmax(0,1fr);
   }
+
+  /* PiP layout */
+  .stage[data-layout="pip"] .stage-inner{
+    grid-template-columns: minmax(0,1fr);
+    grid-template-rows: minmax(0,1fr);
+    border-radius:14px;
+    overflow:hidden;
+    background:#000;
+    box-shadow:
+      0 24px 60px -24px rgba(0,0,0,.9),
+      0 0 0 1px rgba(255,255,255,.06);
+    transition: box-shadow .2s ease;
+  }
+  .stage[data-layout="pip"] .divider{ display:none; }
+
+  .stage[data-layout="pip"] #contentPane{
+    grid-column:1; grid-row:1;
+    width:100%; height:100%;
+    border:0;
+    border-radius:0;
+  }
+
+  /* Framed stage — colored border around the 16:9 video */
+  .stage[data-layout="pip"] .stage-inner.framed{
+    box-shadow:
+      0 24px 60px -24px rgba(0,0,0,.9),
+      0 0 0 var(--stage-frame-w, 0px) var(--stage-frame-color, transparent),
+      0 0 0 1px rgba(255,255,255,.06);
+  }
+
+  .stage[data-layout="pip"] #camPane{
+    position:absolute;
+    z-index:20;
+    border-radius:12px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:
+      0 20px 45px -20px rgba(0,0,0,.95),
+      0 0 0 1px rgba(255,255,255,.05);
+    cursor:grab;
+    background:var(--panel);
+    transition: box-shadow .15s ease, transform .15s ease;
+  }
+  .stage[data-layout="pip"] #camPane:hover{
+    box-shadow:
+      0 26px 55px -20px rgba(0,0,0,.98),
+      0 0 0 1px rgba(79,142,247,.4);
+  }
+  .stage[data-layout="pip"] #camPane.dragging{
+    cursor:grabbing;
+    box-shadow:
+      0 30px 65px -20px rgba(0,0,0,1),
+      0 0 0 2px var(--accent);
+    transition:none;
+  }
+  .stage[data-layout="pip"] #camPane.snapping{
+    transition:
+      left .22s cubic-bezier(.2,.75,.3,1),
+      top .22s cubic-bezier(.2,.75,.3,1),
+      width .2s ease, height .2s ease,
+      box-shadow .15s ease;
+  }
+
+  /* Framed camera PiP — colored ring around the camera */
+  .stage[data-layout="pip"] #camPane.cam-framed{
+    border:0;
+    box-shadow:
+      0 20px 45px -20px rgba(0,0,0,.95),
+      0 0 0 var(--cam-frame-w, 3px) var(--cam-frame-color, #4f8ef7),
+      0 0 0 1px rgba(255,255,255,.05);
+  }
+  .stage[data-layout="pip"] #camPane.cam-framed:hover{
+    box-shadow:
+      0 26px 55px -20px rgba(0,0,0,.98),
+      0 0 0 var(--cam-frame-w, 3px) var(--cam-frame-color, #4f8ef7),
+      0 0 0 1px rgba(79,142,247,.4);
+  }
+  .stage[data-layout="pip"] #camPane.cam-framed.dragging{
+    box-shadow:
+      0 30px 65px -20px rgba(0,0,0,1),
+      0 0 0 var(--cam-frame-w, 3px) var(--cam-frame-color, #4f8ef7),
+      0 0 0 3px var(--accent);
+  }
+
   .stage.recording{
     outline:2px solid rgba(239,68,68,.6);
     outline-offset:-2px;
@@ -142,23 +234,25 @@
 
   .pane-bar{
     flex:0 0 auto;
-    display:flex; align-items:center; gap:8px;
-    padding:8px;
+    display:flex; align-items:center; gap:6px;
+    padding:7px 8px;
     background:var(--panel-2);
     border-bottom:1px solid var(--border);
     flex-wrap:wrap;
+    min-height:42px;
   }
 
   .pane-title{
-    display:flex; align-items:center; gap:8px;
+    display:flex; align-items:center; gap:7px;
     font-size:12.5px; font-weight:600; color:#b9c2cd;
     letter-spacing:.2px; white-space:nowrap;
-    padding-left:4px;
+    padding-left:2px;
   }
   .rec-dot{
     width:8px; height:8px; border-radius:50%;
     background:#3a424d;
     transition:background .2s ease, box-shadow .2s ease;
+    flex:0 0 auto;
   }
   .rec-dot.on{
     background:var(--danger);
@@ -262,8 +356,7 @@
     z-index:3;
     pointer-events:none;
     opacity:0;
-    background:
-      radial-gradient(circle at 50% 38%, #fffdf7 0%, #fff3d9 45%, #ffe3ac 100%);
+    background:radial-gradient(circle at 50% 38%, #fffdf7 0%, #fff3d9 45%, #ffe3ac 100%);
     transition: opacity .3s ease;
   }
   .screen-flash.on{ opacity:.5; }
@@ -274,6 +367,7 @@
     z-index:4;
     display:flex; flex-direction:column; justify-content:space-between;
     pointer-events:none;
+    transition: opacity .18s ease;
   }
   .cam-top{
     display:flex; align-items:flex-start; justify-content:space-between;
@@ -348,7 +442,7 @@
   .cam-btn.on.flash{ background:var(--flash); border-color:var(--flash); color:#1a1400; }
   .cam-btn:disabled{ opacity:.35; cursor:not-allowed; }
 
-  /* Source toggle (📷 / 🖥️ / 🌐) */
+  /* Source toggle */
   .src-btn{
     width:50px; height:50px;
     border-radius:50%;
@@ -367,54 +461,31 @@
   .src-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.36); }
   .src-btn:active{ transform:scale(.94); }
   .src-btn.stage{
-    background:var(--stage);
-    border-color:var(--stage);
+    background:var(--stage); border-color:var(--stage);
     box-shadow: 0 6px 18px -6px rgba(139,92,246,.85);
   }
   .src-btn.stage:hover{ background:#7c4ff0; border-color:#7c4ff0; }
   .src-btn.screen{
-    background:var(--screen);
-    border-color:var(--screen);
+    background:var(--screen); border-color:var(--screen);
     box-shadow: 0 6px 18px -6px rgba(20,184,166,.85);
   }
   .src-btn.screen:hover{ background:#0d9488; border-color:#0d9488; }
-
-  /* When recording: source button becomes pause/resume */
   .src-btn.recording{
-    cursor:pointer;
-    background:var(--pause);
-    border-color:var(--pause);
+    background:var(--pause); border-color:var(--pause);
     box-shadow: 0 6px 18px -6px rgba(245,158,11,.85);
     font-size:18px;
   }
   .src-btn.recording:hover{ background:#d97706; border-color:#d97706; }
   .src-btn.recording.is-paused{
-    background:#22c55e;
-    border-color:#22c55e;
+    background:#22c55e; border-color:#22c55e;
     box-shadow: 0 6px 18px -6px rgba(34,197,94,.85);
     animation:resumePulse 1.6s ease-in-out infinite;
   }
-  .src-btn.recording.is-paused:hover{ background:#16a34a; border-color:#16a34a; }
   @keyframes resumePulse{
     0%,100%{ box-shadow:0 6px 18px -6px rgba(34,197,94,.85), 0 0 0 0 rgba(34,197,94,.5); }
     50%    { box-shadow:0 6px 18px -6px rgba(34,197,94,.85), 0 0 0 8px rgba(34,197,94,0); }
   }
 
-  /* Small label under the source button */
-  .src-label{
-    position:absolute;
-    bottom:-18px; left:50%; transform:translateX(-50%);
-    font-size:9.5px; font-weight:700;
-    letter-spacing:.5px;
-    color:#c4b5fd;
-    white-space:nowrap;
-    pointer-events:none;
-    text-transform:uppercase;
-  }
-  .src-btn.screen .src-label,
-  .src-btn.screen ~ .src-label{ color:#5eead4; }
-
-  /* big shutter */
   .shutter{
     width:66px; height:66px;
     border-radius:50%;
@@ -462,12 +533,9 @@
   .rec-btn:active{ transform:scale(.93); }
   .rec-btn:disabled{ opacity:.35; cursor:not-allowed; }
   .rec-btn.live::before{
-    width:28px; height:28px;
-    border-radius:7px;
-    background:#fff;
+    width:28px; height:28px; border-radius:7px; background:#fff;
   }
   .rec-btn.live{ border-color:var(--rec); animation: livePulse 2s ease-in-out infinite; }
-  .rec-btn.live:hover::before{ background:#fecaca; }
   .rec-btn.live.paused{ animation: none; }
   .rec-btn.live.paused::before{ background:#fbbf24; }
 
@@ -485,7 +553,6 @@
   .rec-btn.screen-src:hover::before{ background:#2dd4bf; }
   .rec-btn.screen-src.live{ border-color:var(--screen); }
 
-  /* record timer pill */
   .rec-timer{
     position:absolute;
     top:10px; left:50%;
@@ -506,18 +573,9 @@
     pointer-events:none;
   }
   .rec-timer.show{ display:inline-flex; }
-  .rec-timer.stage{
-    background:rgba(20,10,40,.82);
-    border-color:rgba(139,92,246,.55);
-  }
-  .rec-timer.screen{
-    background:rgba(5,26,25,.82);
-    border-color:rgba(20,184,166,.55);
-  }
-  .rec-timer.paused{
-    background:rgba(30,20,0,.85);
-    border-color:rgba(245,158,11,.6);
-  }
+  .rec-timer.stage{ background:rgba(20,10,40,.82); border-color:rgba(139,92,246,.55); }
+  .rec-timer.screen{ background:rgba(5,26,25,.82); border-color:rgba(20,184,166,.55); }
+  .rec-timer.paused{ background:rgba(30,20,0,.85); border-color:rgba(245,158,11,.6); }
   .rec-timer .blink{
     width:9px; height:9px; border-radius:50%;
     background:var(--rec);
@@ -525,13 +583,9 @@
   }
   .rec-timer.stage .blink{ background:var(--stage); }
   .rec-timer.screen .blink{ background:var(--screen); }
-  .rec-timer.paused .blink{
-    background:var(--pause);
-    animation: none;
-  }
+  .rec-timer.paused .blink{ background:var(--pause); animation:none; }
   @keyframes recBlink{ 0%,49%{opacity:1} 50%,100%{opacity:.15} }
-  .rec-timer .src-flag,
-  .rec-timer .mic-flag{ font-size:12px; }
+  .rec-timer .src-flag, .rec-timer .mic-flag{ font-size:12px; }
   .rec-timer .src-flag{ color:#c4b5fd; }
   .rec-timer.screen .src-flag{ color:#5eead4; }
   .rec-timer .mic-flag{ color:#fca5a5; }
@@ -585,6 +639,109 @@
   .flash.fire{ animation:flash .42s ease-out; }
   @keyframes flash{ 0%{opacity:.92} 100%{opacity:0} }
 
+  /* ============ PiP compact styling ============ */
+  .pip-only{ display:none; }
+  .stage[data-layout="pip"] .pip-only{ display:grid; }
+
+  .stage[data-layout="pip"] #camPane .pane-bar{
+    min-height:34px;
+    padding:5px 6px;
+    gap:4px;
+    background:linear-gradient(180deg,#1d242e,#151b23);
+    cursor:grab;
+    touch-action:none;
+    user-select:none;
+  }
+  .stage[data-layout="pip"] #camPane.dragging .pane-bar{ cursor:grabbing; }
+  .stage[data-layout="pip"] #camPane .pane-title{
+    font-size:11px;
+    gap:5px;
+    padding-left:2px;
+  }
+  .stage[data-layout="pip"] #camPane .pane-title .label-text{ display:none; }
+  .stage[data-layout="pip"] #camPane .rec-dot{ width:7px; height:7px; }
+  .stage[data-layout="pip"] #camPane .select{
+    font-size:11px;
+    padding:4px 4px;
+    max-width:96px;
+    min-width:0;
+    flex:0 1 auto;
+  }
+  .stage[data-layout="pip"] #camPane .icon{
+    width:26px; height:26px;
+    font-size:13px;
+    border-radius:7px;
+  }
+
+  .stage[data-layout="pip"] #camPane .cam-overlay{
+    opacity:0;
+    pointer-events:none;
+  }
+  .stage[data-layout="pip"] #camPane:hover .cam-overlay,
+  .stage[data-layout="pip"] #camPane.dragging .cam-overlay,
+  .stage[data-layout="pip"] #camPane.recording .cam-overlay{
+    opacity:1;
+    pointer-events:auto;
+  }
+  .stage[data-layout="pip"] #camPane .cam-overlay .cam-btn,
+  .stage[data-layout="pip"] #camPane .cam-overlay .chip,
+  .stage[data-layout="pip"] #camPane .cam-overlay .shutter,
+  .stage[data-layout="pip"] #camPane .cam-overlay .rec-btn,
+  .stage[data-layout="pip"] #camPane .cam-overlay .src-btn{
+    pointer-events:auto;
+  }
+
+  .stage[data-layout="pip"] #camPane .cam-top{ padding:6px; gap:6px; }
+  .stage[data-layout="pip"] #camPane .cam-top-group{ gap:4px; }
+  .stage[data-layout="pip"] #camPane .cam-btn{
+    height:26px; min-width:26px;
+    padding:0 6px; font-size:11px;
+    border-radius:8px; gap:4px;
+  }
+  .stage[data-layout="pip"] #camPane .cam-bottom-group{
+    gap:6px; padding:0 0 8px;
+  }
+  .stage[data-layout="pip"] #camPane .filter-strip{
+    gap:5px; padding:0 6px;
+  }
+  .stage[data-layout="pip"] #camPane .chip{
+    height:24px; padding:0 8px;
+    font-size:10.5px; gap:4px;
+  }
+  .stage[data-layout="pip"] #camPane .chip .emoji{ font-size:11px; }
+  .stage[data-layout="pip"] #camPane .cam-bottom{ gap:10px; padding:0 6px; }
+  .stage[data-layout="pip"] #camPane .shutter,
+  .stage[data-layout="pip"] #camPane .rec-btn{
+    width:40px; height:40px; border-width:2px;
+  }
+  .stage[data-layout="pip"] #camPane .shutter::before,
+  .stage[data-layout="pip"] #camPane .rec-btn::before{
+    width:28px; height:28px;
+  }
+  .stage[data-layout="pip"] #camPane .rec-btn.live::before{
+    width:16px; height:16px; border-radius:4px;
+  }
+  .stage[data-layout="pip"] #camPane .src-btn{
+    width:32px; height:32px;
+    font-size:13px; border-width:2px;
+  }
+  .stage[data-layout="pip"] #camPane .src-btn.recording{ font-size:12px; }
+
+  .stage[data-layout="pip"] #camPane .rec-timer{
+    font-size:10.5px;
+    padding:3px 9px;
+    gap:5px;
+    top:38px;
+  }
+  .stage[data-layout="pip"] #camPane .rec-timer .blink{ width:6px; height:6px; }
+  .stage[data-layout="pip"] #camPane .rec-timer .src-flag,
+  .stage[data-layout="pip"] #camPane .rec-timer .mic-flag{ font-size:10px; }
+
+  .stage[data-layout="pip"] #camPane .fx-status{
+    bottom:6px; left:6px;
+    font-size:10px; padding:4px 8px;
+  }
+
   /* ============ Content pane ============ */
   .frame, .note-wrap, .placeholder{ display:none; }
   .frame{ width:100%; height:100%; border:0; background:#fff; }
@@ -615,14 +772,17 @@
       radial-gradient(900px 500px at 100% -10%, #131a24 0%, transparent 60%),
       #0f141a;
     overflow:hidden;
+    transition: background .2s ease;
+  }
+
+  /* Framed note wrap */
+  .note-wrap.framed{
+    box-shadow: inset 0 0 0 var(--note-frame-w, 3px) var(--note-frame-color, #4f8ef7);
   }
 
   .note-toolbar{
     flex:0 0 auto;
-    display:flex;
-    align-items:center;
-    gap:3px;
-    flex-wrap:wrap;
+    display:flex; align-items:center; gap:3px; flex-wrap:wrap;
     padding:8px 10px;
     background:linear-gradient(180deg,#0e141c,#0b1018);
     border-bottom:1px solid var(--border);
@@ -636,14 +796,12 @@
     padding:0 8px;
     display:inline-flex; align-items:center; justify-content:center;
     font:inherit; font-size:13.5px; line-height:1;
-    color:#b9c2cd;
-    background:transparent;
+    color:#b9c2cd; background:transparent;
     border:1px solid transparent;
     border-radius:8px;
     cursor:pointer;
     transition:background .13s ease, color .13s ease, border-color .13s ease;
-    user-select:none;
-    flex:0 0 auto;
+    user-select:none; flex:0 0 auto;
   }
   .tb-btn:hover{ color:var(--text); background:#1d2631; border-color:#2f3742; }
   .tb-btn:active{ transform:translateY(1px); }
@@ -656,18 +814,10 @@
     content:"";
     position:absolute;
     inset:auto 7px 6px 7px;
-    height:3px;
-    border-radius:2px;
-    background:#fbbf24;
-    opacity:.75;
+    height:3px; border-radius:2px;
+    background:#fbbf24; opacity:.75;
   }
-
-  .tb-div{
-    width:1px; height:20px;
-    background:var(--border);
-    margin:0 4px;
-    flex:0 0 auto;
-  }
+  .tb-div{ width:1px; height:20px; background:var(--border); margin:0 4px; flex:0 0 auto; }
 
   .tb-select{
     height:30px;
@@ -677,105 +827,167 @@
     border:1px solid var(--border);
     border-radius:8px;
     padding:0 6px;
-    outline:none;
-    cursor:pointer;
-    flex:0 0 auto;
-    max-width:130px;
+    outline:none; cursor:pointer;
+    flex:0 0 auto; max-width:130px;
   }
   .tb-select:focus{ border-color:var(--accent); }
   .tb-select option{ background:#0b0f14; color:var(--text); }
 
+  /* ---------- Color pickers ---------- */
+  .color-group{
+    display:inline-flex; align-items:center; gap:0;
+    height:30px;
+    background:#0b0f14;
+    border:1px solid var(--border);
+    border-radius:8px;
+    overflow:hidden;
+    flex:0 0 auto;
+    transition: border-color .15s ease;
+  }
+  .color-group:hover{ border-color:#3a424d; }
+  .color-group:focus-within{ border-color:var(--accent); }
+
+  .color-icon{
+    width:26px; height:100%;
+    display:grid; place-items:center;
+    font-size:13px;
+    color:var(--muted);
+    background:transparent;
+    border-right:1px solid var(--border);
+    flex:0 0 auto;
+    pointer-events:none;
+    user-select:none;
+  }
+  .color-group .color-icon.txt{ color:#93c5fd; }
+  .color-group .color-icon.frame{ color:#c4b5fd; }
+
+  .color-swatch{
+    position:relative;
+    width:30px; height:100%;
+    display:grid; place-items:center;
+    cursor:pointer;
+    overflow:hidden;
+    background:
+      repeating-conic-gradient(#1a1f28 0% 25%, #252c37 0% 50%) 50% / 8px 8px;
+    flex:0 0 auto;
+  }
+  .color-swatch::before{
+    content:"";
+    position:absolute;
+    inset:3px;
+    border-radius:5px;
+    background: var(--sw, #ffffff);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset;
+    transition: background .15s ease;
+  }
+  .color-swatch input[type="color"]{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    opacity:0; cursor:pointer;
+    border:0; padding:0;
+    appearance:none;
+    -webkit-appearance:none;
+  }
+
+  .color-clear{
+    width:22px; height:100%;
+    display:grid; place-items:center;
+    font:inherit; font-size:11px;
+    color:var(--muted);
+    background:transparent;
+    border:0; border-left:1px solid var(--border);
+    cursor:pointer;
+    transition: background .15s ease, color .15s ease;
+    flex:0 0 auto;
+  }
+  .color-clear:hover{ background:#222a34; color:var(--text); }
+
+  /* A row of preset swatches under the pickers in the toolbar */
+  .swatches{
+    display:inline-flex; gap:3px;
+    align-items:center;
+    flex:0 0 auto;
+  }
+  .sw-btn{
+    width:16px; height:16px;
+    border-radius:4px;
+    border:1px solid rgba(255,255,255,.2);
+    cursor:pointer;
+    padding:0;
+    transition: transform .1s ease, box-shadow .15s ease;
+  }
+  .sw-btn:hover{ transform: scale(1.12); box-shadow: 0 0 0 2px rgba(79,142,247,.5); }
+  .sw-btn:active{ transform: scale(.95); }
+
   .note-editor{
-    flex:1 1 auto;
-    min-height:0;
+    flex:1 1 auto; min-height:0;
     overflow-y:auto;
     padding:26px 30px 60px;
     outline:none;
     color:#e8eef5;
     font-family:'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    font-size:15px;
-    line-height:1.75;
-    letter-spacing:.1px;
-    word-wrap:break-word;
-    overflow-wrap:anywhere;
+    font-size:15px; line-height:1.75; letter-spacing:.1px;
+    word-wrap:break-word; overflow-wrap:anywhere;
     caret-color:var(--accent);
+    transition: color .15s ease;
   }
   .note-editor::-webkit-scrollbar{ width:10px; }
   .note-editor::-webkit-scrollbar-thumb{
     background:#2a3038; border-radius:10px; border:2px solid #0f141a;
   }
   .note-editor::-webkit-scrollbar-thumb:hover{ background:#3a424d; }
-
   .note-editor:empty::before{
     content: attr(data-placeholder);
     color:#4f5865;
     pointer-events:none;
     display:block;
   }
-
   .note-editor p{ margin:0 0 .85em; }
   .note-editor h1{
     font-size:2em; font-weight:800; letter-spacing:-.025em;
-    line-height:1.2; margin:1.1em 0 .45em; color:#ffffff;
+    line-height:1.2; margin:1.1em 0 .45em;
   }
   .note-editor h1:first-child{ margin-top:0; }
   .note-editor h2{
     font-size:1.5em; font-weight:750; letter-spacing:-.015em;
-    line-height:1.3; margin:1em 0 .4em; color:#f3f7fc;
+    line-height:1.3; margin:1em 0 .4em;
   }
   .note-editor h3{
-    font-size:1.18em; font-weight:700; letter-spacing:0;
-    line-height:1.35; margin:.9em 0 .35em; color:#e6edf3;
+    font-size:1.18em; font-weight:700;
+    line-height:1.35; margin:.9em 0 .35em;
   }
   .note-editor h1:first-child,
   .note-editor h2:first-child,
   .note-editor h3:first-child{ margin-top:0; }
 
-  .note-editor b, .note-editor strong{ font-weight:800; color:#ffffff; }
+  .note-editor b, .note-editor strong{ font-weight:800; }
   .note-editor i, .note-editor em{ font-style:italic; }
-  .note-editor u{ text-decoration:underline; text-decoration-color: var(--accent); text-underline-offset:3px; }
-
-  .note-editor ul, .note-editor ol{
-    margin:0 0 .9em; padding-left:1.6em;
+  .note-editor u{
+    text-decoration:underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset:3px;
   }
+  .note-editor ul, .note-editor ol{ margin:0 0 .9em; padding-left:1.6em; }
   .note-editor li{ margin:.2em 0; }
   .note-editor ul li::marker{ color:var(--accent); }
   .note-editor ol li::marker{ color:var(--accent); font-weight:600; }
-
-  .note-editor a{
-    color:var(--accent);
-    text-decoration:underline;
-    text-underline-offset:3px;
-  }
-
+  .note-editor a{ color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
   .note-editor blockquote{
-    margin:.8em 0;
-    padding:.5em 0 .5em 1em;
+    margin:.8em 0; padding:.5em 0 .5em 1em;
     border-left:3px solid var(--accent);
-    color:#b9c2cd;
-    font-style:italic;
+    color:#b9c2cd; font-style:italic;
   }
-
   .note-editor code{
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size:.92em;
-    background:#1a2029;
-    padding:.15em .45em;
-    border-radius:5px;
-    color:#e6edf3;
+    font-size:.92em; background:#1a2029;
+    padding:.15em .45em; border-radius:5px;
   }
-
   .note-editor hr{
     border:0; height:1px;
     background:linear-gradient(90deg, transparent, #2a3038, transparent);
     margin:1.4em 0;
   }
-
-  .note-editor ::selection{
-    background:rgba(79,142,247,.35);
-    color:#fff;
-  }
-
+  .note-editor ::selection{ background:rgba(79,142,247,.35); color:#fff; }
   .note-editor font[size="1"]{ font-size:11px; }
   .note-editor font[size="2"]{ font-size:13px; }
   .note-editor font[size="3"]{ font-size:15px; }
@@ -835,12 +1047,8 @@
     border:1px solid var(--border);
     border-radius:999px;
   }
-  .modal-meta .tag.stage{
-    background:#1e1338; border-color:#4c2f7c; color:#c4b5fd;
-  }
-  .modal-meta .tag.screen{
-    background:#0c2e2c; border-color:#175e58; color:#5eead4;
-  }
+  .modal-meta .tag.stage{ background:#1e1338; border-color:#4c2f7c; color:#c4b5fd; }
+  .modal-meta .tag.screen{ background:#0c2e2c; border-color:#175e58; color:#5eead4; }
   .modal-actions{
     display:flex; gap:8px; justify-content:flex-end;
     padding:12px 14px;
@@ -854,7 +1062,7 @@
     .btn{ padding:7px 10px; }
     .brand span{ display:none; }
     .topbar{ padding:0 10px; gap:6px; }
-    .stage{ padding:8px; }
+    .stage{ padding:6px; }
     .pane-bar{ gap:6px; padding:6px; }
     .seg-btn{ padding:5px 8px; }
     .select{ max-width:110px; }
@@ -864,11 +1072,12 @@
     .shutter::before, .rec-btn::before{ width:42px; height:42px; }
     .rec-btn.live::before{ width:24px; height:24px; border-radius:6px; }
     .src-btn{ width:44px; height:44px; font-size:17px; }
-    .src-btn.recording{ font-size:16px; }
     .cam-bottom{ gap:12px; }
     .note-editor{ padding:18px 18px 40px; font-size:14.5px; }
     .tb-select{ max-width:90px; font-size:12px; }
     .tb-btn{ min-width:28px; height:28px; padding:0 6px; font-size:12.5px; }
+    .color-swatch{ width:26px; }
+    .swatches{ display:none; }
   }
 </style>
 </head>
@@ -876,13 +1085,13 @@
 
   <header class="topbar">
     <div class="brand">
-      <div class="mark"></div><span>Camera Split · Screen Recorder</span>
+      <div class="mark"></div><span>Camera Split · PiP + Colors</span>
     </div>
     <div class="spacer"></div>
     <button class="btn" data-act="layout" title="Toggle layout">
-      <span class="glyph">▥</span><span class="label">Side by side</span>
+      <span class="glyph">▣</span><span class="label">YouTube + PiP</span>
     </button>
-    <button class="btn" data-act="swap" title="Swap panes">
+    <button class="btn" data-act="swap" title="Swap / flip camera position">
       <span class="glyph">⇄</span><span class="label">Swap</span>
     </button>
     <button class="btn" data-act="snapshot" title="Take snapshot">
@@ -896,164 +1105,187 @@
     </button>
   </header>
 
-  <main class="stage" id="stage" data-layout="vertical">
+  <main class="stage" id="stage" data-layout="pip">
+    <div class="stage-inner" id="stageInner">
 
-    <!-- ===================== CAMERA PANE ===================== -->
-    <section class="pane" id="camPane">
-      <div class="pane-bar">
-        <div class="pane-title">
-          <span class="rec-dot" id="recDot"></span>
-          Camera
-        </div>
-        <select class="select" id="camSelect" title="Select camera"></select>
-        <div class="spacer"></div>
-        <button class="icon" id="micToggle" title="Microphone for recording">🎤</button>
-        <button class="icon" id="camToggle" title="Start / stop camera">⏻</button>
-      </div>
+      <!-- ===================== CAMERA PANE ===================== -->
+      <section class="pane" id="camPane">
+        <div class="pane-bar" id="camBar">
+          <div class="pane-title">
+            <span class="rec-dot" id="recDot"></span>
+            <span class="label-text">Camera</span>
+          </div>
+          <select class="select" id="camSelect" title="Select camera"></select>
+          <div class="spacer"></div>
 
-      <div class="pane-body" id="camBody">
-        <div class="cam-wrap" id="camWrap">
-          <video class="cam-video" id="video" playsinline autoplay muted></video>
-          <canvas class="cam-canvas" id="fxCanvas"></canvas>
-          <div class="screen-flash" id="screenFlash"></div>
+          <button class="icon pip-only" id="pipSize" title="Camera size (small / medium / large)">⤢</button>
+          <button class="icon pip-only" id="pipCorner" title="Move to next corner">◱</button>
+
+          <button class="icon" id="micToggle" title="Microphone for recording">🎤</button>
+          <button class="icon" id="camToggle" title="Start / stop camera">⏻</button>
         </div>
 
-        <div class="rec-timer" id="recTimer">
-          <span class="blink"></span>
-          <span id="recTime">00:00</span>
-          <span class="src-flag" id="recSrcFlag"></span>
-          <span class="mic-flag" id="recMicFlag"></span>
-          <span class="paused-tag" id="recPausedTag" style="display:none">PAUSED</span>
-        </div>
+        <div class="pane-body" id="camBody">
+          <div class="cam-wrap" id="camWrap">
+            <video class="cam-video" id="video" playsinline autoplay muted></video>
+            <canvas class="cam-canvas" id="fxCanvas"></canvas>
+            <div class="screen-flash" id="screenFlash"></div>
+          </div>
 
-        <div class="fx-status" id="fxStatus"></div>
+          <div class="rec-timer" id="recTimer">
+            <span class="blink"></span>
+            <span id="recTime">00:00</span>
+            <span class="src-flag" id="recSrcFlag"></span>
+            <span class="mic-flag" id="recMicFlag"></span>
+            <span class="paused-tag" id="recPausedTag" style="display:none">PAUSED</span>
+          </div>
 
-        <div class="cam-overlay">
-          <div class="cam-top">
-            <div class="cam-top-group">
-              <button class="cam-btn" id="btnBeauty" title="Beauty filter">✨</button>
-              <button class="cam-btn flash" id="btnFlash" title="Flash">⚡</button>
+          <div class="fx-status" id="fxStatus"></div>
+
+          <div class="cam-overlay">
+            <div class="cam-top">
+              <div class="cam-top-group">
+                <button class="cam-btn" id="btnBeauty" title="Beauty filter">✨</button>
+                <button class="cam-btn flash" id="btnFlash" title="Flash">⚡</button>
+              </div>
+              <div class="cam-top-group">
+                <button class="cam-btn" id="btnMirror" title="Mirror preview">⇋</button>
+                <button class="cam-btn" id="btnFlip" title="Switch camera">🔄</button>
+                <button class="cam-btn" id="btnFull" title="Fullscreen preview">⛶</button>
+              </div>
             </div>
-            <div class="cam-top-group">
-              <button class="cam-btn" id="btnMirror" title="Mirror preview">⇋</button>
-              <button class="cam-btn" id="btnFlip" title="Switch camera">🔄</button>
-              <button class="cam-btn" id="btnFull" title="Fullscreen preview">⛶</button>
+
+            <div class="cam-bottom-group">
+              <div class="filter-strip" id="filterStrip"></div>
+              <div class="cam-bottom">
+                <button class="src-btn" id="btnSrc" title="Recording source">📷</button>
+                <button class="shutter" id="btnSnap" title="Take snapshot"></button>
+                <button class="rec-btn" id="btnRec" title="Start / stop recording"></button>
+              </div>
             </div>
           </div>
 
-          <div class="cam-bottom-group">
-            <div class="filter-strip" id="filterStrip"></div>
-            <div class="cam-bottom">
-              <button class="src-btn" id="btnSrc" title="Recording source">
-                📷
-                <span class="src-label" id="srcLabel">CAM</span>
-              </button>
-              <button class="shutter" id="btnSnap" title="Take snapshot"></button>
-              <button class="rec-btn" id="btnRec" title="Start / stop recording"></button>
+          <div class="cam-state" id="camState">
+            <div>
+              <div class="cs-icon" id="csIcon">🎥</div>
+              <p id="csText">Camera is off.</p>
+              <button class="btn primary" id="csBtn">Start camera</button>
+            </div>
+          </div>
+
+          <div class="flash" id="flash"></div>
+        </div>
+      </section>
+
+      <!-- ===================== CONTENT PANE ===================== -->
+      <section class="pane mode-web" id="contentPane">
+        <div class="pane-bar">
+          <div class="seg">
+            <button type="button" class="seg-btn" data-mode="web">Web</button>
+            <button type="button" class="seg-btn" data-mode="note">Note</button>
+          </div>
+
+          <form class="urlbar" id="urlForm" autocomplete="off">
+            <input class="url-input" id="urlInput" type="text" list="url-presets"
+                   placeholder="Enter a URL…" spellcheck="false">
+            <button class="btn go" type="submit">Go</button>
+          </form>
+
+          <div class="note-toolbar" id="noteToolbar">
+            <button type="button" class="tb-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+            <button type="button" class="tb-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+            <button type="button" class="tb-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+
+            <span class="tb-div"></span>
+
+            <button type="button" class="tb-btn" data-block="h1" title="Heading 1">H1</button>
+            <button type="button" class="tb-btn" data-block="h2" title="Heading 2">H2</button>
+            <button type="button" class="tb-btn" data-block="h3" title="Heading 3">H3</button>
+            <button type="button" class="tb-btn" data-block="p" title="Normal paragraph">¶</button>
+
+            <span class="tb-div"></span>
+
+            <select class="tb-select" id="fontFamily" title="Font family">
+              <option value="'Inter', ui-sans-serif, system-ui, sans-serif">Inter</option>
+              <option value="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">System</option>
+              <option value="Georgia, 'Times New Roman', serif">Serif</option>
+              <option value="'Times New Roman', Times, serif">Times</option>
+              <option value="'Courier New', ui-monospace, Menlo, monospace">Mono</option>
+              <option value="'Comic Sans MS', 'Chalkboard SE', cursive">Playful</option>
+              <option value="'Brush Script MT', 'Segoe Script', cursive">Script</option>
+            </select>
+
+            <select class="tb-select" id="fontSize" title="Font size">
+              <option value="1">Tiny</option>
+              <option value="2">Small</option>
+              <option value="3" selected>Normal</option>
+              <option value="4">Medium</option>
+              <option value="5">Large</option>
+              <option value="6">Huge</option>
+              <option value="7">Giant</option>
+            </select>
+
+            <span class="tb-div"></span>
+
+            <!-- Text color -->
+            <div class="color-group" title="Text color (select text first)">
+              <span class="color-icon txt">A</span>
+              <label class="color-swatch" id="txtSwatch" style="--sw:#e8eef5">
+                <input type="color" id="txtColor" value="#e8eef5" aria-label="Text color">
+              </label>
+              <button type="button" class="color-clear" id="txtClear" title="Clear text color">✕</button>
+            </div>
+
+            <!-- Frame color (border of the note) -->
+            <div class="color-group" title="Frame color around the note">
+              <span class="color-icon frame">▢</span>
+              <label class="color-swatch" id="frameSwatch" style="--sw:#4f8ef7">
+                <input type="color" id="frameColor" value="#4f8ef7" aria-label="Frame color">
+              </label>
+              <button type="button" class="color-clear" id="frameClear" title="Remove frame">✕</button>
+            </div>
+
+            <span class="tb-div"></span>
+
+            <button type="button" class="tb-btn" data-cmd="insertUnorderedList" title="Bullet list">•&nbsp;≡</button>
+            <button type="button" class="tb-btn" data-cmd="insertOrderedList" title="Numbered list">1.&nbsp;≡</button>
+
+            <span class="tb-div"></span>
+
+            <button type="button" class="tb-btn hl" data-hilite="rgba(251,191,36,.55)" title="Yellow highlight">▮</button>
+            <button type="button" class="tb-btn hl" data-hilite="rgba(52,211,153,.45)" title="Green highlight">▮</button>
+            <button type="button" class="tb-btn hl" data-hilite="rgba(244,114,182,.45)" title="Pink highlight">▮</button>
+
+            <span class="tb-div"></span>
+
+            <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear formatting">✕</button>
+          </div>
+
+          <div class="pane-actions">
+            <button type="button" class="icon" data-act="reload" title="Reload">⟳</button>
+            <button type="button" class="icon" data-act="open" title="Open in new tab">↗</button>
+          </div>
+        </div>
+
+        <div class="pane-body" id="contentBody">
+          <iframe class="frame" id="frame" title="Web content" referrerpolicy="no-referrer"></iframe>
+
+          <div class="note-wrap" id="noteWrap">
+            <div class="note-editor" id="noteEditor" contenteditable="true" spellcheck="true"
+                 data-placeholder="Write your notes here… select text and hit B, H1, or pick a color."></div>
+          </div>
+
+          <div class="placeholder">
+            <div>
+              <div class="ph-icon">🌐</div>
+              <p>Enter a URL above to load a page here.</p>
+              <p class="ph-sub">Some sites (Google, YouTube, X, banking…) block being embedded in a frame.</p>
             </div>
           </div>
         </div>
+      </section>
 
-        <div class="cam-state" id="camState">
-          <div>
-            <div class="cs-icon" id="csIcon">🎥</div>
-            <p id="csText">Camera is off.</p>
-            <button class="btn primary" id="csBtn">Start camera</button>
-          </div>
-        </div>
-
-        <div class="flash" id="flash"></div>
-      </div>
-    </section>
-
-    <!-- ===================== CONTENT PANE ===================== -->
-    <section class="pane mode-web" id="contentPane">
-      <div class="pane-bar">
-        <div class="seg">
-          <button type="button" class="seg-btn" data-mode="web">Web</button>
-          <button type="button" class="seg-btn" data-mode="note">Note</button>
-        </div>
-
-        <form class="urlbar" id="urlForm" autocomplete="off">
-          <input class="url-input" id="urlInput" type="text" list="url-presets"
-                 placeholder="Enter a URL…" spellcheck="false">
-          <button class="btn go" type="submit">Go</button>
-        </form>
-
-        <div class="note-toolbar" id="noteToolbar">
-          <button type="button" class="tb-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
-          <button type="button" class="tb-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
-          <button type="button" class="tb-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
-
-          <span class="tb-div"></span>
-
-          <button type="button" class="tb-btn" data-block="h1" title="Heading 1">H1</button>
-          <button type="button" class="tb-btn" data-block="h2" title="Heading 2">H2</button>
-          <button type="button" class="tb-btn" data-block="h3" title="Heading 3">H3</button>
-          <button type="button" class="tb-btn" data-block="p" title="Normal paragraph">¶</button>
-
-          <span class="tb-div"></span>
-
-          <select class="tb-select" id="fontFamily" title="Font family">
-            <option value="'Inter', ui-sans-serif, system-ui, sans-serif">Inter</option>
-            <option value="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">System</option>
-            <option value="Georgia, 'Times New Roman', serif">Serif</option>
-            <option value="'Times New Roman', Times, serif">Times</option>
-            <option value="'Courier New', ui-monospace, Menlo, monospace">Mono</option>
-            <option value="'Comic Sans MS', 'Chalkboard SE', cursive">Playful</option>
-            <option value="'Brush Script MT', 'Segoe Script', cursive">Script</option>
-          </select>
-
-          <select class="tb-select" id="fontSize" title="Font size">
-            <option value="1">Tiny</option>
-            <option value="2">Small</option>
-            <option value="3" selected>Normal</option>
-            <option value="4">Medium</option>
-            <option value="5">Large</option>
-            <option value="6">Huge</option>
-            <option value="7">Giant</option>
-          </select>
-
-          <span class="tb-div"></span>
-
-          <button type="button" class="tb-btn" data-cmd="insertUnorderedList" title="Bullet list">•&nbsp;≡</button>
-          <button type="button" class="tb-btn" data-cmd="insertOrderedList" title="Numbered list">1.&nbsp;≡</button>
-
-          <span class="tb-div"></span>
-
-          <button type="button" class="tb-btn hl" data-hilite="rgba(251,191,36,.55)" title="Yellow highlight">▮</button>
-          <button type="button" class="tb-btn hl" data-hilite="rgba(52,211,153,.45)" title="Green highlight">▮</button>
-          <button type="button" class="tb-btn hl" data-hilite="rgba(244,114,182,.45)" title="Pink highlight">▮</button>
-
-          <span class="tb-div"></span>
-
-          <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear formatting">✕</button>
-        </div>
-
-        <div class="pane-actions">
-          <button type="button" class="icon" data-act="reload" title="Reload">⟳</button>
-          <button type="button" class="icon" data-act="open" title="Open in new tab">↗</button>
-        </div>
-      </div>
-
-      <div class="pane-body" id="contentBody">
-        <iframe class="frame" id="frame" title="Web content" referrerpolicy="no-referrer"></iframe>
-
-        <div class="note-wrap">
-          <div class="note-editor" id="noteEditor" contenteditable="true" spellcheck="true"
-               data-placeholder="Write your notes here… select text and hit B, H1, or highlight."></div>
-        </div>
-
-        <div class="placeholder">
-          <div>
-            <div class="ph-icon">🌐</div>
-            <p>Enter a URL above to load a page here.</p>
-            <p class="ph-sub">Some sites (Google, YouTube, X, banking…) block being embedded in a frame.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
+    </div>
   </main>
 
   <datalist id="url-presets">
@@ -1096,7 +1328,7 @@
   "use strict";
 
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-  const KEY = "camera-split-fx-v6";
+  const KEY = "camera-split-fx-v8";
 
   /* ============================================================
      Filters
@@ -1133,13 +1365,22 @@
     "brightness(1.08) contrast(1.03) saturate(1.09)"
   ];
 
-  /* Recording sources: cycle order */
   const SRC_ORDER = ["cam", "stage", "screen"];
   const SRC_META = {
-    cam:    { icon: "📷", label: "CAM",    color: "var(--rec)" },
-    stage:  { icon: "🖥️", label: "STAGE",  color: "var(--stage)" },
-    screen: { icon: "🌐", label: "SCREEN", color: "var(--screen)" }
+    cam:    { icon: "📷", label: "CAM" },
+    stage:  { icon: "🖥️", label: "STAGE" },
+    screen: { icon: "🌐", label: "SCREEN" }
   };
+
+  const LAYOUT_ORDER = ["pip", "vertical", "horizontal"];
+  const LAYOUT_META = {
+    pip:        { glyph: "▣", label: "YouTube + PiP" },
+    vertical:   { glyph: "▥", label: "Side by side" },
+    horizontal: { glyph: "▤", label: "Stacked" }
+  };
+
+  const PIP_SIZES = [0.18, 0.24, 0.32];
+  const PIP_ASPECT = 4 / 3;
 
   /* ============================================================
      State
@@ -1153,7 +1394,7 @@
 
   function defaults() {
     return {
-      layout: window.matchMedia("(max-width: 760px)").matches ? "horizontal" : "vertical",
+      layout: "pip",
       ratio: 0.5,
       camFirst: true,
       mirrored: true,
@@ -1164,6 +1405,17 @@
       mic: false,
       recFps: 30,
       recSource: "cam",
+      pip: {
+        x: 0.74,
+        y: 0.70,
+        size: 1
+      },
+      colors: {
+        noteText:    "#e8eef5",   // note body text color
+        noteFrame:   "",          // "" = no frame, else hex
+        stageFrame:  "",          // border around the 16:9 stage
+        camFrame:    ""           // ring around the camera PiP
+      },
       content: {
         mode: "web",
         url: "https://en.wikipedia.org/wiki/Main_Page",
@@ -1181,17 +1433,32 @@
 
       let noteHtml = "";
       if (p.content) {
-        if (typeof p.content.noteHtml === "string") {
-          noteHtml = p.content.noteHtml;
-        } else if (typeof p.content.note === "string" && p.content.note) {
+        if (typeof p.content.noteHtml === "string") noteHtml = p.content.noteHtml;
+        else if (typeof p.content.note === "string" && p.content.note) {
           noteHtml = escapeHtml(p.content.note).replace(/\n/g, "<br>");
         }
       }
 
       const srcOk = SRC_ORDER.includes(p.recSource);
+      const layOk = LAYOUT_ORDER.includes(p.layout);
+
+      const pipIn = p.pip && typeof p.pip === "object" ? p.pip : {};
+      const pip = {
+        x: Number.isFinite(+pipIn.x) ? clamp(+pipIn.x, 0, 1) : d.pip.x,
+        y: Number.isFinite(+pipIn.y) ? clamp(+pipIn.y, 0, 1) : d.pip.y,
+        size: [0,1,2].includes(+pipIn.size) ? +pipIn.size : d.pip.size
+      };
+
+      const colorsIn = p.colors && typeof p.colors === "object" ? p.colors : {};
+      const colors = {
+        noteText:   validHex(colorsIn.noteText,  d.colors.noteText),
+        noteFrame:  validHexOrEmpty(colorsIn.noteFrame),
+        stageFrame: validHexOrEmpty(colorsIn.stageFrame),
+        camFrame:   validHexOrEmpty(colorsIn.camFrame)
+      };
 
       return {
-        layout: (p.layout === "horizontal" || p.layout === "vertical") ? p.layout : d.layout,
+        layout: layOk ? p.layout : d.layout,
         ratio: Number.isFinite(+p.ratio) ? clamp(+p.ratio, 0.12, 0.88) : 0.5,
         camFirst: p.camFirst !== false,
         mirrored: p.mirrored !== false,
@@ -1202,6 +1469,8 @@
         mic: p.mic === true,
         recFps: [24,30,60].includes(+p.recFps) ? +p.recFps : 30,
         recSource: srcOk ? p.recSource : "cam",
+        pip,
+        colors,
         content: {
           mode: p.content && p.content.mode === "note" ? "note" : "web",
           url: p.content && typeof p.content.url === "string" ? p.content.url : d.content.url,
@@ -1209,6 +1478,13 @@
         }
       };
     } catch (e) { return d; }
+  }
+
+  function validHex(v, fallback) {
+    return (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : fallback;
+  }
+  function validHexOrEmpty(v) {
+    return (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : "";
   }
 
   let state = load();
@@ -1225,7 +1501,9 @@
      DOM
   ============================================================ */
   const stage       = document.getElementById("stage");
+  const stageInner  = document.getElementById("stageInner");
   const camPane     = document.getElementById("camPane");
+  const camBar      = document.getElementById("camBar");
   const contentPane = document.getElementById("contentPane");
   const camWrap     = document.getElementById("camWrap");
 
@@ -1238,6 +1516,8 @@
   const camSelect   = document.getElementById("camSelect");
   const camToggle   = document.getElementById("camToggle");
   const micToggle   = document.getElementById("micToggle");
+  const pipSizeBtn  = document.getElementById("pipSize");
+  const pipCornerBtn= document.getElementById("pipCorner");
   const camState    = document.getElementById("camState");
   const csIcon      = document.getElementById("csIcon");
   const csText      = document.getElementById("csText");
@@ -1258,7 +1538,6 @@
   const btnSnap     = document.getElementById("btnSnap");
   const btnRec      = document.getElementById("btnRec");
   const btnSrc      = document.getElementById("btnSrc");
-  const srcLabel    = document.getElementById("srcLabel");
   const btnFull     = document.getElementById("btnFull");
 
   const contentBody = document.getElementById("contentBody");
@@ -1267,9 +1546,18 @@
   const urlInput    = document.getElementById("urlInput");
 
   const noteEditor  = document.getElementById("noteEditor");
+  const noteWrap    = document.getElementById("noteWrap");
   const noteToolbar = document.getElementById("noteToolbar");
   const fontFamily  = document.getElementById("fontFamily");
   const fontSize    = document.getElementById("fontSize");
+
+  const txtColor    = document.getElementById("txtColor");
+  const txtSwatch   = document.getElementById("txtSwatch");
+  const txtClear    = document.getElementById("txtClear");
+
+  const frameColor  = document.getElementById("frameColor");
+  const frameSwatch = document.getElementById("frameSwatch");
+  const frameClear  = document.getElementById("frameClear");
 
   const modal       = document.getElementById("modal");
   const modalImg    = document.getElementById("modalImg");
@@ -1289,6 +1577,59 @@
   const resetBtn    = document.querySelector('[data-act="reset"]');
 
   /* ============================================================
+     Colors: apply to the DOM
+  ============================================================ */
+  function applyColors() {
+    const c = state.colors;
+
+    // Note text color
+    if (c.noteText && /^#[0-9a-fA-F]{6}$/.test(c.noteText)) {
+      noteEditor.style.color = c.noteText;
+      noteEditor.style.setProperty("--note-text", c.noteText);
+    } else {
+      noteEditor.style.color = "";
+      noteEditor.style.removeProperty("--note-text");
+    }
+
+    // Note frame (ring around the note area)
+    if (c.noteFrame) {
+      noteWrap.classList.add("framed");
+      noteWrap.style.setProperty("--note-frame-color", c.noteFrame);
+      noteWrap.style.setProperty("--note-frame-w", "3px");
+    } else {
+      noteWrap.classList.remove("framed");
+      noteWrap.style.removeProperty("--note-frame-color");
+      noteWrap.style.removeProperty("--note-frame-w");
+    }
+
+    // Stage frame (ring around the 16:9 video)
+    if (c.stageFrame) {
+      stageInner.classList.add("framed");
+      stageInner.style.setProperty("--stage-frame-color", c.stageFrame);
+      stageInner.style.setProperty("--stage-frame-w", "6px");
+    } else {
+      stageInner.classList.remove("framed");
+      stageInner.style.removeProperty("--stage-frame-color");
+      stageInner.style.removeProperty("--stage-frame-w");
+    }
+
+    // Camera frame (ring around the PiP camera)
+    if (c.camFrame) {
+      camPane.classList.add("cam-framed");
+      camPane.style.setProperty("--cam-frame-color", c.camFrame);
+      camPane.style.setProperty("--cam-frame-w", "3px");
+    } else {
+      camPane.classList.remove("cam-framed");
+      camPane.style.removeProperty("--cam-frame-color");
+      camPane.style.removeProperty("--cam-frame-w");
+    }
+
+    // Reflect in the swatches
+    if (txtSwatch)   txtSwatch.style.setProperty("--sw", c.noteText || "#e8eef5");
+    if (frameSwatch) frameSwatch.style.setProperty("--sw", c.noteFrame || "#4f8ef7");
+  }
+
+  /* ============================================================
      Divider & layout
   ============================================================ */
   const divider = document.createElement("div");
@@ -1300,21 +1641,66 @@
 
   function mountPanes() {
     if (state.camFirst) {
-      stage.appendChild(camPane); stage.appendChild(divider); stage.appendChild(contentPane);
+      stageInner.appendChild(camPane);
+      stageInner.appendChild(divider);
+      stageInner.appendChild(contentPane);
     } else {
-      stage.appendChild(contentPane); stage.appendChild(divider); stage.appendChild(camPane);
+      stageInner.appendChild(contentPane);
+      stageInner.appendChild(divider);
+      stageInner.appendChild(camPane);
     }
+  }
+
+  function sizePipStage() {
+    if (state.layout !== "pip") {
+      stageInner.style.width = "";
+      stageInner.style.height = "";
+      return;
+    }
+    const cs = getComputedStyle(stage);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const availW = Math.max(1, stage.clientWidth - padX);
+    const availH = Math.max(1, stage.clientHeight - padY);
+    const ratio = 16 / 9;
+
+    let w, h;
+    if (availW / availH > ratio) {
+      h = availH;
+      w = h * ratio;
+    } else {
+      w = availW;
+      h = w / ratio;
+    }
+    stageInner.style.width  = Math.round(w) + "px";
+    stageInner.style.height = Math.round(h) + "px";
   }
 
   function applyLayout() {
     stage.dataset.layout = state.layout;
     stage.style.setProperty("--a", (state.ratio * 100).toFixed(3) + "%");
-    divider.setAttribute("aria-orientation", state.layout === "vertical" ? "vertical" : "horizontal");
 
     const vert = state.layout === "vertical";
-    layoutBtn.querySelector(".glyph").textContent = vert ? "▥" : "▤";
-    layoutBtn.querySelector(".label").textContent = vert ? "Side by side" : "Stacked";
-    layoutBtn.title = vert ? "Switch to stacked layout" : "Switch to side-by-side layout";
+    divider.setAttribute("aria-orientation", vert ? "vertical" : "horizontal");
+
+    const meta = LAYOUT_META[state.layout] || LAYOUT_META.pip;
+    layoutBtn.querySelector(".glyph").textContent = meta.glyph;
+    layoutBtn.querySelector(".label").textContent = meta.label;
+    layoutBtn.title = "Switch layout (PiP / Side by side / Stacked)";
+
+    camPane.classList.toggle("pip-mode", state.layout === "pip");
+
+    sizePipStage();
+    if (state.layout === "pip") {
+      requestAnimationFrame(() => { applyPipPosition(false); });
+    } else {
+      camPane.style.width = "";
+      camPane.style.height = "";
+      camPane.style.left = "";
+      camPane.style.top = "";
+      camPane.style.right = "";
+      camPane.style.bottom = "";
+    }
   }
 
   let dragging = false;
@@ -1334,6 +1720,7 @@
   }
   divider.addEventListener("pointerdown", e => {
     if (recorder.isRecording) return;
+    if (state.layout === "pip") return;
     dragging = true;
     divider.setPointerCapture(e.pointerId);
     divider.classList.add("dragging");
@@ -1352,9 +1739,11 @@
   }
   divider.addEventListener("pointerup", endDrag);
   divider.addEventListener("pointercancel", endDrag);
-  divider.addEventListener("dblclick", () => { if (!recorder.isRecording) { setRatio(0.5); save(); } });
+  divider.addEventListener("dblclick", () => {
+    if (!recorder.isRecording && state.layout !== "pip") { setRatio(0.5); save(); }
+  });
   divider.addEventListener("keydown", e => {
-    if (recorder.isRecording) return;
+    if (recorder.isRecording || state.layout === "pip") return;
     const step = e.shiftKey ? 0.05 : 0.02;
     const fwd  = state.layout === "vertical" ? "ArrowRight" : "ArrowDown";
     const back = state.layout === "vertical" ? "ArrowLeft"  : "ArrowUp";
@@ -1362,6 +1751,209 @@
     else if (e.key === back)  { setRatio(state.ratio - step); e.preventDefault(); save(); }
     else if (e.key === "Home"){ setRatio(0.5); e.preventDefault(); save(); }
   });
+
+  /* ============================================================
+     PiP camera position & drag
+  ============================================================ */
+  function applyPipPosition(store) {
+    if (state.layout !== "pip") return;
+
+    const pip = state.pip;
+    const iw = stageInner.clientWidth;
+    const ih = stageInner.clientHeight;
+    if (iw < 10 || ih < 10) return;
+
+    const frac = PIP_SIZES[pip.size] || PIP_SIZES[1];
+    const cw = Math.round(iw * frac);
+    const ch = Math.round(cw / PIP_ASPECT);
+
+    camPane.style.width  = cw + "px";
+    camPane.style.height = ch + "px";
+
+    const maxX = Math.max(0, iw - cw);
+    const maxY = Math.max(0, ih - ch);
+
+    const px = clamp(Math.round(pip.x * iw), 0, maxX);
+    const py = clamp(Math.round(pip.y * ih), 0, maxY);
+
+    camPane.style.left   = px + "px";
+    camPane.style.top    = py + "px";
+    camPane.style.right  = "auto";
+    camPane.style.bottom = "auto";
+
+    if (store) {
+      state.pip.x = iw > 0 ? px / iw : pip.x;
+      state.pip.y = ih > 0 ? py / ih : pip.y;
+      save();
+    }
+  }
+
+  function cornerPixels(which) {
+    const iw = stageInner.clientWidth;
+    const ih = stageInner.clientHeight;
+    const cw = camPane.offsetWidth;
+    const ch = camPane.offsetHeight;
+    const maxX = Math.max(0, iw - cw);
+    const maxY = Math.max(0, ih - ch);
+
+    switch (which) {
+      case "tl": return { x: 0,    y: 0    };
+      case "tr": return { x: maxX, y: 0    };
+      case "bl": return { x: 0,    y: maxY };
+      case "br": return { x: maxX, y: maxY };
+      default:   return { x: maxX, y: maxY };
+    }
+  }
+
+  function nearestCorner(px, py) {
+    const iw = stageInner.clientWidth;
+    const ih = stageInner.clientHeight;
+    const cw = camPane.offsetWidth;
+    const ch = camPane.offsetHeight;
+    const maxX = Math.max(0, iw - cw);
+    const maxY = Math.max(0, ih - ch);
+
+    const corners = [
+      { id: "tl", x: 0,    y: 0    },
+      { id: "tr", x: maxX, y: 0    },
+      { id: "bl", x: 0,    y: maxY },
+      { id: "br", x: maxX, y: maxY }
+    ];
+
+    let best = null, bestD = Infinity;
+    for (const c of corners) {
+      const d = Math.hypot(c.x - px, c.y - py);
+      if (d < bestD) { bestD = d; best = c; }
+    }
+    return { corner: best, distance: bestD };
+  }
+
+  function startPipDrag(e) {
+    if (state.layout !== "pip") return;
+    if (e.button !== 0) return;
+
+    if (e.target.closest("button, select, input, textarea, a, .icon, .cam-btn, .chip, .shutter, .rec-btn, .src-btn, .select, label")) {
+      return;
+    }
+
+    const innerRect = stageInner.getBoundingClientRect();
+    const camRect = camPane.getBoundingClientRect();
+
+    const startLeft = camRect.left - innerRect.left;
+    const startTop  = camRect.top  - innerRect.top;
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    camPane.classList.add("dragging");
+    camPane.classList.remove("snapping");
+    e.preventDefault();
+
+    let lastLeft = startLeft;
+    let lastTop  = startTop;
+
+    const move = (ev) => {
+      let nx = startLeft + (ev.clientX - startX);
+      let ny = startTop  + (ev.clientY - startY);
+
+      const cw = camPane.offsetWidth;
+      const ch = camPane.offsetHeight;
+      const maxX = Math.max(0, innerRect.width - cw);
+      const maxY = Math.max(0, innerRect.height - ch);
+
+      nx = clamp(nx, 0, maxX);
+      ny = clamp(ny, 0, maxY);
+
+      lastLeft = nx;
+      lastTop  = ny;
+
+      camPane.style.left = Math.round(nx) + "px";
+      camPane.style.top  = Math.round(ny) + "px";
+      camPane.style.right = "auto";
+      camPane.style.bottom = "auto";
+    };
+
+    const end = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+
+      camPane.classList.remove("dragging");
+      camPane.classList.add("snapping");
+
+      const iw = innerRect.width;
+      const ih = innerRect.height;
+      const thresh = Math.min(iw, ih) * 0.12;
+
+      const { corner, distance } = nearestCorner(lastLeft, lastTop);
+
+      let fx, fy;
+      if (distance < thresh) {
+        const cp = cornerPixels(corner.id);
+        fx = iw > 0 ? cp.x / iw : 0;
+        fy = ih > 0 ? cp.y / ih : 0;
+      } else {
+        fx = iw > 0 ? lastLeft / iw : 0;
+        fy = ih > 0 ? lastTop  / ih : 0;
+      }
+
+      state.pip.x = clamp(fx, 0, 1);
+      state.pip.y = clamp(fy, 0, 1);
+      save();
+
+      applyPipPosition(true);
+      setTimeout(() => camPane.classList.remove("snapping"), 260);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  }
+
+  camBar.addEventListener("pointerdown", (e) => {
+    if (state.layout !== "pip") return;
+    startPipDrag(e);
+  });
+  camPane.querySelector(".pane-body").addEventListener("pointerdown", (e) => {
+    if (state.layout !== "pip") return;
+    if (e.target.closest("button, select, input, textarea, a, .cam-btn, .chip, .shutter, .rec-btn, .src-btn, label")) return;
+    startPipDrag(e);
+  });
+
+  function cyclePipSize() {
+    state.pip.size = (state.pip.size + 1) % PIP_SIZES.length;
+    save();
+    camPane.classList.add("snapping");
+    applyPipPosition(true);
+    setTimeout(() => camPane.classList.remove("snapping"), 260);
+    const names = ["Small", "Medium", "Large"];
+    pipSizeBtn.title = "Camera size: " + names[state.pip.size];
+  }
+
+  const CORNER_CYCLE = ["br", "bl", "tl", "tr"];
+  function cyclePipCorner() {
+    const iw = stageInner.clientWidth;
+    const ih = stageInner.clientHeight;
+    if (!iw || !ih) return;
+
+    const px = state.pip.x * iw;
+    const py = state.pip.y * ih;
+    const { corner } = nearestCorner(px, py);
+
+    const idx = CORNER_CYCLE.indexOf(corner.id);
+    const next = CORNER_CYCLE[(idx + 1) % CORNER_CYCLE.length];
+    const cp = cornerPixels(next);
+
+    state.pip.x = cp.x / iw;
+    state.pip.y = cp.y / ih;
+    save();
+
+    camPane.classList.add("snapping");
+    applyPipPosition(false);
+    setTimeout(() => camPane.classList.remove("snapping"), 260);
+  }
+
+  pipSizeBtn.addEventListener("click", cyclePipSize);
+  pipCornerBtn.addEventListener("click", cyclePipCorner);
 
   /* ============================================================
      CAMERA
@@ -1390,7 +1982,6 @@
     btnFlash.disabled = !on;
     btnBeauty.disabled = !on;
     btnRec.disabled = !on;
-    // Source button is always enabled while live (it also serves as pause toggle during recording)
     btnSrc.disabled = false;
     recTopBtn.disabled = !on;
   }
@@ -1484,7 +2075,6 @@
       }
       updateFlashUI();
       ensureLoop();
-
     } catch (err) {
       stopCamera();
       showState("🚫", friendlyError(err), "Try again", true);
@@ -1643,7 +2233,6 @@
       }
 
       faceLandmarker = landmarker;
-      console.log("[filters] Face tracking ready");
     } catch (err) {
       fxLoadFailed = true;
       console.warn("[filters] Face tracking unavailable:", err);
@@ -1815,7 +2404,6 @@
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(ang);
-
     ctx.fillStyle = "#0a0a0f";
     ctx.fillRect(-gap, -lensH * 0.06, gap * 2, lensH * 0.13);
 
@@ -1828,7 +2416,6 @@
       roundRect(ctx, cx - lensW / 2, -lensH / 2, lensW, lensH, lensH * 0.34);
       if (fill) { ctx.fillStyle = fill; ctx.fill(); } else ctx.stroke();
     };
-
     drawLens(-eyeDist / 2, lensGrad);
     drawLens( eyeDist / 2, lensGrad);
 
@@ -1855,7 +2442,6 @@
     ctx.moveTo( eyeDist / 2 + lensW / 2, -lensH * 0.1);
     ctx.lineTo( eyeDist / 2 + lensW / 2 + eyeDist * 0.32, -lensH * 0.02);
     ctx.stroke();
-
     ctx.restore();
   }
 
@@ -2149,7 +2735,7 @@
   }
 
   /* ============================================================
-     RECORDER
+     RECORDER (same as before)
   ============================================================ */
   const recorder = {
     mediaRecorder: null,
@@ -2167,10 +2753,9 @@
     totalPaused: 0,
     startedAt: 0,
     timerInterval: null,
-    mode: null,           // "cam" | "stage" | "screen"
+    mode: null,
     pendingBlob: null,
     pendingMeta: null,
-    // display (stage + screen)
     displayStream: null,
     displayVideo: null,
     displayCanvasStream: null,
@@ -2199,11 +2784,7 @@
     if (!state.mic) return null;
     try {
       return await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
       });
     } catch (err) {
       console.warn("[mic]", err);
@@ -2214,7 +2795,6 @@
     }
   }
 
-  /* Mix two audio tracks (mic + system) into a single track via WebAudio */
   async function mixAudioTracks(tracks) {
     const valid = tracks.filter(Boolean);
     if (valid.length === 0) return null;
@@ -2223,24 +2803,17 @@
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return valid[0];
-
       const ctx = new Ctx();
       recorder.audioCtx = ctx;
       const dest = ctx.createMediaStreamDestination();
-
       valid.forEach(t => {
         try {
           const src = ctx.createMediaStreamSource(new MediaStream([t]));
           src.connect(dest);
-        } catch (e) {
-          console.warn("[audio] skip track", e);
-        }
+        } catch (e) {}
       });
-
-      const out = dest.stream.getAudioTracks()[0];
-      return out || valid[0];
+      return dest.stream.getAudioTracks()[0] || valid[0];
     } catch (e) {
-      console.warn("[audio] mix failed", e);
       return valid[0];
     }
   }
@@ -2277,7 +2850,6 @@
     }
   }
 
-  /* ---------- CAMERA-ONLY canvas composite ---------- */
   function ensureRecordCanvas() {
     const vw = video.videoWidth || 1280;
     const vh = video.videoHeight || 720;
@@ -2364,9 +2936,6 @@
     recRaf = requestAnimationFrame(recLoop);
   }
 
-  /* ============================================================
-     START: camera-only
-  ============================================================ */
   async function startCameraRecording() {
     const pick = pickMimeType();
     if (!pick) { alert("Recording is not supported in this browser."); return; }
@@ -2376,7 +2945,6 @@
     try {
       recorder.canvasStream = recorder.canvas.captureStream(state.recFps);
     } catch (e) {
-      console.warn("[record] captureStream failed", e);
       alert("Could not capture the video stream for recording.");
       return;
     }
@@ -2388,11 +2956,8 @@
     const mixed = new MediaStream(tracks);
 
     let mr;
-    try {
-      mr = new MediaRecorder(mixed, pick.mime ? { mimeType: pick.mime } : undefined);
-    } catch (e) {
-      mr = new MediaRecorder(mixed);
-    }
+    try { mr = new MediaRecorder(mixed, pick.mime ? { mimeType: pick.mime } : undefined); }
+    catch (e) { mr = new MediaRecorder(mixed); }
 
     recorder.mimeType = mr.mimeType || pick.mime || "video/webm";
     recorder.fileExt = recorder.mimeType.includes("mp4") ? "mp4" : "webm";
@@ -2419,13 +2984,9 @@
     recLoop();
   }
 
-  /* ============================================================
-     START: whole stage (auto-cropped)
-  ============================================================ */
   async function startStageRecording() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      alert("Screen recording is not supported in this browser.");
-      return;
+      alert("Screen recording is not supported in this browser."); return;
     }
     const pick = pickMimeType();
     if (!pick) { alert("Recording is not supported in this browser."); return; }
@@ -2440,16 +3001,12 @@
         surfaceSwitching: "exclude",
         systemAudio: "exclude"
       });
-    } catch (err) {
-      console.warn("[record] display capture cancelled", err);
-      return;
-    }
+    } catch (err) { return; }
 
     const capVideo = document.createElement("video");
     capVideo.srcObject = displayStream;
     capVideo.muted = true;
     capVideo.playsInline = true;
-
     try { await capVideo.play(); } catch (e) {}
 
     await new Promise(res => {
@@ -2466,6 +3023,8 @@
     const capW = capVideo.videoWidth || 1280;
     const capH = capVideo.videoHeight || 720;
 
+    const cropTarget = (state.layout === "pip") ? stageInner : stage;
+
     let cx = 0, cy = 0, cw = capW, ch = capH;
 
     if (surface === "browser") {
@@ -2473,7 +3032,7 @@
       const innerH = Math.max(1, window.innerHeight);
       const scaleX = capW / innerW;
       const scaleY = capH / innerH;
-      const sr = stage.getBoundingClientRect();
+      const sr = cropTarget.getBoundingClientRect();
 
       cx = Math.round(sr.left * scaleX);
       cy = Math.round(sr.top * scaleY);
@@ -2496,18 +3055,14 @@
 
     let rafId = null;
     function drawLoop() {
-      try {
-        recCtx.drawImage(capVideo, cx, cy, cw, ch, 0, 0, recW, recH);
-      } catch (e) {}
+      try { recCtx.drawImage(capVideo, cx, cy, cw, ch, 0, 0, recW, recH); } catch (e) {}
       rafId = requestAnimationFrame(drawLoop);
     }
     drawLoop();
 
     let canvasStream;
-    try {
-      canvasStream = recCanvas.captureStream(state.recFps);
-    } catch (e) {
-      console.warn("[record] captureStream failed", e);
+    try { canvasStream = recCanvas.captureStream(state.recFps); }
+    catch (e) {
       displayStream.getTracks().forEach(t => t.stop());
       if (rafId) cancelAnimationFrame(rafId);
       alert("Could not capture the recording stream.");
@@ -2521,11 +3076,8 @@
     const mixed = new MediaStream(tracks);
 
     let mr;
-    try {
-      mr = new MediaRecorder(mixed, pick.mime ? { mimeType: pick.mime } : undefined);
-    } catch (e) {
-      mr = new MediaRecorder(mixed);
-    }
+    try { mr = new MediaRecorder(mixed, pick.mime ? { mimeType: pick.mime } : undefined); }
+    catch (e) { mr = new MediaRecorder(mixed); }
 
     recorder.mimeType = mr.mimeType || pick.mime || "video/webm";
     recorder.fileExt = recorder.mimeType.includes("mp4") ? "mp4" : "webm";
@@ -2561,13 +3113,9 @@
     beginRecordingSession("stage");
   }
 
-  /* ============================================================
-     START: full screen recorder (any screen / window / tab)
-  ============================================================ */
   async function startScreenRecording() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      alert("Screen recording is not supported in this browser.");
-      return;
+      alert("Screen recording is not supported in this browser."); return;
     }
     const pick = pickMimeType();
     if (!pick) { alert("Recording is not supported in this browser."); return; }
@@ -2586,23 +3134,15 @@
           autoGainControl: false,
           suppressLocalAudioPlayback: false
         },
-        // NOTE: no preferCurrentTab → user can pick screen/window/tab freely
         selfBrowserSurface: "include",
         surfaceSwitching: "include",
         systemAudio: "include"
       });
-    } catch (err) {
-      console.warn("[record] display capture cancelled", err);
-      return;
-    }
+    } catch (err) { return; }
 
-    // Try to get audio track (may not exist depending on source)
     const screenAudioTracks = displayStream.getAudioTracks();
-
-    // Get mic (if enabled)
     recorder.audioStream = await getMicStream();
 
-    // Build the audio mix: screen audio + mic
     let mixedAudioTrack = null;
     try {
       const allAudio = [];
@@ -2612,30 +3152,24 @@
       }
       mixedAudioTrack = await mixAudioTracks(allAudio);
     } catch (e) {
-      console.warn("[record] audio mix failed", e);
-      mixedAudioTrack = (screenAudioTracks[0] || (recorder.audioStream && recorder.audioStream.getAudioTracks()[0])) || null;
+      mixedAudioTrack = screenAudioTracks[0] ||
+        (recorder.audioStream && recorder.audioStream.getAudioTracks()[0]) || null;
     }
 
-    // Compose the output MediaStream
     const videoTrack = displayStream.getVideoTracks()[0];
     const outTracks = [videoTrack];
     if (mixedAudioTrack) outTracks.push(mixedAudioTrack);
     const outStream = new MediaStream(outTracks);
 
     let mr;
-    try {
-      mr = new MediaRecorder(outStream, pick.mime ? { mimeType: pick.mime } : undefined);
-    } catch (e) {
-      mr = new MediaRecorder(outStream);
-    }
+    try { mr = new MediaRecorder(outStream, pick.mime ? { mimeType: pick.mime } : undefined); }
+    catch (e) { mr = new MediaRecorder(outStream); }
 
     recorder.mimeType = mr.mimeType || pick.mime || "video/webm";
     recorder.fileExt = recorder.mimeType.includes("mp4") ? "mp4" : "webm";
     recorder.chunks = [];
     recorder.mediaRecorder = mr;
     recorder.mode = "screen";
-
-    // For cleanup we only need to keep the display stream + audio stream
     recorder.displayStream = displayStream;
     recorder.displayVideo = null;
     recorder.displayCanvasStream = null;
@@ -2665,61 +3199,49 @@
     beginRecordingSession("screen");
   }
 
-  /* ============================================================
-     RECORDING LIFECYCLE
-  ============================================================ */
   function beginRecordingSession(mode) {
     recorder.isRecording = true;
     recorder.isPaused = false;
     recorder.pausedAt = 0;
     recorder.totalPaused = 0;
     recorder.startedAt = performance.now();
-
     enterRecordingUI(mode);
   }
 
   function enterRecordingUI(mode) {
-    // Timer pill
     recTimer.classList.add("show");
     recTimer.classList.remove("stage", "screen", "paused");
     if (mode === "stage") recTimer.classList.add("stage");
     else if (mode === "screen") recTimer.classList.add("screen");
 
-    const meta = SRC_META[mode];
     recSrcFlag.textContent = (mode === "cam" ? "📷 Cam" : mode === "stage" ? "🖥️ Stage" : "🌐 Screen");
 
-    // Mic indicator: show if there's any audio in the stream
     const hasAudio = (recorder.audioStream && recorder.audioStream.getAudioTracks().length > 0) ||
                      (mode === "screen" && recorder.displayStream &&
                       recorder.displayStream.getAudioTracks().length > 0);
     recMicFlag.textContent = hasAudio ? "🎤" : "";
-
-    // Pause tag hidden initially
     recPausedTag.style.display = "none";
 
-    // Record button
     btnRec.classList.add("live");
     btnRec.classList.remove("paused");
     recTopBtn.classList.add("live");
     recTopBtn.querySelector(".label").textContent = "Stop";
 
-    // Rec dot
     recDot.classList.remove("paused");
     recDot.classList.add("on");
 
-    // Source button → pause toggle
+    camPane.classList.add("recording");
+
     updateSrcUI(true);
     btnSrc.classList.add("recording");
     btnSrc.classList.remove("is-paused");
     btnSrc.textContent = "⏸";
     btnSrc.title = "Pause recording";
 
-    // Stage outline color
     stage.classList.remove("recording", "stage-mode", "screen-mode");
     if (mode === "stage") stage.classList.add("recording", "stage-mode");
     else if (mode === "screen") stage.classList.add("recording", "screen-mode");
 
-    // Timer
     updateRecTimer();
     clearInterval(recorder.timerInterval);
     recorder.timerInterval = setInterval(updateRecTimer, 250);
@@ -2736,6 +3258,8 @@
     recDot.classList.remove("on", "paused");
     recDot.classList.toggle("on", !!stream);
 
+    camPane.classList.remove("recording");
+
     btnSrc.classList.remove("recording", "is-paused");
     updateSrcUI(false);
 
@@ -2747,16 +3271,10 @@
 
   function pauseRecording() {
     if (!recorder.isRecording || recorder.isPaused) return;
-    try {
-      recorder.mediaRecorder.pause();
-    } catch (e) {
-      console.warn("[record] pause failed", e);
-      return;
-    }
+    try { recorder.mediaRecorder.pause(); } catch (e) { return; }
     recorder.isPaused = true;
     recorder.pausedAt = performance.now();
 
-    // UI
     btnSrc.textContent = "▶";
     btnSrc.classList.add("is-paused");
     btnSrc.title = "Resume recording";
@@ -2769,19 +3287,13 @@
 
   function resumeRecording() {
     if (!recorder.isRecording || !recorder.isPaused) return;
-    try {
-      recorder.mediaRecorder.resume();
-    } catch (e) {
-      console.warn("[record] resume failed", e);
-      return;
-    }
+    try { recorder.mediaRecorder.resume(); } catch (e) { return; }
     recorder.isPaused = false;
     if (recorder.pausedAt) {
       recorder.totalPaused += performance.now() - recorder.pausedAt;
       recorder.pausedAt = 0;
     }
 
-    // UI
     btnSrc.textContent = "⏸";
     btnSrc.classList.remove("is-paused");
     btnSrc.title = "Pause recording";
@@ -2809,9 +3321,7 @@
       if (recorder.mediaRecorder && recorder.mediaRecorder.state !== "inactive") {
         recorder.mediaRecorder.stop();
       }
-    } catch (e) {
-      cleanupRecordStreams();
-    }
+    } catch (e) { cleanupRecordStreams(); }
 
     exitRecordingUI();
     recorder.mode = null;
@@ -2820,9 +3330,7 @@
   function updateRecTimer() {
     if (!recorder.isRecording) return;
     let elapsed = performance.now() - recorder.startedAt - recorder.totalPaused;
-    if (recorder.isPaused && recorder.pausedAt) {
-      elapsed -= (performance.now() - recorder.pausedAt);
-    }
+    if (recorder.isPaused && recorder.pausedAt) elapsed -= (performance.now() - recorder.pausedAt);
     const s = Math.max(0, Math.floor(elapsed / 1000));
     const mm = String(Math.floor(s / 60)).padStart(2, "0");
     const ss = String(s % 60).padStart(2, "0");
@@ -2973,32 +3481,24 @@
     const src = state.recSource;
     const meta = SRC_META[src];
 
-    if (recording) {
-      // During recording the button is used as pause/resume — leave it as-is
-      return;
-    }
+    if (recording) return;
 
-    // Restore the icon + label
     btnSrc.classList.remove("stage", "screen");
     if (src === "stage") btnSrc.classList.add("stage");
     if (src === "screen") btnSrc.classList.add("screen");
 
-    // Rebuild inner content (icon + label)
-    btnSrc.innerHTML = meta.icon + '<span class="src-label" id="srcLabel">' + meta.label + "</span>";
+    btnSrc.innerHTML = meta.icon;
 
-    // Button title
     btnSrc.title = src === "cam"
       ? "Recording source: camera pane (tap to switch to stage)"
       : src === "stage"
       ? "Recording source: whole stage (tap to switch to screen recorder)"
       : "Recording source: full screen recorder (tap to switch to camera)";
 
-    // Record button color
     btnRec.classList.remove("stage-src", "screen-src");
     if (src === "stage") btnRec.classList.add("stage-src");
     if (src === "screen") btnRec.classList.add("screen-src");
 
-    // Top-bar record button color
     recTopBtn.classList.remove("stage", "screen");
     if (src === "stage") recTopBtn.classList.add("stage");
     if (src === "screen") recTopBtn.classList.add("screen");
@@ -3006,12 +3506,12 @@
     recTopBtn.title = src === "cam"
       ? "Record the camera pane"
       : src === "stage"
-      ? "Record the whole stage (auto-cropped to the split-screen area)"
+      ? "Record the whole stage (auto-cropped to the video area)"
       : "Open the screen recorder (any screen, window, or tab — with system audio)";
   }
 
   function cycleSource() {
-    if (recorder.isRecording) return;   // locked while recording
+    if (recorder.isRecording) return;
     const i = SRC_ORDER.indexOf(state.recSource);
     state.recSource = SRC_ORDER[(i + 1) % SRC_ORDER.length];
     save();
@@ -3045,9 +3545,7 @@
     try {
       document.execCommand("styleWithCSS", false, true);
       document.execCommand(cmd, false, value || null);
-    } catch (e) {
-      console.warn("[note] exec failed", cmd, e);
-    }
+    } catch (e) {}
     saveEditorSelection();
     syncToolbarState();
     persistNote();
@@ -3091,7 +3589,6 @@
       const cmd = btn.dataset.cmd;
       const block = btn.dataset.block;
       const hilite = btn.dataset.hilite;
-
       if (block) exec("formatBlock", block === "p" ? "p" : block);
       else if (hilite) exec("hiliteColor", hilite);
       else if (cmd) exec(cmd);
@@ -3148,6 +3645,25 @@
         fontSize.value = fsize;
       }
     } catch (e) {}
+
+    // Text color — reflect what's at the caret
+    try {
+      const fg = document.queryCommandValue("foreColor") || "";
+      const hex = rgbToHex(fg);
+      if (hex) {
+        txtColor.value = hex;
+        txtSwatch.style.setProperty("--sw", hex);
+      }
+    } catch (e) {}
+  }
+
+  function rgbToHex(rgb) {
+    if (!rgb) return "";
+    if (rgb.startsWith("#")) return rgb;
+    const m = rgb.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+    if (!m) return "";
+    const toHex = (n) => clamp(parseInt(n, 10), 0, 255).toString(16).padStart(2, "0");
+    return "#" + toHex(m[1]) + toHex(m[2]) + toHex(m[3]);
   }
 
   document.addEventListener("selectionchange", () => {
@@ -3159,8 +3675,99 @@
     }
   });
 
+  /* ---------- Color pickers ---------- */
+
+  // Note text color
+  txtColor.addEventListener("mousedown", () => saveEditorSelection());
+  txtColor.addEventListener("input", () => {
+    const v = txtColor.value;
+    txtSwatch.style.setProperty("--sw", v);
+  });
+  txtColor.addEventListener("change", () => {
+    const v = txtColor.value;
+    state.colors.noteText = v;
+    save();
+    applyColors();
+    // Apply to the current selection inside the note (if any)
+    restoreEditorSelection();
+    try {
+      document.execCommand("styleWithCSS", false, true);
+      document.execCommand("foreColor", false, v);
+    } catch (e) {}
+    saveEditorSelection();
+    persistNote();
+  });
+
+  txtClear.addEventListener("click", () => {
+    state.colors.noteText = "#e8eef5";
+    txtColor.value = "#e8eef5";
+    txtSwatch.style.setProperty("--sw", "#e8eef5");
+    save();
+    applyColors();
+    // Also reset the current selection back to default
+    restoreEditorSelection();
+    try {
+      document.execCommand("styleWithCSS", false, true);
+      document.execCommand("foreColor", false, "#e8eef5");
+    } catch (e) {}
+    saveEditorSelection();
+    persistNote();
+  });
+
+  // Frame color (note)
+  frameColor.addEventListener("input", () => {
+    frameSwatch.style.setProperty("--sw", frameColor.value);
+  });
+  frameColor.addEventListener("change", () => {
+    state.colors.noteFrame = frameColor.value;
+    save();
+    applyColors();
+  });
+
+  frameClear.addEventListener("click", () => {
+    state.colors.noteFrame = "";
+    save();
+    applyColors();
+  });
+
+  /* ---------- Preset swatches for stage / camera frames ---------- */
+  /* We add small swatch buttons to the frame color group, to quickly
+     set the stage and camera frame at once for a cohesive look. */
+  function buildFrameSwatches() {
+    const group = frameSwatch.closest(".color-group");
+    if (!group) return;
+    const row = document.createElement("div");
+    row.className = "swatches";
+    row.style.marginLeft = "4px";
+
+    const presets = [
+      "#4f8ef7", "#8b5cf6", "#ef4444", "#22c55e",
+      "#f59e0b", "#ec4899", "#14b8a6", "#e8eef5"
+    ];
+
+    presets.forEach(c => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "sw-btn";
+      b.style.background = c;
+      b.title = "Set note, stage, and camera frames to " + c;
+      b.addEventListener("click", () => {
+        state.colors.noteFrame  = c;
+        state.colors.stageFrame = c;
+        state.colors.camFrame   = c;
+        frameColor.value = c;
+        frameSwatch.style.setProperty("--sw", c);
+        save();
+        applyColors();
+      });
+      row.appendChild(b);
+    });
+
+    group.parentNode.insertBefore(row, group.nextSibling);
+  }
+
   /* ============================================================
-     RENDER LOOP (screen preview)
+     RENDER LOOP
   ============================================================ */
   let rafId = null;
 
@@ -3345,7 +3952,6 @@
     );
 
     if (document.activeElement !== urlInput) urlInput.value = c.url || "";
-
     if (document.activeElement !== noteEditor) {
       if (noteEditor.innerHTML !== (c.noteHtml || "")) {
         noteEditor.innerHTML = c.noteHtml || "";
@@ -3366,9 +3972,7 @@
       state.content.mode = btn.dataset.mode;
       renderContent();
       save();
-      if (btn.dataset.mode === "note") {
-        setTimeout(() => noteEditor.focus(), 30);
-      }
+      if (btn.dataset.mode === "note") setTimeout(() => noteEditor.focus(), 30);
     });
   });
 
@@ -3408,11 +4012,8 @@
   btnBeauty.addEventListener("click", cycleBeauty);
 
   btnSrc.addEventListener("click", () => {
-    if (recorder.isRecording) {
-      togglePause();
-    } else {
-      cycleSource();
-    }
+    if (recorder.isRecording) togglePause();
+    else cycleSource();
   });
 
   micToggle.addEventListener("click", () => {
@@ -3437,13 +4038,9 @@
 
   btnFull.addEventListener("click", () => {
     const el = camWrap;
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else if (el.requestFullscreen) {
-      el.requestFullscreen().catch(() => {});
-    } else if (video.webkitEnterFullscreen) {
-      video.webkitEnterFullscreen();
-    }
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+    else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
   });
 
   /* ============================================================
@@ -3481,15 +4078,36 @@
      GLOBAL CONTROLS
   ============================================================ */
   layoutBtn.addEventListener("click", () => {
-    state.layout = state.layout === "vertical" ? "horizontal" : "vertical";
-    applyLayout();
+    const i = LAYOUT_ORDER.indexOf(state.layout);
+    state.layout = LAYOUT_ORDER[(i + 1) % LAYOUT_ORDER.length];
     save();
+    applyLayout();
   });
 
   swapBtn.addEventListener("click", () => {
-    state.camFirst = !state.camFirst;
-    mountPanes();
-    save();
+    if (state.layout === "pip") {
+      const iw = stageInner.clientWidth;
+      const ih = stageInner.clientHeight;
+      if (!iw || !ih) return;
+      const cw = camPane.offsetWidth;
+      const ch = camPane.offsetHeight;
+      const maxX = Math.max(0, iw - cw);
+      const maxY = Math.max(0, ih - ch);
+      const px = state.pip.x * iw;
+      const py = state.pip.y * ih;
+      const nx = maxX - px;
+      const ny = maxY - py;
+      state.pip.x = iw > 0 ? nx / iw : 0.5;
+      state.pip.y = ih > 0 ? ny / ih : 0.5;
+      save();
+      camPane.classList.add("snapping");
+      applyPipPosition(false);
+      setTimeout(() => camPane.classList.remove("snapping"), 260);
+    } else {
+      state.camFirst = !state.camFirst;
+      mountPanes();
+      save();
+    }
   });
 
   snapTopBtn.addEventListener("click", takeSnapshot);
@@ -3509,6 +4127,7 @@
     applyLayout();
     noteEditor.innerHTML = "";
     renderContent();
+    applyColors();
     save();
     startCamera(state.deviceId || "");
   });
@@ -3518,16 +4137,22 @@
   ============================================================ */
   document.addEventListener("visibilitychange", () => {
     if (!stream) return;
-    if (document.hidden) {
-      video.pause();
-      stopLoop();
-    } else {
+    if (document.hidden) { video.pause(); stopLoop(); }
+    else {
       video.play().catch(() => {});
       if (state.filter !== "none" || state.beauty > 0) startLoop();
     }
   });
 
-  window.addEventListener("resize", () => { resizeFx(); });
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    resizeFx();
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      sizePipStage();
+      applyPipPosition(false);
+    }, 30);
+  });
 
   window.addEventListener("beforeunload", () => {
     if (recorder.isRecording) {
@@ -3559,6 +4184,8 @@
 
   noteEditor.innerHTML = state.content.noteHtml || "";
   renderContent();
+  applyColors();
+  buildFrameSwatches();
 
   setLive(false);
 
@@ -3576,6 +4203,8 @@
   });
 
   ensureLoop();
+
+  setTimeout(() => { sizePipStage(); applyPipPosition(false); }, 100);
 
 })();
 </script>
