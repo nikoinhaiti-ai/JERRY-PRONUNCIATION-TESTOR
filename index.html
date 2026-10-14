@@ -135,27 +135,32 @@
             transform: translateY(-50%);
         }
 
-        /* --- FLOATING CAMERA WIDGET (small, draggable, with flash/filter) --- */
+        /* --- FLOATING CAMERA WIDGET (small circle, draggable, with flash/filter) --- */
         .camera-float {
             position: fixed;
             bottom: 30px;
             right: 30px;
-            width: 220px;
-            height: 165px;
-            border-radius: 16px;
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
             overflow: hidden;
             box-shadow: 0 12px 30px rgba(0,0,0,0.35);
             border: 3px solid #fff;
             background: #111;
             z-index: 1000;
             cursor: grab;
-            transition: box-shadow 0.2s;
+            transition: box-shadow 0.2s, transform 0.15s;
             user-select: none;
+            touch-action: none;
         }
 
         .camera-float:active {
             cursor: grabbing;
             box-shadow: 0 18px 40px rgba(0,0,0,0.5);
+        }
+
+        .camera-float:hover {
+            transform: scale(1.03);
         }
 
         .camera-float video {
@@ -164,9 +169,10 @@
             object-fit: cover;
             display: block;
             background: #000;
-            transform: scaleX(-1); /* mirror for front camera, adjusted dynamically */
+            transform: scaleX(-1); /* mirror for front camera */
             transition: transform 0.3s ease, filter 0.3s ease;
-            filter: brightness(1.05) contrast(1.05) saturate(1.1) blur(0.3px); /* smooth face filter */
+            filter: brightness(1.05) contrast(1.05) saturate(1.1) blur(0.3px);
+            border-radius: 50%;
         }
 
         /* Flash overlay */
@@ -179,40 +185,43 @@
             background: white;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.1s ease;
+            transition: opacity 0.12s ease;
             z-index: 10;
             mix-blend-mode: overlay;
+            border-radius: 50%;
         }
 
         .flash-overlay.active {
-            opacity: 0.8;
+            opacity: 0.9;
         }
 
         /* tiny status light / label */
         .camera-badge {
             position: absolute;
             top: 8px;
-            left: 10px;
-            background: rgba(0,0,0,0.7);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.65);
             color: white;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: bold;
-            padding: 3px 9px;
+            padding: 2px 8px;
             border-radius: 20px;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
             backdrop-filter: blur(4px);
             pointer-events: none;
             display: flex;
             align-items: center;
             gap: 4px;
             z-index: 20;
+            white-space: nowrap;
         }
 
         .camera-badge::before {
             content: '';
             display: inline-block;
-            width: 7px;
-            height: 7px;
+            width: 6px;
+            height: 6px;
             background: #00e676;
             border-radius: 50%;
             box-shadow: 0 0 8px #00e676;
@@ -228,12 +237,13 @@
         /* Camera control buttons */
         .camera-controls {
             position: absolute;
-            bottom: 8px;
-            right: 10px;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
-            gap: 6px;
+            gap: 5px;
             z-index: 30;
-            opacity: 0.7;
+            opacity: 0.75;
             transition: opacity 0.2s;
         }
 
@@ -246,9 +256,9 @@
             border: none;
             color: white;
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            font-size: 16px;
+            width: 26px;
+            height: 26px;
+            font-size: 13px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -271,15 +281,19 @@
         /* On small screens, adapt size */
         @media (max-width: 600px) {
             .camera-float {
-                width: 150px;
-                height: 112px;
+                width: 100px;
+                height: 100px;
                 bottom: 15px;
                 right: 15px;
             }
             .cam-btn {
-                width: 24px;
-                height: 24px;
-                font-size: 12px;
+                width: 20px;
+                height: 20px;
+                font-size: 10px;
+            }
+            .camera-badge {
+                font-size: 8px;
+                padding: 1px 6px;
             }
         }
     </style>
@@ -302,11 +316,11 @@
         <div id="scroller"></div>
     </div>
 
-    <!-- Floating camera widget with flash, switch, filter -->
+    <!-- Floating camera widget (circular, draggable, with flash/switch/filter) -->
     <div class="camera-float" id="cameraFloat" tabindex="0">
         <video id="cameraVideo" autoplay playsinline muted></video>
         <div class="flash-overlay" id="flashOverlay"></div>
-        <div class="camera-badge" id="cameraBadge">CAM LIVE</div>
+        <div class="camera-badge" id="cameraBadge">LIVE</div>
         
         <div class="camera-controls">
             <button class="cam-btn" id="switchCamBtn" title="Changer caméra avant/arrière">🔄</button>
@@ -473,7 +487,7 @@
             speechSynthesis.onvoiceschanged = () => synth.getVoices();
         }
 
-        // ---------- FLOATING CAMERA with FLASH, SWITCH, FILTER ----------
+        // ---------- FLOATING CAMERA (circular, draggable, flash, switch, filter) ----------
         (function initFloatingCamera() {
             const videoEl = document.getElementById('cameraVideo');
             const floatContainer = document.getElementById('cameraFloat');
@@ -481,18 +495,19 @@
             const switchCamBtn = document.getElementById('switchCamBtn');
             const flashBtn = document.getElementById('flashBtn');
             const filterBtn = document.getElementById('filterBtn');
+            const cameraBadge = document.getElementById('cameraBadge');
             
             let currentStream = null;
             let currentFacingMode = 'user'; // 'user' or 'environment'
-            let flashEnabled = false; // flash effect (screen overlay)
-            let filterEnabled = true; // smooth skin filter default ON
+            let flashEnabled = false;
+            let filterEnabled = true;
             let isDragging = false;
+            let dragMoved = false;
             let startX, startY, startLeft, startTop;
             let cameraAvailable = false;
 
             // ----- Camera management -----
             async function startCamera(facingMode = 'user') {
-                // Stop previous stream
                 if (currentStream) {
                     currentStream.getTracks().forEach(track => track.stop());
                     currentStream = null;
@@ -502,7 +517,7 @@
                     const constraints = {
                         video: {
                             facingMode: facingMode,
-                            width: { ideal: 640 },
+                            width: { ideal: 480 },
                             height: { ideal: 480 }
                         },
                         audio: false
@@ -520,24 +535,27 @@
                         videoEl.style.transform = 'scaleX(1)';
                     }
                     
-                    // Hide fallback if any
+                    // Remove fallback if exists
                     const fallback = floatContainer.querySelector('.camera-fallback');
                     if (fallback) fallback.remove();
                     videoEl.style.display = 'block';
+                    cameraBadge.style.display = 'flex';
+                    switchCamBtn.style.display = 'flex';
+                    flashBtn.style.display = 'flex';
+                    filterBtn.style.display = 'flex';
                     
                     console.log(`Camera started (${facingMode})`);
                 } catch (err) {
                     console.warn(`Camera ${facingMode} failed:`, err);
-                    // If environment fails, try user
                     if (facingMode === 'environment') {
                         try {
                             await startCamera('user');
                             currentFacingMode = 'user';
                         } catch (err2) {
-                            showCameraFallback(err2.message || 'Caméra indisponible');
+                            showCameraFallback('Caméra indisponible');
                         }
                     } else {
-                        showCameraFallback(err.message || 'Caméra indisponible');
+                        showCameraFallback('Caméra indisponible');
                     }
                 }
             }
@@ -545,7 +563,11 @@
             function showCameraFallback(message) {
                 cameraAvailable = false;
                 videoEl.style.display = 'none';
-                // Remove existing fallback
+                cameraBadge.style.display = 'none';
+                switchCamBtn.style.display = 'none';
+                flashBtn.style.display = 'none';
+                filterBtn.style.display = 'none';
+                
                 const existing = floatContainer.querySelector('.camera-fallback');
                 if (existing) existing.remove();
                 
@@ -554,13 +576,13 @@
                 fallback.style.cssText = `
                     width: 100%; height: 100%; display: flex; flex-direction: column;
                     align-items: center; justify-content: center;
-                    background: #1e1e1e; color: #ccc; font-size: 12px; 
-                    text-align: center; padding: 10px; box-sizing: border-box; gap: 6px;
+                    background: #1e1e1e; color: #ccc; font-size: 10px; 
+                    text-align: center; padding: 8px; box-sizing: border-box; gap: 4px;
+                    border-radius: 50%;
                 `;
                 fallback.innerHTML = `
-                    <div style="font-size: 28px;">📷</div>
+                    <div style="font-size: 22px;">📷</div>
                     <div>${message}</div>
-                    <div style="font-size: 10px; opacity: 0.7;">Vérifiez les permissions</div>
                 `;
                 floatContainer.appendChild(fallback);
             }
@@ -569,7 +591,7 @@
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 startCamera('user');
             } else {
-                showCameraFallback('API caméra non supportée');
+                showCameraFallback('API non supportée');
             }
 
             // Switch camera button
@@ -587,18 +609,12 @@
                 flashEnabled = !flashEnabled;
                 
                 if (flashEnabled) {
-                    // Trigger flash overlay
                     flashOverlay.classList.add('active');
-                    setTimeout(() => {
-                        flashOverlay.classList.remove('active');
-                    }, 150);
-                    
-                    // Repeat flash a few times for effect
+                    setTimeout(() => flashOverlay.classList.remove('active'), 180);
                     setTimeout(() => {
                         flashOverlay.classList.add('active');
                         setTimeout(() => flashOverlay.classList.remove('active'), 100);
-                    }, 200);
-                    
+                    }, 220);
                     flashBtn.classList.add('flash-active');
                 } else {
                     flashOverlay.classList.remove('active');
@@ -613,11 +629,9 @@
                 if (filterEnabled) {
                     videoEl.style.filter = 'brightness(1.05) contrast(1.05) saturate(1.1) blur(0.3px)';
                     filterBtn.style.color = '#ffaa00';
-                    filterBtn.textContent = '✨';
                 } else {
                     videoEl.style.filter = 'none';
                     filterBtn.style.color = 'white';
-                    filterBtn.textContent = '✨';
                 }
             });
             // Set initial filter state
@@ -626,7 +640,7 @@
                 filterBtn.style.color = '#ffaa00';
             }
 
-            // ---------- DRAGGABLE BEHAVIOR ----------
+            // ---------- DRAGGABLE BEHAVIOR (fixed positioning, works with circular shape) ----------
             function setInitialPosition() {
                 const rect = floatContainer.getBoundingClientRect();
                 floatContainer.style.bottom = 'auto';
@@ -650,11 +664,12 @@
                 floatContainer.style.top = top + 'px';
             });
 
+            // Mouse events
             floatContainer.addEventListener('mousedown', (e) => {
-                // Ignore if clicking on buttons
                 if (e.target.closest('.cam-btn')) return;
                 e.preventDefault();
                 isDragging = true;
+                dragMoved = false;
                 const rect = floatContainer.getBoundingClientRect();
                 startX = e.clientX;
                 startY = e.clientY;
@@ -668,6 +683,7 @@
             window.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
                 e.preventDefault();
+                dragMoved = true;
 
                 const dx = e.clientX - startX;
                 const dy = e.clientY - startY;
@@ -688,7 +704,7 @@
                 if (isDragging) {
                     isDragging = false;
                     floatContainer.style.cursor = 'grab';
-                    floatContainer.style.transition = 'box-shadow 0.2s';
+                    floatContainer.style.transition = 'box-shadow 0.2s, transform 0.15s';
                     floatContainer.style.willChange = 'auto';
                 }
             });
@@ -700,6 +716,7 @@
                 if (!touch) return;
                 e.preventDefault();
                 isDragging = true;
+                dragMoved = false;
                 const rect = floatContainer.getBoundingClientRect();
                 startX = touch.clientX;
                 startY = touch.clientY;
@@ -714,6 +731,7 @@
                 const touch = e.touches[0];
                 if (!touch) return;
                 e.preventDefault();
+                dragMoved = true;
 
                 const dx = touch.clientX - startX;
                 const dy = touch.clientY - startY;
@@ -734,7 +752,7 @@
                 if (isDragging) {
                     isDragging = false;
                     floatContainer.style.cursor = 'grab';
-                    floatContainer.style.transition = 'box-shadow 0.2s';
+                    floatContainer.style.transition = 'box-shadow 0.2s, transform 0.15s';
                 }
             });
 
