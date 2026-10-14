@@ -3,22 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Camera Split · PiP + Colors</title>
+<title>Snapchat Camera</title>
 <style>
   :root{
-    --bg:#0b0f14;
-    --panel:#161b22;
-    --panel-2:#1a2029;
-    --border:#2a3038;
+    --bg:#000;
+    --panel:#0e1116;
+    --panel-2:#151a21;
+    --border:#232a34;
     --text:#e6edf3;
     --muted:#8b949e;
     --accent:#4f8ef7;
+    --snap:#fffc00;
+    --snap-dark:#e6e300;
     --danger:#ef4444;
     --flash:#fbbf24;
     --rec:#ef4444;
-    --stage:#8b5cf6;
-    --screen:#14b8a6;
     --pause:#f59e0b;
+    --ok:#22c55e;
   }
 
   *{ box-sizing:border-box; }
@@ -30,311 +31,284 @@
     overflow:hidden;
     overscroll-behavior:none;
     display:flex; flex-direction:column;
-    background:var(--bg); color:var(--text);
+    background:#000; color:#fff;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing:antialiased;
+    user-select:none;
+    -webkit-user-select:none;
   }
 
-  /* ============ Top bar ============ */
-  .topbar{
+  /* ============================================================
+     PERMISSION GATE — full-screen first-run overlay
+  ============================================================ */
+  .gate{
+    position:fixed; inset:0;
+    z-index:1000;
+    display:grid; place-items:center;
+    padding:24px;
+    background:
+      radial-gradient(circle at 20% 0%, #1a2030 0%, transparent 55%),
+      radial-gradient(circle at 100% 100%, #171a22 0%, transparent 60%),
+      #05070a;
+    animation:fadeIn .35s ease;
+  }
+  .gate.hide{ display:none; }
+  @keyframes fadeIn{ from{ opacity:0 } to{ opacity:1 } }
+
+  .gate-card{
+    width:min(440px, 100%);
+    background:linear-gradient(180deg, #171c25, #0f1319);
+    border:1px solid #262e3a;
+    border-radius:20px;
+    padding:26px 24px 22px;
+    text-align:center;
+    box-shadow:
+      0 40px 80px -30px rgba(0,0,0,.95),
+      0 0 0 1px rgba(255,255,255,.03) inset;
+    animation:pop .3s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes pop{ from{ transform:scale(.94); opacity:0 } to{ transform:scale(1); opacity:1 } }
+
+  .gate-mark{
+    width:76px; height:76px;
+    margin:0 auto 16px;
+    border-radius:22px;
+    background:linear-gradient(135deg, #fffc00, #ffd60a);
+    display:grid; place-items:center;
+    font-size:38px;
+    box-shadow:
+      0 12px 40px -8px rgba(255,252,0,.55),
+      0 0 0 1px rgba(255,255,255,.15) inset;
+    animation:float 3.5s ease-in-out infinite;
+  }
+  @keyframes float{
+    0%,100%{ transform:translateY(0) rotate(0deg) }
+    50%    { transform:translateY(-6px) rotate(-3deg) }
+  }
+
+  .gate h1{
+    margin:0 0 8px;
+    font-size:23px;
+    font-weight:800;
+    letter-spacing:-.02em;
+  }
+  .gate .lead{
+    margin:0 0 20px;
+    font-size:13.5px;
+    line-height:1.6;
+    color:var(--muted);
+  }
+
+  .perm-row{
+    display:flex; align-items:flex-start; gap:12px;
+    text-align:left;
+    padding:12px 14px;
+    margin-bottom:8px;
+    background:#0b0f14;
+    border:1px solid var(--border);
+    border-radius:12px;
+    transition:border-color .2s ease, background .2s ease;
+  }
+  .perm-row:last-of-type{ margin-bottom:16px; }
+  .perm-row.granted{
+    background:rgba(34,197,94,.06);
+    border-color:rgba(34,197,94,.35);
+  }
+  .perm-row.denied{
+    background:rgba(239,68,68,.06);
+    border-color:rgba(239,68,68,.35);
+  }
+  .perm-icon{
     flex:0 0 auto;
-    display:flex; align-items:center; gap:8px;
-    height:54px; padding:0 14px;
-    border-bottom:1px solid var(--border);
-    background:linear-gradient(180deg,#171d25,#12171e);
-    z-index:60;
+    width:36px; height:36px;
+    border-radius:10px;
+    display:grid; place-items:center;
+    font-size:18px;
+    background:#151b23;
+    border:1px solid var(--border);
+    transition:background .2s ease, border-color .2s ease;
   }
-  .brand{
-    display:flex; align-items:center; gap:9px;
-    font-weight:650; font-size:14px; letter-spacing:.2px;
-    white-space:nowrap;
+  .perm-row.granted .perm-icon{
+    background:rgba(34,197,94,.15);
+    border-color:rgba(34,197,94,.45);
   }
-  .brand .mark{
-    width:20px; height:20px; border-radius:6px;
-    background:linear-gradient(135deg,var(--accent),#8b5cf6);
-    box-shadow:0 0 0 1px #ffffff14 inset;
+  .perm-text{ flex:1 1 auto; min-width:0; }
+  .perm-text .t{
+    font-size:13px; font-weight:650; margin-bottom:2px;
+    display:flex; align-items:center; gap:6px;
   }
-  .spacer{ flex:1 1 auto; }
+  .perm-text .d{
+    font-size:11.5px; color:var(--muted); line-height:1.5;
+  }
+  .perm-status{
+    flex:0 0 auto;
+    font-size:10.5px; font-weight:700;
+    letter-spacing:.4px;
+    padding:3px 8px;
+    border-radius:999px;
+    background:#1a2029;
+    border:1px solid var(--border);
+    color:var(--muted);
+    text-transform:uppercase;
+    align-self:center;
+  }
+  .perm-status.granted{ background:rgba(34,197,94,.18); border-color:rgba(34,197,94,.5); color:#86efac; }
+  .perm-status.denied { background:rgba(239,68,68,.18); border-color:rgba(239,68,68,.5); color:#fca5a5; }
+  .perm-status.pending{ background:rgba(251,191,36,.16); border-color:rgba(251,191,36,.5); color:#fde68a; }
+
+  .gate-actions{
+    display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
+  }
+  .gate-actions .btn{
+    padding:11px 18px; font-size:13.5px; font-weight:650;
+    border-radius:11px;
+  }
+  .gate .skip{
+    display:inline-block;
+    margin-top:14px;
+    font-size:12px;
+    color:var(--muted);
+    text-decoration:underline;
+    text-underline-offset:3px;
+    cursor:pointer;
+  }
+  .gate .skip:hover{ color:var(--text); }
 
   .btn{
     display:inline-flex; align-items:center; gap:7px;
     font:inherit; font-size:13px; color:var(--text);
     background:var(--panel-2);
     border:1px solid var(--border);
-    border-radius:9px;
-    padding:7px 12px;
+    border-radius:10px;
+    padding:8px 14px;
     cursor:pointer; white-space:nowrap;
     transition:background .15s ease, border-color .15s ease, transform .05s ease, opacity .15s ease;
   }
   .btn:hover{ background:#232b35; border-color:#3a424d; }
   .btn:active{ transform:translateY(1px); }
   .btn:disabled{ opacity:.45; cursor:not-allowed; }
-  .btn .glyph{ font-size:14px; line-height:1; opacity:.9; }
   .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .btn.primary:hover{ background:#3f7de6; border-color:#3f7de6; }
-  .btn.rec{ background:#2a1416; border-color:#5c2a2e; color:#fca5a5; }
-  .btn.rec:hover{ background:#3d1a1e; border-color:#7f3a3f; }
-  .btn.rec.live{
-    background:var(--rec); border-color:var(--rec); color:#fff;
-    animation:livePulse 2s ease-in-out infinite;
+  .btn.snap{
+    background:var(--snap);
+    border-color:var(--snap);
+    color:#111;
+    box-shadow:0 8px 26px -6px rgba(255,252,0,.5);
   }
-  .btn.rec.live:hover{ background:#dc2626; border-color:#dc2626; }
-  .btn.rec.stage{ background:#1e1338; border-color:#4c2f7c; color:#c4b5fd; }
-  .btn.rec.stage:hover{ background:#2c1c50; border-color:#6b46c1; }
-  .btn.rec.screen{ background:#0c2e2c; border-color:#175e58; color:#5eead4; }
-  .btn.rec.screen:hover{ background:#0f3d3a; border-color:#0d9488; }
-  @keyframes livePulse{
-    0%,100%{ box-shadow:0 0 0 0 rgba(239,68,68,.6); }
-    50%    { box-shadow:0 0 0 6px rgba(239,68,68,0); }
-  }
+  .btn.snap:hover{ background:#ffd60a; border-color:#ffd60a; }
 
-  /* ============ Stage ============ */
-  .stage{
-    flex:1 1 auto; min-height:0; min-width:0;
+  /* ============================================================
+     APP SHELL
+  ============================================================ */
+  .app{
+    flex:1 1 auto;
+    min-height:0;
+    display:flex; flex-direction:column;
+    position:relative;
+    overflow:hidden;
+    opacity:0;
+    transition:opacity .35s ease;
+  }
+  .app.ready{ opacity:1; }
+
+  /* ============ Top bar (Snapchat minimal) ============ */
+  .topbar{
+    position:absolute;
+    top:0; left:0; right:0;
+    z-index:60;
+    display:flex; align-items:center; gap:8px;
+    height:56px; padding:0 14px;
+    background:linear-gradient(180deg, rgba(0,0,0,.7), rgba(0,0,0,0));
+    pointer-events:none;
+  }
+  .topbar > *{ pointer-events:auto; }
+  .brand{
+    display:flex; align-items:center; gap:9px;
+    font-weight:750; font-size:14.5px; letter-spacing:-.01em;
+    white-space:nowrap;
+    color:#fff;
+    text-shadow:0 1px 4px rgba(0,0,0,.6);
+  }
+  .brand .mark{
+    width:26px; height:26px;
+    border-radius:8px;
+    background:linear-gradient(135deg, #fffc00, #ffd60a);
     display:grid; place-items:center;
-    padding:10px;
+    font-size:14px;
+    box-shadow:0 4px 14px -2px rgba(255,252,0,.6);
+  }
+  .spacer{ flex:1 1 auto; }
+
+  .tb-btn{
+    width:38px; height:38px;
+    display:grid; place-items:center;
+    color:#fff;
+    font:inherit; font-size:16px;
+    background:rgba(20,26,34,.55);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:50%;
+    cursor:pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition:background .15s ease, transform .1s ease, border-color .15s ease;
     position:relative;
   }
+  .tb-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.28); }
+  .tb-btn:active{ transform:scale(.93); }
 
-  .stage-inner{
-    display:grid;
-    width:100%; height:100%;
-    min-width:0; min-height:0;
+  .tb-btn.perm-needed::after{
+    content:"";
+    position:absolute;
+    top:1px; right:1px;
+    width:9px; height:9px;
+    border-radius:50%;
+    background:var(--flash);
+    box-shadow:0 0 0 2px #0b0f14;
+    animation:badgePulse 1.8s ease-in-out infinite;
+  }
+  @keyframes badgePulse{
+    0%,100%{ opacity:1; transform:scale(1); }
+    50%    { opacity:.5; transform:scale(1.25); }
+  }
+
+  .rec-pill{
+    display:inline-flex; align-items:center; gap:8px;
+    height:34px; padding:0 13px;
+    background:rgba(0,0,0,.65);
+    border:1px solid rgba(239,68,68,.55);
+    border-radius:999px;
+    font-size:12.5px; font-weight:700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing:.4px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display:none;
+  }
+  .rec-pill.show{ display:inline-flex; }
+  .rec-pill .blink{
+    width:9px; height:9px; border-radius:50%;
+    background:var(--rec);
+    animation:recBlink 1s steps(2,end) infinite;
+  }
+  .rec-pill.paused{ border-color:rgba(245,158,11,.6); }
+  .rec-pill.paused .blink{ background:var(--pause); animation:none; }
+  .rec-pill .mic{ color:#fca5a5; font-size:11px; }
+  @keyframes recBlink{ 0%,49%{opacity:1} 50%,100%{opacity:.15} }
+
+  /* ============ Fullscreen camera stage ============ */
+  .stage{
+    flex:1 1 auto;
+    min-height:0;
     position:relative;
-  }
-
-  .stage[data-layout="vertical"] .stage-inner{
-    grid-template-columns: var(--a,50%) 12px minmax(0,1fr);
-    grid-template-rows: minmax(0,1fr);
-  }
-  .stage[data-layout="horizontal"] .stage-inner{
-    grid-template-columns: minmax(0,1fr);
-    grid-template-rows: var(--a,50%) 12px minmax(0,1fr);
-  }
-
-  /* PiP layout */
-  .stage[data-layout="pip"] .stage-inner{
-    grid-template-columns: minmax(0,1fr);
-    grid-template-rows: minmax(0,1fr);
-    border-radius:14px;
     overflow:hidden;
     background:#000;
-    box-shadow:
-      0 24px 60px -24px rgba(0,0,0,.9),
-      0 0 0 1px rgba(255,255,255,.06);
-    transition: box-shadow .2s ease;
-  }
-  .stage[data-layout="pip"] .divider{ display:none; }
-
-  .stage[data-layout="pip"] #contentPane{
-    grid-column:1; grid-row:1;
-    width:100%; height:100%;
-    border:0;
-    border-radius:0;
+    touch-action:none;
   }
 
-  /* Framed stage — colored border around the 16:9 video */
-  .stage[data-layout="pip"] .stage-inner.framed{
-    box-shadow:
-      0 24px 60px -24px rgba(0,0,0,.9),
-      0 0 0 var(--stage-frame-w, 0px) var(--stage-frame-color, transparent),
-      0 0 0 1px rgba(255,255,255,.06);
-  }
-
-  .stage[data-layout="pip"] #camPane{
-    position:absolute;
-    z-index:20;
-    border-radius:12px;
-    overflow:hidden;
-    border:1px solid rgba(255,255,255,.14);
-    box-shadow:
-      0 20px 45px -20px rgba(0,0,0,.95),
-      0 0 0 1px rgba(255,255,255,.05);
-    cursor:grab;
-    background:var(--panel);
-    transition: box-shadow .15s ease, transform .15s ease;
-  }
-  .stage[data-layout="pip"] #camPane:hover{
-    box-shadow:
-      0 26px 55px -20px rgba(0,0,0,.98),
-      0 0 0 1px rgba(79,142,247,.4);
-  }
-  .stage[data-layout="pip"] #camPane.dragging{
-    cursor:grabbing;
-    box-shadow:
-      0 30px 65px -20px rgba(0,0,0,1),
-      0 0 0 2px var(--accent);
-    transition:none;
-  }
-  .stage[data-layout="pip"] #camPane.snapping{
-    transition:
-      left .22s cubic-bezier(.2,.75,.3,1),
-      top .22s cubic-bezier(.2,.75,.3,1),
-      width .2s ease, height .2s ease,
-      box-shadow .15s ease;
-  }
-
-  /* Framed camera PiP — colored ring around the camera */
-  .stage[data-layout="pip"] #camPane.cam-framed{
-    border:0;
-    box-shadow:
-      0 20px 45px -20px rgba(0,0,0,.95),
-      0 0 0 var(--cam-frame-w, 3px) var(--cam-frame-color, #4f8ef7),
-      0 0 0 1px rgba(255,255,255,.05);
-  }
-  .stage[data-layout="pip"] #camPane.cam-framed:hover{
-    box-shadow:
-      0 26px 55px -20px rgba(0,0,0,.98),
-      0 0 0 var(--cam-frame-w, 3px) var(--cam-frame-color, #4f8ef7),
-      0 0 0 1px rgba(79,142,247,.4);
-  }
-  .stage[data-layout="pip"] #camPane.cam-framed.dragging{
-    box-shadow:
-      0 30px 65px -20px rgba(0,0,0,1),
-      0 0 0 var(--cam-frame-w, 3px) var(--cam-frame-color, #4f8ef7),
-      0 0 0 3px var(--accent);
-  }
-
-  .stage.recording{
-    outline:2px solid rgba(239,68,68,.6);
-    outline-offset:-2px;
-    border-radius:14px;
-  }
-  .stage.recording.stage-mode{ outline-color:rgba(139,92,246,.6); }
-  .stage.recording.screen-mode{ outline-color:rgba(20,184,166,.6); }
-
-  /* ============ Divider ============ */
-  .divider{
-    display:flex; align-items:center; justify-content:center;
-    touch-action:none; outline:none; border-radius:99px;
-  }
-  .divider::before{
-    content:"";
-    background:var(--border); border-radius:99px;
-    transition:background .15s ease;
-  }
-  .stage[data-layout="vertical"] .divider{ cursor:col-resize; }
-  .stage[data-layout="vertical"] .divider::before{ width:4px; height:64px; }
-  .stage[data-layout="horizontal"] .divider{ cursor:row-resize; }
-  .stage[data-layout="horizontal"] .divider::before{ width:64px; height:4px; }
-
-  .divider:hover::before,
-  .divider:focus-visible::before,
-  .divider.dragging::before{ background:var(--accent); }
-
-  /* ============ Pane ============ */
-  .pane{
-    display:flex; flex-direction:column;
-    min-width:0; min-height:0;
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:12px;
-    overflow:hidden;
-  }
-
-  .pane-bar{
-    flex:0 0 auto;
-    display:flex; align-items:center; gap:6px;
-    padding:7px 8px;
-    background:var(--panel-2);
-    border-bottom:1px solid var(--border);
-    flex-wrap:wrap;
-    min-height:42px;
-  }
-
-  .pane-title{
-    display:flex; align-items:center; gap:7px;
-    font-size:12.5px; font-weight:600; color:#b9c2cd;
-    letter-spacing:.2px; white-space:nowrap;
-    padding-left:2px;
-  }
-  .rec-dot{
-    width:8px; height:8px; border-radius:50%;
-    background:#3a424d;
-    transition:background .2s ease, box-shadow .2s ease;
-    flex:0 0 auto;
-  }
-  .rec-dot.on{
-    background:var(--danger);
-    box-shadow:0 0 0 3px rgba(239,68,68,.2);
-    animation:pulse 2s infinite;
-  }
-  .rec-dot.paused{
-    background:var(--pause);
-    box-shadow:0 0 0 3px rgba(245,158,11,.25);
-    animation:none;
-  }
-  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
-
-  .seg{
-    display:flex; gap:2px; padding:2px;
-    background:#0b0f14;
-    border:1px solid var(--border);
-    border-radius:9px;
-    flex:0 0 auto;
-  }
-  .seg-btn{
-    font:inherit; font-size:12px; font-weight:550;
-    color:var(--muted); background:transparent;
-    border:0; border-radius:7px;
-    padding:5px 10px; cursor:pointer;
-    transition:background .15s ease, color .15s ease;
-  }
-  .seg-btn:hover{ color:var(--text); }
-  .seg-btn.on{ background:var(--accent); color:#fff; }
-
-  .urlbar{ flex:1 1 auto; display:flex; gap:6px; min-width:0; }
-  .url-input{
-    flex:1 1 auto; min-width:0;
-    font:inherit; font-size:13px; color:var(--text);
-    background:#0b0f14;
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:6px 10px; outline:none;
-    transition:border-color .15s ease, box-shadow .15s ease;
-  }
-  .url-input::placeholder{ color:#5c6672; }
-  .url-input:focus{
-    border-color:var(--accent);
-    box-shadow:0 0 0 3px rgba(79,142,247,.16);
-  }
-  .go{ padding:6px 12px; border-radius:8px; }
-
-  .icon{
-    width:30px; height:30px;
-    display:grid; place-items:center;
-    font:inherit; font-size:14px;
-    color:var(--muted); background:transparent;
-    border:1px solid transparent;
-    border-radius:8px; cursor:pointer; flex:0 0 auto;
-    transition:background .15s ease, color .15s ease, border-color .15s ease;
-  }
-  .icon:hover{ color:var(--text); background:#222a34; border-color:var(--border); }
-  .icon.on{ color:#fff; background:var(--accent); border-color:var(--accent); }
-
-  .select{
-    font:inherit; font-size:12.5px; color:var(--text);
-    background:#0b0f14;
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:6px 8px; outline:none;
-    max-width:170px; cursor:pointer;
-  }
-  .select:focus{ border-color:var(--accent); }
-
-  .pane-body{
-    position:relative;
-    flex:1 1 auto; min-height:0;
-    background:#05080b;
-  }
-
-  /* ============ Camera layers ============ */
-  .cam-wrap{
+  .camera-layer{
     position:absolute; inset:0;
-    display:flex; align-items:center; justify-content:center;
     overflow:hidden;
-    background:#05080b;
-    isolation:isolate;
+    background:#000;
   }
   .cam-video{
     position:absolute; inset:0;
@@ -342,6 +316,7 @@
     width:100%; height:100%;
     object-fit:cover; display:block;
     background:#000;
+    transition:filter .2s ease;
   }
   .cam-video.mirror{ transform:scaleX(-1); }
 
@@ -357,978 +332,570 @@
     pointer-events:none;
     opacity:0;
     background:radial-gradient(circle at 50% 38%, #fffdf7 0%, #fff3d9 45%, #ffe3ac 100%);
-    transition: opacity .3s ease;
+    transition:opacity .3s ease;
   }
-  .screen-flash.on{ opacity:.5; }
-  .screen-flash.burst{ opacity:1; transition: opacity .04s ease; }
+  .screen-flash.on{ opacity:.55; }
+  .screen-flash.burst{ opacity:1; transition:opacity .04s ease; }
 
-  .cam-overlay{
+  /* Snap flash */
+  .snap-flash{
     position:absolute; inset:0;
-    z-index:4;
-    display:flex; flex-direction:column; justify-content:space-between;
-    pointer-events:none;
-    transition: opacity .18s ease;
-  }
-  .cam-top{
-    display:flex; align-items:flex-start; justify-content:space-between;
-    gap:10px;
-    padding:10px;
-  }
-  .cam-top-group{
-    display:flex; gap:6px; flex-wrap:wrap;
-  }
-  .cam-overlay .cam-btn{ pointer-events:auto; }
-
-  .cam-bottom-group{
-    display:flex; flex-direction:column; gap:10px;
-    padding:0 0 14px;
-    background:linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.36) 58%, transparent);
-  }
-
-  .filter-strip{
-    display:flex; gap:8px;
-    padding:0 12px;
-    overflow-x:auto; overflow-y:hidden;
-    scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
-  }
-  .filter-strip::-webkit-scrollbar{ display:none; }
-
-  .chip{
-    flex:0 0 auto;
-    display:inline-flex; align-items:center; gap:7px;
-    height:38px; padding:0 14px;
-    font:inherit; font-size:12.5px; font-weight:600;
-    color:#fff;
-    background:rgba(20,26,34,.72);
-    border:1px solid rgba(255,255,255,.14);
-    border-radius:999px;
-    cursor:pointer; white-space:nowrap;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transition:background .15s ease, border-color .15s ease, transform .1s ease, box-shadow .15s ease;
-  }
-  .chip:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.28); }
-  .chip:active{ transform:scale(.95); }
-  .chip.on{
-    background:var(--accent);
-    border-color:var(--accent);
-    box-shadow:0 6px 18px -6px rgba(79,142,247,.75);
-  }
-  .chip .emoji{ font-size:15px; line-height:1; }
-
-  .cam-bottom{
-    display:flex; align-items:center; justify-content:center;
-    gap:16px; padding:0 12px;
-  }
-
-  .cam-btn{
-    height:40px; min-width:40px;
-    display:inline-flex; align-items:center; justify-content:center; gap:6px;
-    font:inherit; font-size:13px; font-weight:550;
-    color:#fff;
-    background:rgba(20,26,34,.72);
-    border:1px solid rgba(255,255,255,.14);
-    border-radius:11px;
-    padding:0 13px;
-    cursor:pointer;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transition:background .15s ease, border-color .15s ease, transform .05s ease, opacity .15s ease, color .15s ease;
-  }
-  .cam-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.28); }
-  .cam-btn:active{ transform:translateY(1px); }
-  .cam-btn.on{ background:var(--accent); border-color:var(--accent); }
-  .cam-btn.on.flash{ background:var(--flash); border-color:var(--flash); color:#1a1400; }
-  .cam-btn:disabled{ opacity:.35; cursor:not-allowed; }
-
-  /* Source toggle */
-  .src-btn{
-    width:50px; height:50px;
-    border-radius:50%;
-    border:2px solid rgba(255,255,255,.22);
-    background:rgba(20,26,34,.72);
-    color:#fff;
-    font-size:20px; line-height:1;
-    display:grid; place-items:center;
-    cursor:pointer;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transition:background .15s ease, border-color .15s ease, transform .05s ease, box-shadow .15s ease;
-    pointer-events:auto;
-    position:relative;
-  }
-  .src-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.36); }
-  .src-btn:active{ transform:scale(.94); }
-  .src-btn.stage{
-    background:var(--stage); border-color:var(--stage);
-    box-shadow: 0 6px 18px -6px rgba(139,92,246,.85);
-  }
-  .src-btn.stage:hover{ background:#7c4ff0; border-color:#7c4ff0; }
-  .src-btn.screen{
-    background:var(--screen); border-color:var(--screen);
-    box-shadow: 0 6px 18px -6px rgba(20,184,166,.85);
-  }
-  .src-btn.screen:hover{ background:#0d9488; border-color:#0d9488; }
-  .src-btn.recording{
-    background:var(--pause); border-color:var(--pause);
-    box-shadow: 0 6px 18px -6px rgba(245,158,11,.85);
-    font-size:18px;
-  }
-  .src-btn.recording:hover{ background:#d97706; border-color:#d97706; }
-  .src-btn.recording.is-paused{
-    background:#22c55e; border-color:#22c55e;
-    box-shadow: 0 6px 18px -6px rgba(34,197,94,.85);
-    animation:resumePulse 1.6s ease-in-out infinite;
-  }
-  @keyframes resumePulse{
-    0%,100%{ box-shadow:0 6px 18px -6px rgba(34,197,94,.85), 0 0 0 0 rgba(34,197,94,.5); }
-    50%    { box-shadow:0 6px 18px -6px rgba(34,197,94,.85), 0 0 0 8px rgba(34,197,94,0); }
-  }
-
-  .shutter{
-    width:66px; height:66px;
-    border-radius:50%;
-    border:3px solid rgba(255,255,255,.85);
-    background:transparent;
-    display:grid; place-items:center;
-    cursor:pointer; padding:0;
-    position:relative;
-    transition: transform .1s ease, border-color .15s ease;
-    pointer-events:auto;
-  }
-  .shutter::before{
-    content:"";
-    width:48px; height:48px; border-radius:50%;
+    z-index:12;
     background:#fff;
-    box-shadow: 0 4px 16px -4px rgba(0,0,0,.85);
-    transition: background .15s ease, transform .15s ease;
-  }
-  .shutter:hover{ border-color:#fff; }
-  .shutter:hover::before{ background:#ffe9b0; }
-  .shutter:active{ transform:scale(.93); }
-  .shutter:active::before{ transform:scale(.86); }
-  .shutter:disabled{ opacity:.35; cursor:not-allowed; }
-
-  .rec-btn{
-    width:66px; height:66px;
-    border-radius:50%;
-    border:3px solid rgba(255,255,255,.85);
-    background:transparent;
-    display:grid; place-items:center;
-    cursor:pointer; padding:0;
-    position:relative;
-    transition: transform .1s ease, border-color .15s ease;
-    pointer-events:auto;
-  }
-  .rec-btn::before{
-    content:"";
-    width:48px; height:48px; border-radius:50%;
-    background:var(--rec);
-    box-shadow: 0 4px 16px -4px rgba(0,0,0,.85), 0 0 22px -4px rgba(239,68,68,.7);
-    transition: background .15s ease, transform .2s ease, border-radius .2s ease;
-  }
-  .rec-btn:hover{ border-color:#fff; }
-  .rec-btn:hover::before{ background:#f87171; }
-  .rec-btn:active{ transform:scale(.93); }
-  .rec-btn:disabled{ opacity:.35; cursor:not-allowed; }
-  .rec-btn.live::before{
-    width:28px; height:28px; border-radius:7px; background:#fff;
-  }
-  .rec-btn.live{ border-color:var(--rec); animation: livePulse 2s ease-in-out infinite; }
-  .rec-btn.live.paused{ animation: none; }
-  .rec-btn.live.paused::before{ background:#fbbf24; }
-
-  .rec-btn.stage-src::before{
-    background:var(--stage);
-    box-shadow: 0 4px 16px -4px rgba(0,0,0,.85), 0 0 22px -4px rgba(139,92,246,.75);
-  }
-  .rec-btn.stage-src:hover::before{ background:#a78bfa; }
-  .rec-btn.stage-src.live{ border-color:var(--stage); }
-
-  .rec-btn.screen-src::before{
-    background:var(--screen);
-    box-shadow: 0 4px 16px -4px rgba(0,0,0,.85), 0 0 22px -4px rgba(20,184,166,.75);
-  }
-  .rec-btn.screen-src:hover::before{ background:#2dd4bf; }
-  .rec-btn.screen-src.live{ border-color:var(--screen); }
-
-  .rec-timer{
-    position:absolute;
-    top:10px; left:50%;
-    transform:translateX(-50%);
-    z-index:5;
-    display:none;
-    align-items:center; gap:8px;
-    padding:6px 14px;
-    font-size:13px; font-weight:700;
-    color:#fff;
-    background:rgba(15,5,5,.82);
-    border:1px solid rgba(239,68,68,.5);
-    border-radius:999px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    font-variant-numeric: tabular-nums;
-    letter-spacing:.5px;
-    pointer-events:none;
-  }
-  .rec-timer.show{ display:inline-flex; }
-  .rec-timer.stage{ background:rgba(20,10,40,.82); border-color:rgba(139,92,246,.55); }
-  .rec-timer.screen{ background:rgba(5,26,25,.82); border-color:rgba(20,184,166,.55); }
-  .rec-timer.paused{ background:rgba(30,20,0,.85); border-color:rgba(245,158,11,.6); }
-  .rec-timer .blink{
-    width:9px; height:9px; border-radius:50%;
-    background:var(--rec);
-    animation:recBlink 1s steps(2,end) infinite;
-  }
-  .rec-timer.stage .blink{ background:var(--stage); }
-  .rec-timer.screen .blink{ background:var(--screen); }
-  .rec-timer.paused .blink{ background:var(--pause); animation:none; }
-  @keyframes recBlink{ 0%,49%{opacity:1} 50%,100%{opacity:.15} }
-  .rec-timer .src-flag, .rec-timer .mic-flag{ font-size:12px; }
-  .rec-timer .src-flag{ color:#c4b5fd; }
-  .rec-timer.screen .src-flag{ color:#5eead4; }
-  .rec-timer .mic-flag{ color:#fca5a5; }
-  .rec-timer .paused-tag{ color:#fbbf24; font-size:11px; letter-spacing:.8px; }
-
-  .fx-status{
-    position:absolute;
-    bottom:10px; left:10px;
-    z-index:5;
-    display:none;
-    align-items:center; gap:7px;
-    padding:6px 12px;
-    font-size:11.5px; font-weight:600;
-    color:#fff;
-    background:rgba(20,26,34,.8);
-    border:1px solid rgba(255,255,255,.14);
-    border-radius:999px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    pointer-events:none;
-  }
-  .fx-status.show{ display:inline-flex; }
-  .fx-status .spinner{
-    width:12px; height:12px;
-    border:2px solid rgba(255,255,255,.28);
-    border-top-color:#fff;
-    border-radius:50%;
-    animation:spin .7s linear infinite;
-  }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
-
-  .cam-state{
-    position:absolute; inset:0;
-    z-index:6;
-    display:none;
-    place-items:center; text-align:center;
-    padding:26px;
-    background:#05080b;
-  }
-  .cam-state.show{ display:grid; }
-  .cam-state .cs-icon{ font-size:34px; margin-bottom:12px; opacity:.8; }
-  .cam-state p{ margin:0 0 14px; font-size:13px; color:var(--muted); line-height:1.6; max-width:330px; }
-  .cam-state .cs-err{ color:#fca5a5; }
-
-  .flash{
-    position:absolute; inset:0;
-    z-index:7;
-    background:#fff; opacity:0;
-    pointer-events:none;
-  }
-  .flash.fire{ animation:flash .42s ease-out; }
-  @keyframes flash{ 0%{opacity:.92} 100%{opacity:0} }
-
-  /* ============ PiP compact styling ============ */
-  .pip-only{ display:none; }
-  .stage[data-layout="pip"] .pip-only{ display:grid; }
-
-  .stage[data-layout="pip"] #camPane .pane-bar{
-    min-height:34px;
-    padding:5px 6px;
-    gap:4px;
-    background:linear-gradient(180deg,#1d242e,#151b23);
-    cursor:grab;
-    touch-action:none;
-    user-select:none;
-  }
-  .stage[data-layout="pip"] #camPane.dragging .pane-bar{ cursor:grabbing; }
-  .stage[data-layout="pip"] #camPane .pane-title{
-    font-size:11px;
-    gap:5px;
-    padding-left:2px;
-  }
-  .stage[data-layout="pip"] #camPane .pane-title .label-text{ display:none; }
-  .stage[data-layout="pip"] #camPane .rec-dot{ width:7px; height:7px; }
-  .stage[data-layout="pip"] #camPane .select{
-    font-size:11px;
-    padding:4px 4px;
-    max-width:96px;
-    min-width:0;
-    flex:0 1 auto;
-  }
-  .stage[data-layout="pip"] #camPane .icon{
-    width:26px; height:26px;
-    font-size:13px;
-    border-radius:7px;
-  }
-
-  .stage[data-layout="pip"] #camPane .cam-overlay{
     opacity:0;
     pointer-events:none;
   }
-  .stage[data-layout="pip"] #camPane:hover .cam-overlay,
-  .stage[data-layout="pip"] #camPane.dragging .cam-overlay,
-  .stage[data-layout="pip"] #camPane.recording .cam-overlay{
-    opacity:1;
-    pointer-events:auto;
-  }
-  .stage[data-layout="pip"] #camPane .cam-overlay .cam-btn,
-  .stage[data-layout="pip"] #camPane .cam-overlay .chip,
-  .stage[data-layout="pip"] #camPane .cam-overlay .shutter,
-  .stage[data-layout="pip"] #camPane .cam-overlay .rec-btn,
-  .stage[data-layout="pip"] #camPane .cam-overlay .src-btn{
-    pointer-events:auto;
+  .snap-flash.fire{ animation:snapFlash .45s cubic-bezier(.2,.8,.3,1); }
+  @keyframes snapFlash{
+    0%  { opacity:.95; }
+    60% { opacity:.35; }
+    100%{ opacity:0; }
   }
 
-  .stage[data-layout="pip"] #camPane .cam-top{ padding:6px; gap:6px; }
-  .stage[data-layout="pip"] #camPane .cam-top-group{ gap:4px; }
-  .stage[data-layout="pip"] #camPane .cam-btn{
-    height:26px; min-width:26px;
-    padding:0 6px; font-size:11px;
-    border-radius:8px; gap:4px;
-  }
-  .stage[data-layout="pip"] #camPane .cam-bottom-group{
-    gap:6px; padding:0 0 8px;
-  }
-  .stage[data-layout="pip"] #camPane .filter-strip{
-    gap:5px; padding:0 6px;
-  }
-  .stage[data-layout="pip"] #camPane .chip{
-    height:24px; padding:0 8px;
-    font-size:10.5px; gap:4px;
-  }
-  .stage[data-layout="pip"] #camPane .chip .emoji{ font-size:11px; }
-  .stage[data-layout="pip"] #camPane .cam-bottom{ gap:10px; padding:0 6px; }
-  .stage[data-layout="pip"] #camPane .shutter,
-  .stage[data-layout="pip"] #camPane .rec-btn{
-    width:40px; height:40px; border-width:2px;
-  }
-  .stage[data-layout="pip"] #camPane .shutter::before,
-  .stage[data-layout="pip"] #camPane .rec-btn::before{
-    width:28px; height:28px;
-  }
-  .stage[data-layout="pip"] #camPane .rec-btn.live::before{
-    width:16px; height:16px; border-radius:4px;
-  }
-  .stage[data-layout="pip"] #camPane .src-btn{
-    width:32px; height:32px;
-    font-size:13px; border-width:2px;
-  }
-  .stage[data-layout="pip"] #camPane .src-btn.recording{ font-size:12px; }
-
-  .stage[data-layout="pip"] #camPane .rec-timer{
-    font-size:10.5px;
-    padding:3px 9px;
-    gap:5px;
-    top:38px;
-  }
-  .stage[data-layout="pip"] #camPane .rec-timer .blink{ width:6px; height:6px; }
-  .stage[data-layout="pip"] #camPane .rec-timer .src-flag,
-  .stage[data-layout="pip"] #camPane .rec-timer .mic-flag{ font-size:10px; }
-
-  .stage[data-layout="pip"] #camPane .fx-status{
-    bottom:6px; left:6px;
-    font-size:10px; padding:4px 8px;
-  }
-
-  /* ============ Content pane ============ */
-  .frame, .note-wrap, .placeholder{ display:none; }
-  .frame{ width:100%; height:100%; border:0; background:#fff; }
-
-  .placeholder{
-    position:absolute; inset:0;
-    place-items:center; text-align:center;
-    padding:28px; color:var(--muted);
-    font-size:13px; line-height:1.6;
-  }
-  .placeholder .ph-icon{ font-size:26px; margin-bottom:10px; opacity:.8; }
-  .placeholder p{ margin:0; }
-  .placeholder .ph-sub{ margin-top:8px; font-size:12px; color:#5c6672; max-width:330px; }
-
-  .pane.mode-web  .frame{ display:block; }
-  .pane.mode-note .note-wrap{ display:flex; }
-  .pane.mode-note .urlbar,
-  .pane.mode-note .pane-actions [data-act="reload"]{ display:none; }
-  .pane.mode-web .note-toolbar{ display:none; }
-  .pane-body.empty .frame{ display:none; }
-  .pane-body.empty .placeholder{ display:grid; }
-
-  /* ============ Rich note editor ============ */
-  .note-wrap{
-    position:absolute; inset:0;
-    flex-direction:column;
-    background:
-      radial-gradient(900px 500px at 100% -10%, #131a24 0%, transparent 60%),
-      #0f141a;
-    overflow:hidden;
-    transition: background .2s ease;
-  }
-
-  /* Framed note wrap */
-  .note-wrap.framed{
-    box-shadow: inset 0 0 0 var(--note-frame-w, 3px) var(--note-frame-color, #4f8ef7);
-  }
-
-  .note-toolbar{
-    flex:0 0 auto;
-    display:flex; align-items:center; gap:3px; flex-wrap:wrap;
-    padding:8px 10px;
-    background:linear-gradient(180deg,#0e141c,#0b1018);
-    border-bottom:1px solid var(--border);
-    overflow-x:auto;
-    scrollbar-width:none;
-  }
-  .note-toolbar::-webkit-scrollbar{ display:none; }
-
-  .tb-btn{
-    min-width:30px; height:30px;
-    padding:0 8px;
-    display:inline-flex; align-items:center; justify-content:center;
-    font:inherit; font-size:13.5px; line-height:1;
-    color:#b9c2cd; background:transparent;
-    border:1px solid transparent;
-    border-radius:8px;
-    cursor:pointer;
-    transition:background .13s ease, color .13s ease, border-color .13s ease;
-    user-select:none; flex:0 0 auto;
-  }
-  .tb-btn:hover{ color:var(--text); background:#1d2631; border-color:#2f3742; }
-  .tb-btn:active{ transform:translateY(1px); }
-  .tb-btn.on{ color:#fff; background:var(--accent); border-color:var(--accent); }
-  .tb-btn b, .tb-btn strong{ font-weight:800; font-size:15px; }
-  .tb-btn i{ font-style:italic; font-family: Georgia, serif; font-size:15px; }
-  .tb-btn u{ text-decoration:underline; font-size:14px; }
-  .tb-btn.hl{ position:relative; color:#fde68a; }
-  .tb-btn.hl::after{
-    content:"";
+  /* ============ Right rail (Snapchat-style action column) ============ */
+  .rail{
     position:absolute;
-    inset:auto 7px 6px 7px;
-    height:3px; border-radius:2px;
-    background:#fbbf24; opacity:.75;
-  }
-  .tb-div{ width:1px; height:20px; background:var(--border); margin:0 4px; flex:0 0 auto; }
-
-  .tb-select{
-    height:30px;
-    font:inherit; font-size:12.5px;
-    color:var(--text);
-    background:#0b0f14;
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:0 6px;
-    outline:none; cursor:pointer;
-    flex:0 0 auto; max-width:130px;
-  }
-  .tb-select:focus{ border-color:var(--accent); }
-  .tb-select option{ background:#0b0f14; color:var(--text); }
-
-  /* ---------- Color pickers ---------- */
-  .color-group{
-    display:inline-flex; align-items:center; gap:0;
-    height:30px;
-    background:#0b0f14;
-    border:1px solid var(--border);
-    border-radius:8px;
-    overflow:hidden;
-    flex:0 0 auto;
-    transition: border-color .15s ease;
-  }
-  .color-group:hover{ border-color:#3a424d; }
-  .color-group:focus-within{ border-color:var(--accent); }
-
-  .color-icon{
-    width:26px; height:100%;
-    display:grid; place-items:center;
-    font-size:13px;
-    color:var(--muted);
-    background:transparent;
-    border-right:1px solid var(--border);
-    flex:0 0 auto;
-    pointer-events:none;
-    user-select:none;
-  }
-  .color-group .color-icon.txt{ color:#93c5fd; }
-  .color-group .color-icon.frame{ color:#c4b5fd; }
-
-  .color-swatch{
-    position:relative;
-    width:30px; height:100%;
-    display:grid; place-items:center;
-    cursor:pointer;
-    overflow:hidden;
-    background:
-      repeating-conic-gradient(#1a1f28 0% 25%, #252c37 0% 50%) 50% / 8px 8px;
-    flex:0 0 auto;
-  }
-  .color-swatch::before{
-    content:"";
-    position:absolute;
-    inset:3px;
-    border-radius:5px;
-    background: var(--sw, #ffffff);
-    box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset;
-    transition: background .15s ease;
-  }
-  .color-swatch input[type="color"]{
-    position:absolute; inset:0;
-    width:100%; height:100%;
-    opacity:0; cursor:pointer;
-    border:0; padding:0;
-    appearance:none;
-    -webkit-appearance:none;
-  }
-
-  .color-clear{
-    width:22px; height:100%;
-    display:grid; place-items:center;
-    font:inherit; font-size:11px;
-    color:var(--muted);
-    background:transparent;
-    border:0; border-left:1px solid var(--border);
-    cursor:pointer;
-    transition: background .15s ease, color .15s ease;
-    flex:0 0 auto;
-  }
-  .color-clear:hover{ background:#222a34; color:var(--text); }
-
-  /* A row of preset swatches under the pickers in the toolbar */
-  .swatches{
-    display:inline-flex; gap:3px;
+    right:12px;
+    top:50%;
+    transform:translateY(-50%);
+    z-index:8;
+    display:flex; flex-direction:column; gap:14px;
     align-items:center;
-    flex:0 0 auto;
-  }
-  .sw-btn{
-    width:16px; height:16px;
-    border-radius:4px;
-    border:1px solid rgba(255,255,255,.2);
-    cursor:pointer;
-    padding:0;
-    transition: transform .1s ease, box-shadow .15s ease;
-  }
-  .sw-btn:hover{ transform: scale(1.12); box-shadow: 0 0 0 2px rgba(79,142,247,.5); }
-  .sw-btn:active{ transform: scale(.95); }
-
-  .note-editor{
-    flex:1 1 auto; min-height:0;
-    overflow-y:auto;
-    padding:26px 30px 60px;
-    outline:none;
-    color:#e8eef5;
-    font-family:'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    font-size:15px; line-height:1.75; letter-spacing:.1px;
-    word-wrap:break-word; overflow-wrap:anywhere;
-    caret-color:var(--accent);
-    transition: color .15s ease;
-  }
-  .note-editor::-webkit-scrollbar{ width:10px; }
-  .note-editor::-webkit-scrollbar-thumb{
-    background:#2a3038; border-radius:10px; border:2px solid #0f141a;
-  }
-  .note-editor::-webkit-scrollbar-thumb:hover{ background:#3a424d; }
-  .note-editor:empty::before{
-    content: attr(data-placeholder);
-    color:#4f5865;
     pointer-events:none;
+  }
+  .rail > *{ pointer-events:auto; }
+
+  .rail-btn{
+    width:46px; height:46px;
+    display:grid; place-items:center;
+    color:#fff; font:inherit; font-size:18px;
+    background:rgba(15,20,26,.55);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:50%;
+    cursor:pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition:background .15s ease, transform .1s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+    position:relative;
+  }
+  .rail-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.28); }
+  .rail-btn:active{ transform:scale(.9); }
+  .rail-btn.on{
+    background:var(--snap);
+    border-color:var(--snap);
+    color:#111;
+    box-shadow:0 6px 22px -4px rgba(255,252,0,.6);
+  }
+  .rail-btn.flash.on{
+    background:var(--flash);
+    border-color:var(--flash);
+    color:#1a1400;
+  }
+  .rail-btn.mirror.on{
+    background:#4f8ef7; border-color:#4f8ef7; color:#fff;
+    box-shadow:0 6px 22px -4px rgba(79,142,247,.6);
+  }
+  .rail-btn.beauty.on{
+    background:linear-gradient(135deg, #a78bfa, #f472b6);
+    border-color:#a78bfa;
+    color:#fff;
+    box-shadow:0 6px 22px -4px rgba(167,139,250,.7);
+  }
+  .rail-btn.perm-needed::after{
+    content:"";
+    position:absolute;
+    top:1px; right:1px;
+    width:9px; height:9px;
+    border-radius:50%;
+    background:var(--flash);
+    box-shadow:0 0 0 2px #0b0f14;
+    animation:badgePulse 1.8s ease-in-out infinite;
+  }
+
+  /* ============ Bottom bar (Snapchat) ============ */
+  .bottom{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    z-index:7;
+    padding:12px 0 20px;
+    display:flex; flex-direction:column; gap:14px;
+    background:linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,.42) 55%, transparent);
+    pointer-events:none;
+  }
+  .bottom > *{ pointer-events:auto; }
+
+  /* Filter carousel */
+  .filters{
+    display:flex; gap:10px;
+    padding:4px 16px;
+    overflow-x:auto; overflow-y:hidden;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+    scroll-snap-type: x proximity;
+  }
+  .filters::-webkit-scrollbar{ display:none; }
+
+  .f-chip{
+    flex:0 0 auto;
+    display:inline-flex; align-items:center; gap:8px;
+    height:42px; padding:0 16px;
+    font:inherit; font-size:13px; font-weight:650;
+    color:#fff;
+    background:rgba(15,20,26,.6);
+    border:1px solid rgba(255,255,255,.16);
+    border-radius:999px;
+    cursor:pointer;
+    white-space:nowrap;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition:background .15s ease, border-color .15s ease, transform .1s ease, box-shadow .15s ease;
+    scroll-snap-align:center;
+  }
+  .f-chip .emoji{ font-size:16px; line-height:1; }
+  .f-chip:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.3); }
+  .f-chip:active{ transform:scale(.95); }
+  .f-chip.on{
+    background:var(--snap);
+    border-color:var(--snap);
+    color:#111;
+    box-shadow:0 8px 26px -6px rgba(255,252,0,.7);
+  }
+
+  /* Center controls */
+  .center-row{
+    display:flex; align-items:center; justify-content:center;
+    gap:22px;
+    padding:0 16px;
+    position:relative;
+  }
+
+  /* Left: source picker */
+  .source-picker{
+    position:relative;
+    display:flex; align-items:center;
+  }
+  .source-btn{
+    width:46px; height:46px;
+    border-radius:50%;
+    border:1.5px solid rgba(255,255,255,.2);
+    background:rgba(15,20,26,.55);
+    color:#fff;
+    font-size:18px;
+    display:grid; place-items:center;
+    cursor:pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition:background .15s ease, transform .1s ease, border-color .15s ease;
+  }
+  .source-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.35); }
+  .source-btn:active{ transform:scale(.9); }
+  .source-btn.stage{ background:#8b5cf6; border-color:#8b5cf6; }
+  .source-btn.screen{ background:#14b8a6; border-color:#14b8a6; }
+  .source-btn.recording{ background:var(--pause); border-color:var(--pause); font-size:16px; }
+  .source-btn.recording.is-paused{ background:#22c55e; border-color:#22c55e; animation:resumePulse 1.6s ease-in-out infinite; }
+  @keyframes resumePulse{
+    0%,100%{ box-shadow:0 0 0 0 rgba(34,197,94,.5); }
+    50%    { box-shadow:0 0 0 10px rgba(34,197,94,0); }
+  }
+
+  /* Center: big yellow shutter (Snapchat) */
+  .shutter{
+    width:84px; height:84px;
+    border-radius:50%;
+    border:4px solid #fff;
+    background:transparent;
+    display:grid; place-items:center;
+    cursor:pointer; padding:0;
+    position:relative;
+    transition:transform .1s ease, border-color .15s ease;
+    box-shadow:
+      0 0 0 4px var(--snap),
+      0 12px 40px -8px rgba(255,252,0,.6);
+  }
+  .shutter::before{
+    content:"";
+    width:62px; height:62px; border-radius:50%;
+    background:#fff;
+    transition:background .15s ease, transform .15s ease;
+  }
+  .shutter:hover::before{ background:#fffbe0; }
+  .shutter:active{ transform:scale(.92); }
+  .shutter:active::before{ transform:scale(.86); }
+  .shutter:disabled{ opacity:.4; cursor:not-allowed; }
+
+  /* Right: gallery / last snap */
+  .gallery-btn{
+    width:46px; height:46px;
+    border-radius:12px;
+    border:1.5px solid rgba(255,255,255,.2);
+    background:rgba(15,20,26,.55);
+    color:#fff;
+    display:grid; place-items:center;
+    cursor:pointer;
+    overflow:hidden;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition:background .15s ease, transform .1s ease, border-color .15s ease;
+    position:relative;
+    font-size:18px;
+  }
+  .gallery-btn:hover{ background:rgba(38,47,58,.9); border-color:rgba(255,255,255,.35); }
+  .gallery-btn:active{ transform:scale(.9); }
+  .gallery-btn img{
+    width:100%; height:100%;
+    object-fit:cover; display:block;
+  }
+  .gallery-btn .placeholder-icon{
+    display:grid; place-items:center;
+    width:100%; height:100%;
+    font-size:18px;
+    color:rgba(255,255,255,.75);
+  }
+
+  /* ============ Camera off / error state ============ */
+  .cam-state{
+    position:absolute; inset:0;
+    z-index:9;
+    display:none;
+    place-items:center; text-align:center;
+    padding:26px;
+    background:
+      radial-gradient(circle at 50% 40%, #1a2030 0%, #05070a 70%);
+  }
+  .cam-state.show{ display:grid; }
+  .cam-state .cs-icon{
+    font-size:52px;
+    margin-bottom:16px;
+    opacity:.85;
+    animation:float 3.5s ease-in-out infinite;
+  }
+  .cam-state h2{
+    margin:0 0 8px;
+    font-size:18px; font-weight:750;
+    letter-spacing:-.01em;
+  }
+  .cam-state p{
+    margin:0 0 20px;
+    font-size:13px; color:var(--muted);
+    line-height:1.6; max-width:340px;
+    margin-left:auto; margin-right:auto;
+  }
+  .cam-state .cs-err{ color:#fca5a5; }
+  .cam-state .cs-actions{
+    display:flex; gap:10px; justify-content:center; flex-wrap:wrap;
+  }
+
+  /* ============ Preview modal (snap preview) ============ */
+  .preview{
+    position:fixed; inset:0;
+    z-index:400;
+    display:none;
+    background:#000;
+    flex-direction:column;
+    animation:fadeIn .2s ease;
+  }
+  .preview.show{ display:flex; }
+
+  .preview-media{
+    flex:1 1 auto;
+    position:relative;
+    display:grid; place-items:center;
+    overflow:hidden;
+    background:#000;
+  }
+  .preview-media img,
+  .preview-media video{
+    max-width:100%; max-height:100%;
+    object-fit:contain;
     display:block;
   }
-  .note-editor p{ margin:0 0 .85em; }
-  .note-editor h1{
-    font-size:2em; font-weight:800; letter-spacing:-.025em;
-    line-height:1.2; margin:1.1em 0 .45em;
+  .preview-close{
+    position:absolute;
+    top:14px; left:14px;
+    width:38px; height:38px;
+    border-radius:50%;
+    background:rgba(15,20,26,.75);
+    border:1px solid rgba(255,255,255,.16);
+    color:#fff;
+    display:grid; place-items:center;
+    cursor:pointer;
+    font-size:16px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index:2;
   }
-  .note-editor h1:first-child{ margin-top:0; }
-  .note-editor h2{
-    font-size:1.5em; font-weight:750; letter-spacing:-.015em;
-    line-height:1.3; margin:1em 0 .4em;
-  }
-  .note-editor h3{
-    font-size:1.18em; font-weight:700;
-    line-height:1.35; margin:.9em 0 .35em;
-  }
-  .note-editor h1:first-child,
-  .note-editor h2:first-child,
-  .note-editor h3:first-child{ margin-top:0; }
+  .preview-close:hover{ background:rgba(38,47,58,.95); }
 
-  .note-editor b, .note-editor strong{ font-weight:800; }
-  .note-editor i, .note-editor em{ font-style:italic; }
-  .note-editor u{
-    text-decoration:underline;
-    text-decoration-color: var(--accent);
-    text-underline-offset:3px;
+  .preview-meta{
+    position:absolute;
+    top:16px; left:50%;
+    transform:translateX(-50%);
+    display:flex; gap:6px;
+    z-index:2;
   }
-  .note-editor ul, .note-editor ol{ margin:0 0 .9em; padding-left:1.6em; }
-  .note-editor li{ margin:.2em 0; }
-  .note-editor ul li::marker{ color:var(--accent); }
-  .note-editor ol li::marker{ color:var(--accent); font-weight:600; }
-  .note-editor a{ color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
-  .note-editor blockquote{
-    margin:.8em 0; padding:.5em 0 .5em 1em;
-    border-left:3px solid var(--accent);
-    color:#b9c2cd; font-style:italic;
-  }
-  .note-editor code{
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size:.92em; background:#1a2029;
-    padding:.15em .45em; border-radius:5px;
-  }
-  .note-editor hr{
-    border:0; height:1px;
-    background:linear-gradient(90deg, transparent, #2a3038, transparent);
-    margin:1.4em 0;
-  }
-  .note-editor ::selection{ background:rgba(79,142,247,.35); color:#fff; }
-  .note-editor font[size="1"]{ font-size:11px; }
-  .note-editor font[size="2"]{ font-size:13px; }
-  .note-editor font[size="3"]{ font-size:15px; }
-  .note-editor font[size="4"]{ font-size:17px; }
-  .note-editor font[size="5"]{ font-size:20px; }
-  .note-editor font[size="6"]{ font-size:24px; }
-  .note-editor font[size="7"]{ font-size:28px; }
-
-  /* ============ Preview modal ============ */
-  .modal{
-    position:fixed; inset:0;
-    display:none; place-items:center; padding:20px;
-    background:rgba(3,6,10,.78);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    z-index:200;
-  }
-  .modal.show{ display:grid; }
-  .modal-card{
-    width:min(640px,100%);
-    max-height:90vh;
-    display:flex; flex-direction:column;
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:14px;
-    overflow:hidden;
-    box-shadow:0 30px 70px -20px rgba(0,0,0,.95);
-    animation:pop .22s cubic-bezier(.2,.9,.3,1.2);
-  }
-  @keyframes pop{ from{transform:scale(.94);opacity:0} to{transform:scale(1);opacity:1} }
-  .modal-head{
-    display:flex; align-items:center; gap:10px;
-    padding:12px 14px;
-    border-bottom:1px solid var(--border);
-    font-size:13.5px; font-weight:600;
-  }
-  .modal-head .spacer{ flex:1; }
-  .modal-img{
-    width:100%; max-height:62vh;
-    object-fit:contain; background:#000; display:block;
-  }
-  .modal-video{
-    width:100%; max-height:62vh;
-    background:#000; display:block;
-  }
-  .modal-meta{
-    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
-    padding:10px 14px;
-    font-size:12px; color:var(--muted);
-    border-top:1px solid var(--border);
-    background:#0d1218;
-  }
-  .modal-meta .tag{
+  .preview-meta .tag{
     display:inline-flex; align-items:center; gap:5px;
-    padding:3px 9px;
-    background:#1a2029;
-    border:1px solid var(--border);
+    padding:5px 11px;
+    font-size:11px; font-weight:600;
+    color:#fff;
+    background:rgba(15,20,26,.75);
+    border:1px solid rgba(255,255,255,.14);
     border-radius:999px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
-  .modal-meta .tag.stage{ background:#1e1338; border-color:#4c2f7c; color:#c4b5fd; }
-  .modal-meta .tag.screen{ background:#0c2e2c; border-color:#175e58; color:#5eead4; }
-  .modal-actions{
-    display:flex; gap:8px; justify-content:flex-end;
-    padding:12px 14px;
-    border-top:1px solid var(--border);
-    background:var(--panel-2);
+
+  .preview-actions{
+    flex:0 0 auto;
+    display:flex; gap:12px; align-items:center; justify-content:center;
+    padding:20px;
+    background:linear-gradient(to top, #000, rgba(0,0,0,.7));
   }
+  .p-action{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    color:#fff;
+    font:inherit; font-size:11.5px; font-weight:600;
+    background:transparent;
+    border:0;
+    cursor:pointer;
+    padding:6px 10px;
+    border-radius:10px;
+    transition:background .15s ease;
+  }
+  .p-action:hover{ background:rgba(255,255,255,.08); }
+  .p-action .ic{
+    width:48px; height:48px;
+    border-radius:50%;
+    display:grid; place-items:center;
+    font-size:20px;
+    background:rgba(20,26,34,.8);
+    border:1px solid rgba(255,255,255,.14);
+    transition:transform .1s ease, background .15s ease, border-color .15s ease;
+  }
+  .p-action:hover .ic{ background:rgba(38,47,58,.95); border-color:rgba(255,255,255,.3); }
+  .p-action:active .ic{ transform:scale(.92); }
+  .p-action.primary .ic{
+    background:var(--snap);
+    border-color:var(--snap);
+    color:#111;
+    box-shadow:0 8px 26px -6px rgba(255,252,0,.6);
+  }
+  .p-action.primary:hover .ic{ background:#ffd60a; }
+  .p-action.danger .ic{
+    background:rgba(239,68,68,.2);
+    border-color:rgba(239,68,68,.5);
+    color:#fca5a5;
+  }
+  .p-action.danger:hover .ic{ background:rgba(239,68,68,.35); }
+
+  /* ============ Toast ============ */
+  .toast{
+    position:fixed;
+    left:50%; bottom:100px;
+    transform:translateX(-50%) translateY(20px);
+    z-index:500;
+    display:inline-flex; align-items:center; gap:9px;
+    padding:10px 18px;
+    font-size:13px; font-weight:600;
+    color:#fff;
+    background:rgba(15,20,26,.92);
+    border:1px solid rgba(255,255,255,.16);
+    border-radius:999px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    max-width:90vw;
+    text-align:center;
+  }
+  .toast.show{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+  }
+  .toast .t-ic{ font-size:15px; }
 
   /* ============ Responsive ============ */
-  @media (max-width:720px){
-    .btn .label{ display:none; }
-    .btn{ padding:7px 10px; }
-    .brand span{ display:none; }
-    .topbar{ padding:0 10px; gap:6px; }
-    .stage{ padding:6px; }
-    .pane-bar{ gap:6px; padding:6px; }
-    .seg-btn{ padding:5px 8px; }
-    .select{ max-width:110px; }
-    .cam-btn{ padding:0 10px; font-size:12px; height:36px; min-width:36px; }
-    .chip{ height:34px; padding:0 12px; font-size:12px; }
-    .shutter, .rec-btn{ width:58px; height:58px; }
-    .shutter::before, .rec-btn::before{ width:42px; height:42px; }
-    .rec-btn.live::before{ width:24px; height:24px; border-radius:6px; }
-    .src-btn{ width:44px; height:44px; font-size:17px; }
-    .cam-bottom{ gap:12px; }
-    .note-editor{ padding:18px 18px 40px; font-size:14.5px; }
-    .tb-select{ max-width:90px; font-size:12px; }
-    .tb-btn{ min-width:28px; height:28px; padding:0 6px; font-size:12.5px; }
-    .color-swatch{ width:26px; }
-    .swatches{ display:none; }
+  @media (max-width:520px){
+    .shutter{ width:74px; height:74px; }
+    .shutter::before{ width:54px; height:54px; }
+    .rail-btn{ width:42px; height:42px; font-size:16px; }
+    .f-chip{ height:38px; padding:0 13px; font-size:12px; }
+    .f-chip .emoji{ font-size:14px; }
+    .rail{ right:10px; gap:12px; }
+    .bottom{ padding:10px 0 16px; gap:12px; }
+    .center-row{ gap:16px; }
+    .gate-card{ padding:22px 18px; }
+    .gate h1{ font-size:20px; }
   }
 </style>
 </head>
 <body>
 
-  <header class="topbar">
-    <div class="brand">
-      <div class="mark"></div><span>Camera Split · PiP + Colors</span>
-    </div>
-    <div class="spacer"></div>
-    <button class="btn" data-act="layout" title="Toggle layout">
-      <span class="glyph">▣</span><span class="label">YouTube + PiP</span>
-    </button>
-    <button class="btn" data-act="swap" title="Swap / flip camera position">
-      <span class="glyph">⇄</span><span class="label">Swap</span>
-    </button>
-    <button class="btn" data-act="snapshot" title="Take snapshot">
-      <span class="glyph">◉</span><span class="label">Snapshot</span>
-    </button>
-    <button class="btn rec" data-act="record" id="recTopBtn" title="Start / stop recording">
-      <span class="glyph">●</span><span class="label">Record</span>
-    </button>
-    <button class="btn" data-act="reset" title="Reset">
-      <span class="glyph">↺</span><span class="label">Reset</span>
-    </button>
-  </header>
+  <!-- ============================================================
+       PERMISSION GATE
+  ============================================================ -->
+  <div class="gate" id="gate">
+    <div class="gate-card">
+      <div class="gate-mark">👻</div>
+      <h1>Snapchat Camera</h1>
+      <p class="lead">
+        To use the camera we need your permission. Nothing is recorded or uploaded — everything stays on your device.
+      </p>
 
-  <main class="stage" id="stage" data-layout="pip">
-    <div class="stage-inner" id="stageInner">
-
-      <!-- ===================== CAMERA PANE ===================== -->
-      <section class="pane" id="camPane">
-        <div class="pane-bar" id="camBar">
-          <div class="pane-title">
-            <span class="rec-dot" id="recDot"></span>
-            <span class="label-text">Camera</span>
-          </div>
-          <select class="select" id="camSelect" title="Select camera"></select>
-          <div class="spacer"></div>
-
-          <button class="icon pip-only" id="pipSize" title="Camera size (small / medium / large)">⤢</button>
-          <button class="icon pip-only" id="pipCorner" title="Move to next corner">◱</button>
-
-          <button class="icon" id="micToggle" title="Microphone for recording">🎤</button>
-          <button class="icon" id="camToggle" title="Start / stop camera">⏻</button>
+      <div class="perm-row" id="rowCam">
+        <div class="perm-icon">📷</div>
+        <div class="perm-text">
+          <div class="t">Camera</div>
+          <div class="d">Live preview, snapshots, filters, beauty, and video recording.</div>
         </div>
-
-        <div class="pane-body" id="camBody">
-          <div class="cam-wrap" id="camWrap">
-            <video class="cam-video" id="video" playsinline autoplay muted></video>
-            <canvas class="cam-canvas" id="fxCanvas"></canvas>
-            <div class="screen-flash" id="screenFlash"></div>
-          </div>
-
-          <div class="rec-timer" id="recTimer">
-            <span class="blink"></span>
-            <span id="recTime">00:00</span>
-            <span class="src-flag" id="recSrcFlag"></span>
-            <span class="mic-flag" id="recMicFlag"></span>
-            <span class="paused-tag" id="recPausedTag" style="display:none">PAUSED</span>
-          </div>
-
-          <div class="fx-status" id="fxStatus"></div>
-
-          <div class="cam-overlay">
-            <div class="cam-top">
-              <div class="cam-top-group">
-                <button class="cam-btn" id="btnBeauty" title="Beauty filter">✨</button>
-                <button class="cam-btn flash" id="btnFlash" title="Flash">⚡</button>
-              </div>
-              <div class="cam-top-group">
-                <button class="cam-btn" id="btnMirror" title="Mirror preview">⇋</button>
-                <button class="cam-btn" id="btnFlip" title="Switch camera">🔄</button>
-                <button class="cam-btn" id="btnFull" title="Fullscreen preview">⛶</button>
-              </div>
-            </div>
-
-            <div class="cam-bottom-group">
-              <div class="filter-strip" id="filterStrip"></div>
-              <div class="cam-bottom">
-                <button class="src-btn" id="btnSrc" title="Recording source">📷</button>
-                <button class="shutter" id="btnSnap" title="Take snapshot"></button>
-                <button class="rec-btn" id="btnRec" title="Start / stop recording"></button>
-              </div>
-            </div>
-          </div>
-
-          <div class="cam-state" id="camState">
-            <div>
-              <div class="cs-icon" id="csIcon">🎥</div>
-              <p id="csText">Camera is off.</p>
-              <button class="btn primary" id="csBtn">Start camera</button>
-            </div>
-          </div>
-
-          <div class="flash" id="flash"></div>
-        </div>
-      </section>
-
-      <!-- ===================== CONTENT PANE ===================== -->
-      <section class="pane mode-web" id="contentPane">
-        <div class="pane-bar">
-          <div class="seg">
-            <button type="button" class="seg-btn" data-mode="web">Web</button>
-            <button type="button" class="seg-btn" data-mode="note">Note</button>
-          </div>
-
-          <form class="urlbar" id="urlForm" autocomplete="off">
-            <input class="url-input" id="urlInput" type="text" list="url-presets"
-                   placeholder="Enter a URL…" spellcheck="false">
-            <button class="btn go" type="submit">Go</button>
-          </form>
-
-          <div class="note-toolbar" id="noteToolbar">
-            <button type="button" class="tb-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
-            <button type="button" class="tb-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
-            <button type="button" class="tb-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
-
-            <span class="tb-div"></span>
-
-            <button type="button" class="tb-btn" data-block="h1" title="Heading 1">H1</button>
-            <button type="button" class="tb-btn" data-block="h2" title="Heading 2">H2</button>
-            <button type="button" class="tb-btn" data-block="h3" title="Heading 3">H3</button>
-            <button type="button" class="tb-btn" data-block="p" title="Normal paragraph">¶</button>
-
-            <span class="tb-div"></span>
-
-            <select class="tb-select" id="fontFamily" title="Font family">
-              <option value="'Inter', ui-sans-serif, system-ui, sans-serif">Inter</option>
-              <option value="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">System</option>
-              <option value="Georgia, 'Times New Roman', serif">Serif</option>
-              <option value="'Times New Roman', Times, serif">Times</option>
-              <option value="'Courier New', ui-monospace, Menlo, monospace">Mono</option>
-              <option value="'Comic Sans MS', 'Chalkboard SE', cursive">Playful</option>
-              <option value="'Brush Script MT', 'Segoe Script', cursive">Script</option>
-            </select>
-
-            <select class="tb-select" id="fontSize" title="Font size">
-              <option value="1">Tiny</option>
-              <option value="2">Small</option>
-              <option value="3" selected>Normal</option>
-              <option value="4">Medium</option>
-              <option value="5">Large</option>
-              <option value="6">Huge</option>
-              <option value="7">Giant</option>
-            </select>
-
-            <span class="tb-div"></span>
-
-            <!-- Text color -->
-            <div class="color-group" title="Text color (select text first)">
-              <span class="color-icon txt">A</span>
-              <label class="color-swatch" id="txtSwatch" style="--sw:#e8eef5">
-                <input type="color" id="txtColor" value="#e8eef5" aria-label="Text color">
-              </label>
-              <button type="button" class="color-clear" id="txtClear" title="Clear text color">✕</button>
-            </div>
-
-            <!-- Frame color (border of the note) -->
-            <div class="color-group" title="Frame color around the note">
-              <span class="color-icon frame">▢</span>
-              <label class="color-swatch" id="frameSwatch" style="--sw:#4f8ef7">
-                <input type="color" id="frameColor" value="#4f8ef7" aria-label="Frame color">
-              </label>
-              <button type="button" class="color-clear" id="frameClear" title="Remove frame">✕</button>
-            </div>
-
-            <span class="tb-div"></span>
-
-            <button type="button" class="tb-btn" data-cmd="insertUnorderedList" title="Bullet list">•&nbsp;≡</button>
-            <button type="button" class="tb-btn" data-cmd="insertOrderedList" title="Numbered list">1.&nbsp;≡</button>
-
-            <span class="tb-div"></span>
-
-            <button type="button" class="tb-btn hl" data-hilite="rgba(251,191,36,.55)" title="Yellow highlight">▮</button>
-            <button type="button" class="tb-btn hl" data-hilite="rgba(52,211,153,.45)" title="Green highlight">▮</button>
-            <button type="button" class="tb-btn hl" data-hilite="rgba(244,114,182,.45)" title="Pink highlight">▮</button>
-
-            <span class="tb-div"></span>
-
-            <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear formatting">✕</button>
-          </div>
-
-          <div class="pane-actions">
-            <button type="button" class="icon" data-act="reload" title="Reload">⟳</button>
-            <button type="button" class="icon" data-act="open" title="Open in new tab">↗</button>
-          </div>
-        </div>
-
-        <div class="pane-body" id="contentBody">
-          <iframe class="frame" id="frame" title="Web content" referrerpolicy="no-referrer"></iframe>
-
-          <div class="note-wrap" id="noteWrap">
-            <div class="note-editor" id="noteEditor" contenteditable="true" spellcheck="true"
-                 data-placeholder="Write your notes here… select text and hit B, H1, or pick a color."></div>
-          </div>
-
-          <div class="placeholder">
-            <div>
-              <div class="ph-icon">🌐</div>
-              <p>Enter a URL above to load a page here.</p>
-              <p class="ph-sub">Some sites (Google, YouTube, X, banking…) block being embedded in a frame.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-    </div>
-  </main>
-
-  <datalist id="url-presets">
-    <option value="https://en.wikipedia.org/wiki/Main_Page"></option>
-    <option value="https://example.com"></option>
-    <option value="https://www.openstreetmap.org"></option>
-    <option value="https://news.ycombinator.com"></option>
-    <option value="https://developer.mozilla.org"></option>
-  </datalist>
-
-  <!-- ===================== PREVIEW MODAL ===================== -->
-  <div class="modal" id="modal">
-    <div class="modal-card">
-      <div class="modal-head">
-        <span id="modalIcon">◉</span>
-        <span id="modalTitle">Snapshot</span>
-        <span class="spacer"></span>
-        <button class="icon" id="modalClose" title="Close">✕</button>
+        <div class="perm-status" id="stCam">Required</div>
       </div>
 
-      <img class="modal-img" id="modalImg" alt="Snapshot preview">
-      <video class="modal-video" id="modalVideo" controls playsinline style="display:none"></video>
-
-      <div class="modal-meta" id="modalMeta" style="display:none">
-        <span class="tag" id="metaSource">📷 Camera pane</span>
-        <span class="tag" id="metaDuration">⏱ 00:00</span>
-        <span class="tag" id="metaSize">📦 0 MB</span>
-        <span class="tag" id="metaType">🎬 WebM</span>
+      <div class="perm-row" id="rowMic">
+        <div class="perm-icon">🎤</div>
+        <div class="perm-text">
+          <div class="t">Microphone <span style="color:var(--muted);font-weight:500">(optional)</span></div>
+          <div class="d">Records audio alongside your videos. You can skip this.</div>
+        </div>
+        <div class="perm-status" id="stMic">Optional</div>
       </div>
 
-      <div class="modal-actions">
-        <button class="btn" id="modalDiscard">Discard</button>
-        <button class="btn primary" id="modalDownload">⬇ Download</button>
+      <div class="perm-row" id="rowScreen">
+        <div class="perm-icon">🖥️</div>
+        <div class="perm-text">
+          <div class="t">Screen recording <span style="color:var(--muted);font-weight:500">(optional)</span></div>
+          <div class="d">Only asked when you tap the screen-recorder button.</div>
+        </div>
+        <div class="perm-status" id="stScreen">On demand</div>
       </div>
+
+      <div class="gate-actions">
+        <button class="btn snap" id="gateAllow" type="button">
+          <span>✓</span> Allow camera &amp; mic
+        </button>
+        <button class="btn" id="gateCamOnly" type="button">
+          📷 Camera only
+        </button>
+      </div>
+
+      <span class="skip" id="gateSkip">Skip — just explore the app</span>
     </div>
+  </div>
+
+  <!-- ============================================================
+       APP
+  ============================================================ -->
+  <div class="app" id="app" aria-hidden="true">
+
+    <!-- ===== Top bar ===== -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">👻</div>
+        <span>Camera</span>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="rec-pill" id="recPill">
+        <span class="blink"></span>
+        <span id="recTime">00:00</span>
+        <span class="mic" id="recMicFlag"></span>
+      </div>
+
+      <button class="tb-btn" id="btnLayout" title="Change layout">▣</button>
+      <button class="tb-btn" id="btnSettings" title="Settings">⚙</button>
+    </header>
+
+    <!-- ===== Fullscreen camera stage ===== -->
+    <main class="stage" id="stage">
+      <div class="camera-layer" id="camLayer">
+        <video class="cam-video mirror" id="video" playsinline autoplay muted></video>
+        <canvas class="cam-canvas" id="fxCanvas"></canvas>
+        <div class="screen-flash" id="screenFlash"></div>
+        <div class="snap-flash" id="snapFlash"></div>
+      </div>
+
+      <!-- ===== Right rail (Snapchat action column) ===== -->
+      <div class="rail" id="rail">
+        <button class="rail-btn beauty" id="btnBeauty" title="Beauty filter">✨</button>
+        <button class="rail-btn flash" id="btnFlash" title="Flash">⚡</button>
+        <button class="rail-btn mirror on" id="btnMirror" title="Mirror camera">⇋</button>
+        <button class="rail-btn" id="btnFlip" title="Flip camera">🔄</button>
+      </div>
+
+      <!-- ===== Bottom bar ===== -->
+      <div class="bottom">
+        <div class="filters" id="filters"></div>
+
+        <div class="center-row">
+          <div class="source-picker">
+            <button class="source-btn" id="btnSource" title="Recording source">📷</button>
+          </div>
+
+          <button class="shutter" id="btnShutter" title="Take a snap"></button>
+
+          <button class="gallery-btn" id="btnGallery" title="Last snap">
+            <span class="placeholder-icon">🖼️</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== Camera off / error state ===== -->
+      <div class="cam-state" id="camState">
+        <div>
+          <div class="cs-icon" id="csIcon">📷</div>
+          <h2 id="csTitle">Camera is off</h2>
+          <p id="csText">Grant camera permission to start your camera.</p>
+          <div class="cs-actions">
+            <button class="btn snap" id="csAllow" type="button">Allow camera</button>
+            <button class="btn" id="csRetry" type="button">Try again</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============================================================
+       PREVIEW MODAL (snap preview)
+  ============================================================ -->
+  <div class="preview" id="preview">
+    <div class="preview-media">
+      <button class="preview-close" id="previewClose" title="Close">✕</button>
+      <div class="preview-meta" id="previewMeta"></div>
+      <img id="previewImg" alt="Snap preview" style="display:none">
+      <video id="previewVideo" playsinline controls style="display:none"></video>
+    </div>
+    <div class="preview-actions">
+      <button class="p-action danger" id="pDiscard">
+        <span class="ic">🗑️</span>
+        <span>Delete</span>
+      </button>
+      <button class="p-action" id="pSave">
+        <span class="ic">💾</span>
+        <span>Save</span>
+      </button>
+      <button class="p-action primary" id="pShare">
+        <span class="ic">➤</span>
+        <span>Download</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       TOAST
+  ============================================================ -->
+  <div class="toast" id="toast">
+    <span class="t-ic">✓</span>
+    <span id="toastText">Done</span>
   </div>
 
 <script>
 (() => {
   "use strict";
 
+  const KEY = "snapchat-camera-v1";
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-  const KEY = "camera-split-fx-v8";
 
   /* ============================================================
      Filters
@@ -1356,8 +923,8 @@
   const BEAUTY_LABELS = ["✨", "✨¹", "✨²"];
   const BEAUTY_TITLES = [
     "Beauty: off",
-    "Beauty: soft (skin smoothing)",
-    "Beauty: smooth (extra glow + eye light)"
+    "Beauty: soft",
+    "Beauty: smooth"
   ];
   const BEAUTY_GRADE = [
     "none",
@@ -1367,36 +934,17 @@
 
   const SRC_ORDER = ["cam", "stage", "screen"];
   const SRC_META = {
-    cam:    { icon: "📷", label: "CAM" },
-    stage:  { icon: "🖥️", label: "STAGE" },
-    screen: { icon: "🌐", label: "SCREEN" }
+    cam:    { icon: "📷", label: "Camera" },
+    stage:  { icon: "🖥️", label: "Stage" },
+    screen: { icon: "🌐", label: "Screen" }
   };
-
-  const LAYOUT_ORDER = ["pip", "vertical", "horizontal"];
-  const LAYOUT_META = {
-    pip:        { glyph: "▣", label: "YouTube + PiP" },
-    vertical:   { glyph: "▥", label: "Side by side" },
-    horizontal: { glyph: "▤", label: "Stacked" }
-  };
-
-  const PIP_SIZES = [0.18, 0.24, 0.32];
-  const PIP_ASPECT = 4 / 3;
 
   /* ============================================================
      State
   ============================================================ */
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
   function defaults() {
     return {
       layout: "pip",
-      ratio: 0.5,
-      camFirst: true,
       mirrored: true,
       deviceId: "",
       filter: "none",
@@ -1405,16 +953,12 @@
       mic: false,
       recFps: 30,
       recSource: "cam",
-      pip: {
-        x: 0.74,
-        y: 0.70,
-        size: 1
-      },
+      pip: { x: 0.74, y: 0.70, size: 1 },
       colors: {
-        noteText:    "#e8eef5",   // note body text color
-        noteFrame:   "",          // "" = no frame, else hex
-        stageFrame:  "",          // border around the 16:9 stage
-        camFrame:    ""           // ring around the camera PiP
+        noteText:  "#e8eef5",
+        noteFrame: "",
+        stageFrame: "",
+        camFrame: ""
       },
       content: {
         mode: "web",
@@ -1430,37 +974,10 @@
       const raw = localStorage.getItem(KEY);
       if (!raw) return d;
       const p = JSON.parse(raw);
-
-      let noteHtml = "";
-      if (p.content) {
-        if (typeof p.content.noteHtml === "string") noteHtml = p.content.noteHtml;
-        else if (typeof p.content.note === "string" && p.content.note) {
-          noteHtml = escapeHtml(p.content.note).replace(/\n/g, "<br>");
-        }
-      }
-
       const srcOk = SRC_ORDER.includes(p.recSource);
-      const layOk = LAYOUT_ORDER.includes(p.layout);
-
       const pipIn = p.pip && typeof p.pip === "object" ? p.pip : {};
-      const pip = {
-        x: Number.isFinite(+pipIn.x) ? clamp(+pipIn.x, 0, 1) : d.pip.x,
-        y: Number.isFinite(+pipIn.y) ? clamp(+pipIn.y, 0, 1) : d.pip.y,
-        size: [0,1,2].includes(+pipIn.size) ? +pipIn.size : d.pip.size
-      };
-
-      const colorsIn = p.colors && typeof p.colors === "object" ? p.colors : {};
-      const colors = {
-        noteText:   validHex(colorsIn.noteText,  d.colors.noteText),
-        noteFrame:  validHexOrEmpty(colorsIn.noteFrame),
-        stageFrame: validHexOrEmpty(colorsIn.stageFrame),
-        camFrame:   validHexOrEmpty(colorsIn.camFrame)
-      };
-
       return {
-        layout: layOk ? p.layout : d.layout,
-        ratio: Number.isFinite(+p.ratio) ? clamp(+p.ratio, 0.12, 0.88) : 0.5,
-        camFirst: p.camFirst !== false,
+        layout: "pip",
         mirrored: p.mirrored !== false,
         deviceId: typeof p.deviceId === "string" ? p.deviceId : "",
         filter: FILTERS.some(f => f.id === p.filter) ? p.filter : "none",
@@ -1469,22 +986,15 @@
         mic: p.mic === true,
         recFps: [24,30,60].includes(+p.recFps) ? +p.recFps : 30,
         recSource: srcOk ? p.recSource : "cam",
-        pip,
-        colors,
-        content: {
-          mode: p.content && p.content.mode === "note" ? "note" : "web",
-          url: p.content && typeof p.content.url === "string" ? p.content.url : d.content.url,
-          noteHtml
-        }
+        pip: {
+          x: Number.isFinite(+pipIn.x) ? clamp(+pipIn.x, 0, 1) : d.pip.x,
+          y: Number.isFinite(+pipIn.y) ? clamp(+pipIn.y, 0, 1) : d.pip.y,
+          size: [0,1,2].includes(+pipIn.size) ? +pipIn.size : d.pip.size
+        },
+        colors: { ...d.colors },
+        content: { mode: "web", url: d.content.url, noteHtml: "" }
       };
     } catch (e) { return d; }
-  }
-
-  function validHex(v, fallback) {
-    return (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : fallback;
-  }
-  function validHexOrEmpty(v) {
-    return (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : "";
   }
 
   let state = load();
@@ -1500,490 +1010,207 @@
   /* ============================================================
      DOM
   ============================================================ */
-  const stage       = document.getElementById("stage");
-  const stageInner  = document.getElementById("stageInner");
-  const camPane     = document.getElementById("camPane");
-  const camBar      = document.getElementById("camBar");
-  const contentPane = document.getElementById("contentPane");
-  const camWrap     = document.getElementById("camWrap");
+  const gate       = document.getElementById("gate");
+  const app        = document.getElementById("app");
+  const stage      = document.getElementById("stage");
+  const camLayer   = document.getElementById("camLayer");
 
-  const video       = document.getElementById("video");
-  const fxCanvas    = document.getElementById("fxCanvas");
-  const fxCtx       = fxCanvas.getContext("2d");
-  const screenFlash = document.getElementById("screenFlash");
+  const video      = document.getElementById("video");
+  const fxCanvas   = document.getElementById("fxCanvas");
+  const fxCtx      = fxCanvas.getContext("2d");
+  const screenFlash= document.getElementById("screenFlash");
+  const snapFlash  = document.getElementById("snapFlash");
 
-  const recDot      = document.getElementById("recDot");
-  const camSelect   = document.getElementById("camSelect");
-  const camToggle   = document.getElementById("camToggle");
-  const micToggle   = document.getElementById("micToggle");
-  const pipSizeBtn  = document.getElementById("pipSize");
-  const pipCornerBtn= document.getElementById("pipCorner");
-  const camState    = document.getElementById("camState");
-  const csIcon      = document.getElementById("csIcon");
-  const csText      = document.getElementById("csText");
-  const csBtn       = document.getElementById("csBtn");
-  const flash       = document.getElementById("flash");
-  const fxStatus    = document.getElementById("fxStatus");
-  const filterStrip = document.getElementById("filterStrip");
-  const recTimer    = document.getElementById("recTimer");
-  const recTime     = document.getElementById("recTime");
-  const recSrcFlag  = document.getElementById("recSrcFlag");
-  const recMicFlag  = document.getElementById("recMicFlag");
-  const recPausedTag= document.getElementById("recPausedTag");
+  const filtersEl  = document.getElementById("filters");
 
-  const btnBeauty   = document.getElementById("btnBeauty");
-  const btnFlash    = document.getElementById("btnFlash");
-  const btnMirror   = document.getElementById("btnMirror");
-  const btnFlip     = document.getElementById("btnFlip");
-  const btnSnap     = document.getElementById("btnSnap");
-  const btnRec      = document.getElementById("btnRec");
-  const btnSrc      = document.getElementById("btnSrc");
-  const btnFull     = document.getElementById("btnFull");
+  const btnBeauty  = document.getElementById("btnBeauty");
+  const btnFlash   = document.getElementById("btnFlash");
+  const btnMirror  = document.getElementById("btnMirror");
+  const btnFlip    = document.getElementById("btnFlip");
+  const btnShutter = document.getElementById("btnShutter");
+  const btnSource  = document.getElementById("btnSource");
+  const btnGallery = document.getElementById("btnGallery");
+  const btnLayout  = document.getElementById("btnLayout");
+  const btnSettings= document.getElementById("btnSettings");
 
-  const contentBody = document.getElementById("contentBody");
-  const frame       = document.getElementById("frame");
-  const urlForm     = document.getElementById("urlForm");
-  const urlInput    = document.getElementById("urlInput");
+  const recPill    = document.getElementById("recPill");
+  const recTimeEl  = document.getElementById("recTime");
+  const recMicFlag = document.getElementById("recMicFlag");
 
-  const noteEditor  = document.getElementById("noteEditor");
-  const noteWrap    = document.getElementById("noteWrap");
-  const noteToolbar = document.getElementById("noteToolbar");
-  const fontFamily  = document.getElementById("fontFamily");
-  const fontSize    = document.getElementById("fontSize");
+  const camState   = document.getElementById("camState");
+  const csIcon     = document.getElementById("csIcon");
+  const csTitle    = document.getElementById("csTitle");
+  const csText     = document.getElementById("csText");
+  const csAllow    = document.getElementById("csAllow");
+  const csRetry    = document.getElementById("csRetry");
 
-  const txtColor    = document.getElementById("txtColor");
-  const txtSwatch   = document.getElementById("txtSwatch");
-  const txtClear    = document.getElementById("txtClear");
+  const preview    = document.getElementById("preview");
+  const previewImg = document.getElementById("previewImg");
+  const previewVideo = document.getElementById("previewVideo");
+  const previewMeta = document.getElementById("previewMeta");
+  const previewClose = document.getElementById("previewClose");
+  const pDiscard   = document.getElementById("pDiscard");
+  const pSave      = document.getElementById("pSave");
+  const pShare     = document.getElementById("pShare");
 
-  const frameColor  = document.getElementById("frameColor");
-  const frameSwatch = document.getElementById("frameSwatch");
-  const frameClear  = document.getElementById("frameClear");
+  const toast      = document.getElementById("toast");
+  const toastText  = document.getElementById("toastText");
 
-  const modal       = document.getElementById("modal");
-  const modalImg    = document.getElementById("modalImg");
-  const modalVideo  = document.getElementById("modalVideo");
-  const modalMeta   = document.getElementById("modalMeta");
-  const modalIcon   = document.getElementById("modalIcon");
-  const modalTitle  = document.getElementById("modalTitle");
-  const metaSource  = document.getElementById("metaSource");
-  const metaDuration= document.getElementById("metaDuration");
-  const metaSize    = document.getElementById("metaSize");
-  const metaType    = document.getElementById("metaType");
-
-  const layoutBtn   = document.querySelector('[data-act="layout"]');
-  const swapBtn     = document.querySelector('[data-act="swap"]');
-  const snapTopBtn  = document.querySelector('[data-act="snapshot"]');
-  const recTopBtn   = document.getElementById("recTopBtn");
-  const resetBtn    = document.querySelector('[data-act="reset"]');
+  /* Permission gate elements */
+  const stCam      = document.getElementById("stCam");
+  const stMic      = document.getElementById("stMic");
+  const stScreen   = document.getElementById("stScreen");
+  const rowCam     = document.getElementById("rowCam");
+  const rowMic     = document.getElementById("rowMic");
+  const rowScreen  = document.getElementById("rowScreen");
+  const gateAllow  = document.getElementById("gateAllow");
+  const gateCamOnly= document.getElementById("gateCamOnly");
+  const gateSkip   = document.getElementById("gateSkip");
 
   /* ============================================================
-     Colors: apply to the DOM
+     Toast
   ============================================================ */
-  function applyColors() {
-    const c = state.colors;
-
-    // Note text color
-    if (c.noteText && /^#[0-9a-fA-F]{6}$/.test(c.noteText)) {
-      noteEditor.style.color = c.noteText;
-      noteEditor.style.setProperty("--note-text", c.noteText);
-    } else {
-      noteEditor.style.color = "";
-      noteEditor.style.removeProperty("--note-text");
-    }
-
-    // Note frame (ring around the note area)
-    if (c.noteFrame) {
-      noteWrap.classList.add("framed");
-      noteWrap.style.setProperty("--note-frame-color", c.noteFrame);
-      noteWrap.style.setProperty("--note-frame-w", "3px");
-    } else {
-      noteWrap.classList.remove("framed");
-      noteWrap.style.removeProperty("--note-frame-color");
-      noteWrap.style.removeProperty("--note-frame-w");
-    }
-
-    // Stage frame (ring around the 16:9 video)
-    if (c.stageFrame) {
-      stageInner.classList.add("framed");
-      stageInner.style.setProperty("--stage-frame-color", c.stageFrame);
-      stageInner.style.setProperty("--stage-frame-w", "6px");
-    } else {
-      stageInner.classList.remove("framed");
-      stageInner.style.removeProperty("--stage-frame-color");
-      stageInner.style.removeProperty("--stage-frame-w");
-    }
-
-    // Camera frame (ring around the PiP camera)
-    if (c.camFrame) {
-      camPane.classList.add("cam-framed");
-      camPane.style.setProperty("--cam-frame-color", c.camFrame);
-      camPane.style.setProperty("--cam-frame-w", "3px");
-    } else {
-      camPane.classList.remove("cam-framed");
-      camPane.style.removeProperty("--cam-frame-color");
-      camPane.style.removeProperty("--cam-frame-w");
-    }
-
-    // Reflect in the swatches
-    if (txtSwatch)   txtSwatch.style.setProperty("--sw", c.noteText || "#e8eef5");
-    if (frameSwatch) frameSwatch.style.setProperty("--sw", c.noteFrame || "#4f8ef7");
+  let toastTimer = null;
+  function showToast(msg, icon) {
+    toastText.textContent = msg;
+    toast.querySelector(".t-ic").textContent = icon || "✓";
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 2400);
   }
 
   /* ============================================================
-     Divider & layout
+     Permission status
   ============================================================ */
-  const divider = document.createElement("div");
-  divider.className = "divider";
-  divider.tabIndex = 0;
-  divider.setAttribute("role", "separator");
-  divider.setAttribute("aria-label", "Resize panes");
-  divider.title = "Drag to resize · double-click to reset";
+  const perms = {
+    camera: "unknown",   // "unknown" | "granted" | "denied" | "prompt"
+    mic:    "unknown"
+  };
 
-  function mountPanes() {
-    if (state.camFirst) {
-      stageInner.appendChild(camPane);
-      stageInner.appendChild(divider);
-      stageInner.appendChild(contentPane);
-    } else {
-      stageInner.appendChild(contentPane);
-      stageInner.appendChild(divider);
-      stageInner.appendChild(camPane);
-    }
+  async function refreshPermissionStatus() {
+    try {
+      if (!navigator.permissions || !navigator.permissions.query) return;
+      const cam = await navigator.permissions.query({ name: "camera" });
+      perms.camera = cam.state;
+      const mic = await navigator.permissions.query({ name: "microphone" });
+      perms.mic = mic.state;
+    } catch (e) { /* unsupported names in some browsers */ }
   }
 
-  function sizePipStage() {
-    if (state.layout !== "pip") {
-      stageInner.style.width = "";
-      stageInner.style.height = "";
-      return;
-    }
-    const cs = getComputedStyle(stage);
-    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    const availW = Math.max(1, stage.clientWidth - padX);
-    const availH = Math.max(1, stage.clientHeight - padY);
-    const ratio = 16 / 9;
+  function paintGate() {
+    const set = (rowEl, statusEl, state, requiredLabel, optionalLabel, grantedLabel) => {
+      rowEl.classList.remove("granted", "denied");
+      statusEl.classList.remove("granted", "denied", "pending");
 
-    let w, h;
-    if (availW / availH > ratio) {
-      h = availH;
-      w = h * ratio;
-    } else {
-      w = availW;
-      h = w / ratio;
-    }
-    stageInner.style.width  = Math.round(w) + "px";
-    stageInner.style.height = Math.round(h) + "px";
-  }
-
-  function applyLayout() {
-    stage.dataset.layout = state.layout;
-    stage.style.setProperty("--a", (state.ratio * 100).toFixed(3) + "%");
-
-    const vert = state.layout === "vertical";
-    divider.setAttribute("aria-orientation", vert ? "vertical" : "horizontal");
-
-    const meta = LAYOUT_META[state.layout] || LAYOUT_META.pip;
-    layoutBtn.querySelector(".glyph").textContent = meta.glyph;
-    layoutBtn.querySelector(".label").textContent = meta.label;
-    layoutBtn.title = "Switch layout (PiP / Side by side / Stacked)";
-
-    camPane.classList.toggle("pip-mode", state.layout === "pip");
-
-    sizePipStage();
-    if (state.layout === "pip") {
-      requestAnimationFrame(() => { applyPipPosition(false); });
-    } else {
-      camPane.style.width = "";
-      camPane.style.height = "";
-      camPane.style.left = "";
-      camPane.style.top = "";
-      camPane.style.right = "";
-      camPane.style.bottom = "";
-    }
-  }
-
-  let dragging = false;
-  function setRatio(r) {
-    state.ratio = clamp(r, 0.12, 0.88);
-    stage.style.setProperty("--a", (state.ratio * 100).toFixed(3) + "%");
-  }
-  function ratioFromPointer(e) {
-    const s = stage.getBoundingClientRect();
-    const d = divider.getBoundingClientRect();
-    if (state.layout === "vertical") {
-      const avail = s.width - d.width;
-      return (e.clientX - s.left - d.width / 2) / avail;
-    }
-    const avail = s.height - d.height;
-    return (e.clientY - s.top - d.height / 2) / avail;
-  }
-  divider.addEventListener("pointerdown", e => {
-    if (recorder.isRecording) return;
-    if (state.layout === "pip") return;
-    dragging = true;
-    divider.setPointerCapture(e.pointerId);
-    divider.classList.add("dragging");
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = state.layout === "vertical" ? "col-resize" : "row-resize";
-    e.preventDefault();
-  });
-  divider.addEventListener("pointermove", e => { if (dragging) setRatio(ratioFromPointer(e)); });
-  function endDrag() {
-    if (!dragging) return;
-    dragging = false;
-    divider.classList.remove("dragging");
-    document.body.style.userSelect = "";
-    document.body.style.cursor = "";
-    save();
-  }
-  divider.addEventListener("pointerup", endDrag);
-  divider.addEventListener("pointercancel", endDrag);
-  divider.addEventListener("dblclick", () => {
-    if (!recorder.isRecording && state.layout !== "pip") { setRatio(0.5); save(); }
-  });
-  divider.addEventListener("keydown", e => {
-    if (recorder.isRecording || state.layout === "pip") return;
-    const step = e.shiftKey ? 0.05 : 0.02;
-    const fwd  = state.layout === "vertical" ? "ArrowRight" : "ArrowDown";
-    const back = state.layout === "vertical" ? "ArrowLeft"  : "ArrowUp";
-    if (e.key === fwd)        { setRatio(state.ratio + step); e.preventDefault(); save(); }
-    else if (e.key === back)  { setRatio(state.ratio - step); e.preventDefault(); save(); }
-    else if (e.key === "Home"){ setRatio(0.5); e.preventDefault(); save(); }
-  });
-
-  /* ============================================================
-     PiP camera position & drag
-  ============================================================ */
-  function applyPipPosition(store) {
-    if (state.layout !== "pip") return;
-
-    const pip = state.pip;
-    const iw = stageInner.clientWidth;
-    const ih = stageInner.clientHeight;
-    if (iw < 10 || ih < 10) return;
-
-    const frac = PIP_SIZES[pip.size] || PIP_SIZES[1];
-    const cw = Math.round(iw * frac);
-    const ch = Math.round(cw / PIP_ASPECT);
-
-    camPane.style.width  = cw + "px";
-    camPane.style.height = ch + "px";
-
-    const maxX = Math.max(0, iw - cw);
-    const maxY = Math.max(0, ih - ch);
-
-    const px = clamp(Math.round(pip.x * iw), 0, maxX);
-    const py = clamp(Math.round(pip.y * ih), 0, maxY);
-
-    camPane.style.left   = px + "px";
-    camPane.style.top    = py + "px";
-    camPane.style.right  = "auto";
-    camPane.style.bottom = "auto";
-
-    if (store) {
-      state.pip.x = iw > 0 ? px / iw : pip.x;
-      state.pip.y = ih > 0 ? py / ih : pip.y;
-      save();
-    }
-  }
-
-  function cornerPixels(which) {
-    const iw = stageInner.clientWidth;
-    const ih = stageInner.clientHeight;
-    const cw = camPane.offsetWidth;
-    const ch = camPane.offsetHeight;
-    const maxX = Math.max(0, iw - cw);
-    const maxY = Math.max(0, ih - ch);
-
-    switch (which) {
-      case "tl": return { x: 0,    y: 0    };
-      case "tr": return { x: maxX, y: 0    };
-      case "bl": return { x: 0,    y: maxY };
-      case "br": return { x: maxX, y: maxY };
-      default:   return { x: maxX, y: maxY };
-    }
-  }
-
-  function nearestCorner(px, py) {
-    const iw = stageInner.clientWidth;
-    const ih = stageInner.clientHeight;
-    const cw = camPane.offsetWidth;
-    const ch = camPane.offsetHeight;
-    const maxX = Math.max(0, iw - cw);
-    const maxY = Math.max(0, ih - ch);
-
-    const corners = [
-      { id: "tl", x: 0,    y: 0    },
-      { id: "tr", x: maxX, y: 0    },
-      { id: "bl", x: 0,    y: maxY },
-      { id: "br", x: maxX, y: maxY }
-    ];
-
-    let best = null, bestD = Infinity;
-    for (const c of corners) {
-      const d = Math.hypot(c.x - px, c.y - py);
-      if (d < bestD) { bestD = d; best = c; }
-    }
-    return { corner: best, distance: bestD };
-  }
-
-  function startPipDrag(e) {
-    if (state.layout !== "pip") return;
-    if (e.button !== 0) return;
-
-    if (e.target.closest("button, select, input, textarea, a, .icon, .cam-btn, .chip, .shutter, .rec-btn, .src-btn, .select, label")) {
-      return;
-    }
-
-    const innerRect = stageInner.getBoundingClientRect();
-    const camRect = camPane.getBoundingClientRect();
-
-    const startLeft = camRect.left - innerRect.left;
-    const startTop  = camRect.top  - innerRect.top;
-    const startX = e.clientX;
-    const startY = e.clientY;
-
-    camPane.classList.add("dragging");
-    camPane.classList.remove("snapping");
-    e.preventDefault();
-
-    let lastLeft = startLeft;
-    let lastTop  = startTop;
-
-    const move = (ev) => {
-      let nx = startLeft + (ev.clientX - startX);
-      let ny = startTop  + (ev.clientY - startY);
-
-      const cw = camPane.offsetWidth;
-      const ch = camPane.offsetHeight;
-      const maxX = Math.max(0, innerRect.width - cw);
-      const maxY = Math.max(0, innerRect.height - ch);
-
-      nx = clamp(nx, 0, maxX);
-      ny = clamp(ny, 0, maxY);
-
-      lastLeft = nx;
-      lastTop  = ny;
-
-      camPane.style.left = Math.round(nx) + "px";
-      camPane.style.top  = Math.round(ny) + "px";
-      camPane.style.right = "auto";
-      camPane.style.bottom = "auto";
-    };
-
-    const end = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
-
-      camPane.classList.remove("dragging");
-      camPane.classList.add("snapping");
-
-      const iw = innerRect.width;
-      const ih = innerRect.height;
-      const thresh = Math.min(iw, ih) * 0.12;
-
-      const { corner, distance } = nearestCorner(lastLeft, lastTop);
-
-      let fx, fy;
-      if (distance < thresh) {
-        const cp = cornerPixels(corner.id);
-        fx = iw > 0 ? cp.x / iw : 0;
-        fy = ih > 0 ? cp.y / ih : 0;
+      if (state === "granted") {
+        rowEl.classList.add("granted");
+        statusEl.classList.add("granted");
+        statusEl.textContent = grantedLabel || "Granted";
+      } else if (state === "denied") {
+        rowEl.classList.add("denied");
+        statusEl.classList.add("denied");
+        statusEl.textContent = "Blocked";
+      } else if (state === "prompt" || state === "pending") {
+        statusEl.classList.add("pending");
+        statusEl.textContent = "Ready";
       } else {
-        fx = iw > 0 ? lastLeft / iw : 0;
-        fy = ih > 0 ? lastTop  / ih : 0;
+        statusEl.textContent = requiredLabel || optionalLabel || "Ask";
       }
-
-      state.pip.x = clamp(fx, 0, 1);
-      state.pip.y = clamp(fy, 0, 1);
-      save();
-
-      applyPipPosition(true);
-      setTimeout(() => camPane.classList.remove("snapping"), 260);
     };
 
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
+    set(rowCam,    stCam,    perms.camera, "Required", "Optional", "Granted");
+    set(rowMic,    stMic,    perms.mic,    "Optional", "Optional", "Granted");
+    set(rowScreen, stScreen, "on-demand",  "On demand","On demand","On demand");
   }
 
-  camBar.addEventListener("pointerdown", (e) => {
-    if (state.layout !== "pip") return;
-    startPipDrag(e);
+  /* ============================================================
+     PERMISSION GATE flow
+  ============================================================ */
+  function hideGate() {
+    gate.classList.add("hide");
+    app.classList.add("ready");
+    app.setAttribute("aria-hidden", "false");
+  }
+
+  async function requestPermissions(wantMic) {
+    hideGate();
+    await startCamera(state.deviceId || "", wantMic ? { prewarm: true } : undefined);
+  }
+
+  gateAllow.addEventListener("click", async () => {
+    gateAllow.disabled = true;
+    gateCamOnly.disabled = true;
+    gateAllow.innerHTML = '<span>⏳</span> Requesting…';
+    try {
+      // Combined request — camera + mic in one prompt
+      await startCamera(state.deviceId || "", { requestMic: true });
+    } finally {
+      gateAllow.disabled = false;
+      gateCamOnly.disabled = false;
+      gateAllow.innerHTML = '<span>✓</span> Allow camera & mic';
+    }
   });
-  camPane.querySelector(".pane-body").addEventListener("pointerdown", (e) => {
-    if (state.layout !== "pip") return;
-    if (e.target.closest("button, select, input, textarea, a, .cam-btn, .chip, .shutter, .rec-btn, .src-btn, label")) return;
-    startPipDrag(e);
+
+  gateCamOnly.addEventListener("click", async () => {
+    gateAllow.disabled = true;
+    gateCamOnly.disabled = true;
+    gateCamOnly.innerHTML = '⏳ Requesting…';
+    try {
+      await startCamera(state.deviceId || "", { requestMic: false });
+    } finally {
+      gateAllow.disabled = false;
+      gateCamOnly.disabled = false;
+      gateCamOnly.innerHTML = '📷 Camera only';
+    }
   });
 
-  function cyclePipSize() {
-    state.pip.size = (state.pip.size + 1) % PIP_SIZES.length;
-    save();
-    camPane.classList.add("snapping");
-    applyPipPosition(true);
-    setTimeout(() => camPane.classList.remove("snapping"), 260);
-    const names = ["Small", "Medium", "Large"];
-    pipSizeBtn.title = "Camera size: " + names[state.pip.size];
+  gateSkip.addEventListener("click", () => {
+    hideGate();
+    showCameraOffState("📷", "Camera off", "Tap the yellow button below to grant camera access.");
+  });
+
+  /* ============================================================
+     Camera state UI
+  ============================================================ */
+  function showCameraOffState(icon, title, text) {
+    csIcon.textContent = icon;
+    csTitle.textContent = title;
+    csText.textContent = text;
+    camState.classList.add("show");
+  }
+  function hideCameraOffState() {
+    camState.classList.remove("show");
   }
 
-  const CORNER_CYCLE = ["br", "bl", "tl", "tr"];
-  function cyclePipCorner() {
-    const iw = stageInner.clientWidth;
-    const ih = stageInner.clientHeight;
-    if (!iw || !ih) return;
+  csAllow.addEventListener("click", async () => {
+    csAllow.disabled = true;
+    try {
+      await startCamera(state.deviceId || "", { requestMic: state.mic });
+    } finally {
+      csAllow.disabled = false;
+    }
+  });
 
-    const px = state.pip.x * iw;
-    const py = state.pip.y * ih;
-    const { corner } = nearestCorner(px, py);
-
-    const idx = CORNER_CYCLE.indexOf(corner.id);
-    const next = CORNER_CYCLE[(idx + 1) % CORNER_CYCLE.length];
-    const cp = cornerPixels(next);
-
-    state.pip.x = cp.x / iw;
-    state.pip.y = cp.y / ih;
-    save();
-
-    camPane.classList.add("snapping");
-    applyPipPosition(false);
-    setTimeout(() => camPane.classList.remove("snapping"), 260);
-  }
-
-  pipSizeBtn.addEventListener("click", cyclePipSize);
-  pipCornerBtn.addEventListener("click", cyclePipCorner);
+  csRetry.addEventListener("click", async () => {
+    hideCameraOffState();
+    await startCamera(state.deviceId || "", { requestMic: state.mic });
+  });
 
   /* ============================================================
      CAMERA
   ============================================================ */
   let stream = null;
+  let micStream = null;
   let starting = false;
   let devices = [];
   let hasTorch = false;
-
-  function showState(icon, text, btnLabel, isError) {
-    csIcon.textContent = icon;
-    csText.textContent = text;
-    csText.className = isError ? "cs-err" : "";
-    csBtn.textContent = btnLabel || "Start camera";
-    csBtn.style.display = btnLabel === null ? "none" : "";
-    camState.classList.add("show");
-  }
-  function hideState() { camState.classList.remove("show"); }
+  let pendingMicWanted = false;
 
   function setLive(on) {
-    recDot.classList.toggle("on", on && !recorder.isRecording);
-    camToggle.classList.toggle("on", on);
-    camToggle.title = on ? "Stop camera" : "Start camera";
-    btnSnap.disabled = !on;
+    btnShutter.disabled = !on;
     btnFlip.disabled = !on || devices.length < 2;
     btnFlash.disabled = !on;
     btnBeauty.disabled = !on;
-    btnRec.disabled = !on;
-    btnSrc.disabled = false;
-    recTopBtn.disabled = !on;
   }
 
   async function applyTorch(on) {
@@ -2012,6 +1239,13 @@
     updateFlashUI();
   }
 
+  function stopMic() {
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      micStream = null;
+    }
+  }
+
   function friendlyError(err) {
     const n = err && err.name;
     if (n === "NotAllowedError" || n === "SecurityError")
@@ -2025,10 +1259,16 @@
     return "Could not start the camera. " + (err && err.message ? err.message : "");
   }
 
-  async function startCamera(deviceId) {
+  /**
+   * Start the camera. `opts.requestMic` requests the microphone in the
+   * same call (so users see one permission prompt instead of two).
+   */
+  async function startCamera(deviceId, opts) {
     if (starting) return;
     starting = true;
-    hideState();
+    hideCameraOffState();
+
+    const requestMic = !!(opts && (opts.requestMic || opts.prewarm));
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -2039,10 +1279,15 @@
       lastLandmarks = null;
 
       const constraints = {
-        audio: false,
+        audio: requestMic ? {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } : false,
         video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "user" }
       };
 
+      // Combined getUserMedia — one prompt for camera (+mic if requested)
       stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
 
@@ -2050,12 +1295,23 @@
         await new Promise(res => {
           const done = () => { video.removeEventListener("loadedmetadata", done); res(); };
           video.addEventListener("loadedmetadata", done);
-          setTimeout(res, 1200);
+          setTimeout(res, 1500);
         });
       }
-
       try { await video.play(); } catch (e) {}
 
+      // If mic was requested, keep the audio track alive for later recording
+      if (requestMic) {
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length) {
+          // Move audio into its own stream so we can stop it independently
+          micStream = new MediaStream(audioTracks);
+          state.mic = true;
+          save();
+        }
+      }
+
+      // Torch support?
       const track = stream.getVideoTracks()[0];
       try {
         const caps = track && track.getCapabilities ? track.getCapabilities() : {};
@@ -2067,7 +1323,8 @@
 
       await refreshDevices(settings.deviceId);
       setLive(true);
-      hideState();
+      hideCameraOffState();
+      refreshPermissionStatus().then(paintGate);
 
       if (state.flash) {
         if (hasTorch) await applyTorch(true);
@@ -2075,9 +1332,13 @@
       }
       updateFlashUI();
       ensureLoop();
+
+      showToast("Camera ready", "📷");
+
     } catch (err) {
       stopCamera();
-      showState("🚫", friendlyError(err), "Try again", true);
+      stopMic();
+      showCameraOffState("🚫", "Can't access camera", friendlyError(err));
       console.warn("[camera]", err);
     } finally {
       starting = false;
@@ -2088,52 +1349,19 @@
     try {
       const all = await navigator.mediaDevices.enumerateDevices();
       devices = all.filter(d => d.kind === "videoinput");
-      camSelect.innerHTML = "";
-
-      if (!devices.length) {
-        const o = document.createElement("option");
-        o.textContent = "No camera";
-        camSelect.appendChild(o);
-        camSelect.disabled = true;
-        return;
-      }
-
-      camSelect.disabled = false;
-      devices.forEach((d, i) => {
-        const o = document.createElement("option");
-        o.value = d.deviceId;
-        o.textContent = d.label || ("Camera " + (i + 1));
-        camSelect.appendChild(o);
-      });
-
-      const pick = activeId || state.deviceId;
-      camSelect.value = (pick && devices.some(d => d.deviceId === pick))
-        ? pick : devices[0].deviceId;
-
       setLive(!!stream);
-    } catch (e) { camSelect.disabled = true; }
-  }
-
-  function toggleCamera() {
-    if (stream) {
-      stopCamera();
-      showState("🎥", "Camera is off.", "Start camera", false);
-      save();
-    } else {
-      startCamera(state.deviceId || "");
-    }
+    } catch (e) {}
   }
 
   function flipCamera() {
     if (!stream || devices.length < 2) return;
     if (recorder.isRecording) return;
-    let i = devices.findIndex(d => d.deviceId === camSelect.value);
+    let i = devices.findIndex(d => d.deviceId === state.deviceId);
     if (i === -1) i = 0;
     const next = devices[(i + 1) % devices.length];
-    camSelect.value = next.deviceId;
     state.deviceId = next.deviceId;
     save();
-    startCamera(next.deviceId);
+    startCamera(next.deviceId, { requestMic: state.mic });
   }
 
   function applyMirror() {
@@ -2146,10 +1374,10 @@
   ============================================================ */
   function updateFlashUI() {
     btnFlash.classList.toggle("on", !!state.flash);
-    if (!stream) { btnFlash.title = "Flash (start the camera first)"; return; }
+    if (!stream) { btnFlash.title = "Flash"; return; }
     btnFlash.title = hasTorch
-      ? (state.flash ? "Flash: LED on (tap to turn off)" : "Flash: tap to turn on LED")
-      : (state.flash ? "Fill light: on (screen flash)" : "Fill light: tap to use the screen as a warm flash");
+      ? (state.flash ? "Flash: LED on" : "Flash: tap for LED")
+      : (state.flash ? "Fill light: on" : "Fill light: tap for screen flash");
   }
 
   async function toggleFlash() {
@@ -2187,6 +1415,7 @@
     state.beauty = (state.beauty + 1) % 3;
     save();
     updateBeautyUI();
+    showToast(BEAUTY_TITLES[state.beauty], "✨");
   }
 
   /* ============================================================
@@ -2202,22 +1431,18 @@
     if (faceLandmarker || fxLoadFailed || fxLoading) return;
     if (state.filter === "none") return;
     fxLoading = true;
-    updateFxStatus();
 
     try {
       const vision = await import(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"
       );
-
       const fileset = await vision.FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
       );
-
       const baseOpts = {
         modelAssetPath:
           "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
       };
-
       let landmarker;
       try {
         landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
@@ -2225,34 +1450,22 @@
           runningMode: "VIDEO", numFaces: 1
         });
       } catch (gpuErr) {
-        console.warn("[filters] GPU delegate failed, falling back to CPU", gpuErr);
         landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
           baseOptions: Object.assign({ delegate: "CPU" }, baseOpts),
           runningMode: "VIDEO", numFaces: 1
         });
       }
-
       faceLandmarker = landmarker;
     } catch (err) {
       fxLoadFailed = true;
-      console.warn("[filters] Face tracking unavailable:", err);
+      console.warn("[filters]", err);
     } finally {
       fxLoading = false;
-      updateFxStatus();
     }
   }
 
-  function updateFxStatus() {
-    if (state.filter === "none" || !stream) { fxStatus.classList.remove("show"); return; }
-    if (faceLandmarker) { fxStatus.classList.remove("show"); return; }
-    fxStatus.classList.add("show");
-    fxStatus.innerHTML = fxLoadFailed
-      ? "⚠️ Filters unavailable"
-      : '<span class="spinner"></span> Loading face tracking…';
-  }
-
   /* ============================================================
-     Projection
+     Projection & drawing helpers
   ============================================================ */
   function makeProjector(vw, vh, tw, th, mirrored) {
     const scale = Math.max(tw / vw, th / vh);
@@ -2265,31 +1478,11 @@
       return { x: x * scale + ox, y: y * scale + oy };
     };
   }
-
   function coverRect(vw, vh, tw, th) {
     const scale = Math.max(tw / vw, th / vh);
     const dw = vw * scale, dh = vh * scale;
     return { dx: (tw - dw) / 2, dy: (th - dh) / 2, dw, dh };
   }
-
-  let fxW = 1, fxH = 1, fxDpr = 1;
-
-  function resizeFx() {
-    const rect = camWrap.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.round(rect.width));
-    const h = Math.max(1, Math.round(rect.height));
-    if (w === fxW && h === fxH && dpr === fxDpr) return;
-    fxW = w; fxH = h; fxDpr = dpr;
-    fxCanvas.width  = Math.round(w * dpr);
-    fxCanvas.height = Math.round(h * dpr);
-    fxCanvas.style.width  = w + "px";
-    fxCanvas.style.height = h + "px";
-  }
-
-  /* ============================================================
-     Drawing helpers
-  ============================================================ */
   function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
   function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
@@ -2324,23 +1517,19 @@
   }
 
   /* ============================================================
-     BEAUTY
+     Beauty
   ============================================================ */
   function drawSoftFocus(ctx, tw, th, level, mirrored) {
     if (level <= 0) return;
     const vw = video.videoWidth, vh = video.videoHeight;
     if (!vw || !vh) return;
-
     const bw = Math.max(1, Math.round(tw / 3));
     const bh = Math.max(1, Math.round(th / 3));
-
     if (blurCanvas.width !== bw || blurCanvas.height !== bh) {
       blurCanvas.width = bw; blurCanvas.height = bh;
     }
-
     const r = coverRect(vw, vh, tw, th);
     const s = bw / tw;
-
     blurCtx.setTransform(1, 0, 0, 1, 0, 0);
     blurCtx.clearRect(0, 0, bw, bh);
     blurCtx.save();
@@ -2371,7 +1560,6 @@
     const rEye = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
     const eyeDist = dist(lEye, rEye);
     const radius = eyeDist * (level >= 2 ? 0.52 : 0.42);
-
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.globalAlpha = level >= 2 ? 0.20 : 0.12;
@@ -2389,7 +1577,7 @@
   }
 
   /* ============================================================
-     FILTER RENDERERS
+     Filter renderers
   ============================================================ */
   function fxShades(ctx, lm, P) {
     const lc = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
@@ -2397,33 +1585,26 @@
     const c  = mid(lc, rc);
     const eyeDist = dist(lc, rc);
     const ang = Math.atan2(rc.y - lc.y, rc.x - lc.x);
-    const lensW = eyeDist * 0.66;
-    const lensH = lensW * 0.78;
-    const gap   = eyeDist * 0.10;
-
+    const lensW = eyeDist * 0.66, lensH = lensW * 0.78, gap = eyeDist * 0.10;
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(ang);
     ctx.fillStyle = "#0a0a0f";
     ctx.fillRect(-gap, -lensH * 0.06, gap * 2, lensH * 0.13);
-
     const lensGrad = ctx.createLinearGradient(0, -lensH / 2, 0, lensH / 2);
     lensGrad.addColorStop(0,    "rgba(28,32,50,0.96)");
     lensGrad.addColorStop(0.42, "rgba(62,80,118,0.94)");
     lensGrad.addColorStop(1,    "rgba(8,10,20,0.96)");
-
     const drawLens = (cx, fill) => {
       roundRect(ctx, cx - lensW / 2, -lensH / 2, lensW, lensH, lensH * 0.34);
       if (fill) { ctx.fillStyle = fill; ctx.fill(); } else ctx.stroke();
     };
     drawLens(-eyeDist / 2, lensGrad);
     drawLens( eyeDist / 2, lensGrad);
-
     ctx.strokeStyle = "rgba(0,0,0,0.9)";
     ctx.lineWidth = Math.max(2, lensH * 0.085);
     drawLens(-eyeDist / 2);
     drawLens( eyeDist / 2);
-
     ctx.fillStyle = "rgba(255,255,255,0.2)";
     ctx.beginPath();
     ctx.ellipse(-eyeDist / 2 - lensW * 0.16, -lensH * 0.22, lensW * 0.2, lensH * 0.13, -0.42, 0, Math.PI * 2);
@@ -2431,7 +1612,6 @@
     ctx.beginPath();
     ctx.ellipse( eyeDist / 2 - lensW * 0.16, -lensH * 0.22, lensW * 0.2, lensH * 0.13, -0.42, 0, Math.PI * 2);
     ctx.fill();
-
     ctx.strokeStyle = "#0a0a0f";
     ctx.lineWidth = Math.max(2, lensH * 0.1);
     ctx.beginPath();
@@ -2446,14 +1626,10 @@
   }
 
   function fxDog(ctx, lm, P) {
-    const top   = P(LMK.FOREHEAD);
-    const chin  = P(LMK.CHIN);
-    const lc    = P(LMK.L_CHEEK);
-    const rc    = P(LMK.R_CHEEK);
-    const nose  = P(LMK.NOSE);
-    const mouthB= P(LMK.MOUTH_BOT);
-    const faceW = dist(lc, rc);
-    const faceH = dist(top, chin);
+    const top = P(LMK.FOREHEAD), chin = P(LMK.CHIN);
+    const lc  = P(LMK.L_CHEEK), rc = P(LMK.R_CHEEK);
+    const nose = P(LMK.NOSE), mouthB = P(LMK.MOUTH_BOT);
+    const faceW = dist(lc, rc), faceH = dist(top, chin);
 
     const drawEar = (cx, cy, dir) => {
       const w = faceW * 0.32, h = faceH * 0.54;
@@ -2461,8 +1637,7 @@
       ctx.translate(cx, cy);
       ctx.rotate(dir * 0.28);
       const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, "#8a5a30");
-      g.addColorStop(1, "#43260f");
+      g.addColorStop(0, "#8a5a30"); g.addColorStop(1, "#43260f");
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(-w * 0.14, 0);
@@ -2486,12 +1661,10 @@
 
     const nx = nose.x, ny = nose.y + faceH * 0.035;
     const nw = faceW * 0.17, nh = nw * 0.74;
-
     ctx.save();
     ctx.translate(nx, ny);
     const ng = ctx.createRadialGradient(-nw * 0.16, -nh * 0.22, nh * 0.04, 0, 0, nw * 0.72);
-    ng.addColorStop(0, "#55555e");
-    ng.addColorStop(1, "#08080c");
+    ng.addColorStop(0, "#55555e"); ng.addColorStop(1, "#08080c");
     ctx.fillStyle = ng;
     ctx.beginPath();
     ctx.ellipse(0, 0, nw / 2, nh / 2, 0, 0, Math.PI * 2);
@@ -2525,13 +1698,11 @@
   }
 
   function fxStache(ctx, lm, P) {
-    const ml = P(LMK.MOUTH_L);
-    const mr = P(LMK.MOUTH_R);
-    const c  = mid(ml, mr);
+    const ml = P(LMK.MOUTH_L), mr = P(LMK.MOUTH_R);
+    const c = mid(ml, mr);
     const mouthW = dist(ml, mr);
     const ang = Math.atan2(mr.y - ml.y, mr.x - ml.x);
     const w = mouthW * 1.2, h = mouthW * 0.36;
-
     ctx.save();
     ctx.translate(c.x, c.y - h * 0.5);
     ctx.rotate(ang);
@@ -2546,29 +1717,21 @@
     ctx.bezierCurveTo( w * 0.45, -h * 0.88,  w * 0.18, -h * 0.72, 0, -h * 0.05);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "rgba(100,78,60,0.35)";
-    ctx.beginPath(); ctx.ellipse(-w * 0.26, -h * 0.38, w * 0.12, h * 0.1, -0.3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse( w * 0.26, -h * 0.38, w * 0.12, h * 0.1,  0.3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
   function fxCrown(ctx, lm, P) {
-    const top = P(LMK.FOREHEAD);
-    const lc  = P(LMK.L_CHEEK);
-    const rc  = P(LMK.R_CHEEK);
-    const faceW = dist(lc, rc);
-    const faceH = dist(top, P(LMK.CHIN));
+    const top = P(LMK.FOREHEAD), lc = P(LMK.L_CHEEK), rc = P(LMK.R_CHEEK);
+    const faceW = dist(lc, rc), faceH = dist(top, P(LMK.CHIN));
     const lc2 = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
     const rc2 = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
     const tilt = Math.atan2(rc2.y - lc2.y, rc2.x - lc2.x) * 0.6;
     const w = faceW * 0.9, h = w * 0.42;
     const baseY = top.y - faceH * 0.02;
-
     ctx.save();
     ctx.translate(top.x, baseY);
     ctx.rotate(tilt);
     const x0 = -w / 2;
-
     ctx.beginPath();
     ctx.moveTo(x0, 0);
     ctx.lineTo(x0, -h * 0.16);
@@ -2581,30 +1744,21 @@
     }
     ctx.lineTo(x0 + w, 0);
     ctx.closePath();
-
     const g = ctx.createLinearGradient(0, -h, 0, 0);
-    g.addColorStop(0,    "#ffe98a");
-    g.addColorStop(0.45, "#ffcb2e");
-    g.addColorStop(1,    "#c98600");
+    g.addColorStop(0, "#ffe98a"); g.addColorStop(0.45, "#ffcb2e"); g.addColorStop(1, "#c98600");
     ctx.fillStyle = g;
     ctx.fill();
-
     ctx.strokeStyle = "#8a5c00";
     ctx.lineWidth = Math.max(1.5, w * 0.012);
     ctx.stroke();
-
     ctx.fillStyle = "#b8791a";
     ctx.fillRect(x0, -h * 0.16, w, h * 0.18);
-
     const jewels = ["#ff3b6b", "#4f8ef7", "#34d399", "#a78bfa", "#fbbf24"];
     for (let i = 0; i < 5; i++) {
       const jx = x0 + (i + 0.5) * (w / 5);
       ctx.fillStyle = jewels[i];
       ctx.beginPath(); ctx.arc(jx, -h * 0.06, w * 0.028, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.65)";
-      ctx.beginPath(); ctx.arc(jx - w * 0.01, -h * 0.075, w * 0.009, 0, Math.PI * 2); ctx.fill();
     }
-
     for (let i = 0; i < 3; i++) {
       const sx = x0 + (i * 2 + 0.5) * (w / 5);
       drawSparkle(ctx, sx, -h * 0.98, w * 0.032, "rgba(255,255,240,0.95)");
@@ -2613,24 +1767,19 @@
   }
 
   function fxBunny(ctx, lm, P) {
-    const top = P(LMK.FOREHEAD);
-    const lc  = P(LMK.L_CHEEK);
-    const rc  = P(LMK.R_CHEEK);
-    const faceW = dist(lc, rc);
-    const faceH = dist(top, P(LMK.CHIN));
+    const top = P(LMK.FOREHEAD), lc = P(LMK.L_CHEEK), rc = P(LMK.R_CHEEK);
+    const faceW = dist(lc, rc), faceH = dist(top, P(LMK.CHIN));
     const lc2 = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
     const rc2 = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
     const ang = Math.atan2(rc2.y - lc2.y, rc2.x - lc2.x);
-    const cx  = (lc2.x + rc2.x) / 2;
-
+    const cx = (lc2.x + rc2.x) / 2;
     const drawEar = (offsetX, tilt) => {
       const ew = faceW * 0.21, eh = faceH * 0.9;
       ctx.save();
       ctx.translate(cx + offsetX, top.y + faceH * 0.02);
       ctx.rotate(ang + tilt);
       const g = ctx.createLinearGradient(0, 0, 0, -eh);
-      g.addColorStop(0, "#f2eef6");
-      g.addColorStop(1, "#ffffff");
+      g.addColorStop(0, "#f2eef6"); g.addColorStop(1, "#ffffff");
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.ellipse(0, -eh / 2, ew / 2, eh / 2, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "rgba(180,170,190,0.65)";
@@ -2640,7 +1789,6 @@
       ctx.beginPath(); ctx.ellipse(0, -eh / 2, ew * 0.28, eh * 0.36, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     };
-
     const spread = faceW * 0.24;
     drawEar(-spread, -0.2);
     drawEar( spread,  0.2);
@@ -2652,7 +1800,6 @@
     const eyeDist = dist(lEye, rEye);
     const base = eyeDist * 0.55;
     const t = performance.now() / 520;
-
     const drawHeart = (cx, cy, s, phase) => {
       s *= 1 + Math.sin(t + phase) * 0.12;
       ctx.save();
@@ -2660,8 +1807,7 @@
       ctx.shadowColor = "rgba(255,60,110,0.9)";
       ctx.shadowBlur = s * 0.55;
       const g = ctx.createLinearGradient(0, -s * 0.7, 0, s * 0.45);
-      g.addColorStop(0, "#ff4d79");
-      g.addColorStop(1, "#c9184a");
+      g.addColorStop(0, "#ff4d79"); g.addColorStop(1, "#c9184a");
       ctx.fillStyle = g;
       const topCurve = s * 0.3;
       ctx.beginPath();
@@ -2672,14 +1818,8 @@
       ctx.bezierCurveTo(s / 2, 0, 0, 0, 0, topCurve);
       ctx.closePath();
       ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = "rgba(255,255,255,0.6)";
-      ctx.beginPath();
-      ctx.ellipse(-s * 0.16, s * 0.28, s * 0.08, s * 0.06, -0.5, 0, Math.PI * 2);
-      ctx.fill();
       ctx.restore();
     };
-
     drawHeart(lEye.x, lEye.y, base, 0);
     drawHeart(rEye.x, rEye.y, base, Math.PI * 0.8);
   }
@@ -2687,12 +1827,11 @@
   function fxPirate(ctx, lm, P) {
     const lEye = mid(P(LMK.L_EYE_OUT), P(LMK.L_EYE_IN));
     const rEye = mid(P(LMK.R_EYE_OUT), P(LMK.R_EYE_IN));
-    const c    = mid(lEye, rEye);
+    const c = mid(lEye, rEye);
     const eyeDist = dist(lEye, rEye);
     const ang = Math.atan2(rEye.y - lEye.y, rEye.x - lEye.x);
     const patchEye = lEye.x < rEye.x ? lEye : rEye;
     const size = eyeDist * 0.52;
-
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(ang);
@@ -2704,17 +1843,10 @@
     ctx.lineTo( eyeDist * 1.05,  eyeDist * 0.07);
     ctx.stroke();
     ctx.restore();
-
     ctx.save();
     ctx.translate(patchEye.x, patchEye.y);
     ctx.rotate(ang);
     ctx.fillStyle = "#08080c";
-    ctx.beginPath(); ctx.ellipse(0, 0, size * 0.74, size * 0.86, 0, 0, Math.PI * 2); ctx.fill();
-    const g = ctx.createLinearGradient(-size * 0.5, -size * 0.5, size * 0.45, size * 0.45);
-    g.addColorStop(0,   "rgba(90,90,105,0.6)");
-    g.addColorStop(0.5, "rgba(20,20,26,0.2)");
-    g.addColorStop(1,   "rgba(0,0,0,0.45)");
-    ctx.fillStyle = g;
     ctx.beginPath(); ctx.ellipse(0, 0, size * 0.74, size * 0.86, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,0.14)";
     ctx.lineWidth = Math.max(1, size * 0.06);
@@ -2735,31 +1867,194 @@
   }
 
   /* ============================================================
-     RECORDER (same as before)
+     Render loop
+  ============================================================ */
+  let fxW = 1, fxH = 1, fxDpr = 1;
+  function resizeFx() {
+    const rect = camLayer.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    if (w === fxW && h === fxH && dpr === fxDpr) return;
+    fxW = w; fxH = h; fxDpr = dpr;
+    fxCanvas.width  = Math.round(w * dpr);
+    fxCanvas.height = Math.round(h * dpr);
+    fxCanvas.style.width  = w + "px";
+    fxCanvas.style.height = h + "px";
+  }
+
+  let rafId = null;
+  function loop() {
+    rafId = requestAnimationFrame(loop);
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh || !stream) return;
+
+    resizeFx();
+    fxCtx.setTransform(fxDpr, 0, 0, fxDpr, 0, 0);
+    fxCtx.clearRect(0, 0, fxW, fxH);
+
+    const beautyOn = state.beauty > 0;
+    const filterOn = state.filter !== "none";
+    const needsCanvas = beautyOn || filterOn;
+
+    const now = performance.now();
+    if (filterOn && faceLandmarker && now - lastDetectAt > 28) {
+      lastDetectAt = now;
+      try {
+        const res = faceLandmarker.detectForVideo(video, now);
+        lastLandmarks = (res && res.faceLandmarks && res.faceLandmarks[0]) || null;
+      } catch (e) {}
+    }
+    if (!filterOn) lastLandmarks = null;
+
+    if (!needsCanvas) return;
+
+    const mirrored = !!state.mirrored;
+    const r = coverRect(vw, vh, fxW, fxH);
+
+    fxCtx.save();
+    fxCtx.fillStyle = "#000";
+    fxCtx.fillRect(0, 0, fxW, fxH);
+    fxCtx.filter = beautyOn ? BEAUTY_GRADE[state.beauty] : "none";
+    if (mirrored) { fxCtx.translate(fxW, 0); fxCtx.scale(-1, 1); }
+    fxCtx.drawImage(video, r.dx, r.dy, r.dw, r.dh);
+    fxCtx.restore();
+
+    if (beautyOn) drawSoftFocus(fxCtx, fxW, fxH, state.beauty, mirrored);
+
+    let project = null;
+    if (lastLandmarks) project = makeProjector(vw, vh, fxW, fxH, mirrored);
+    if (project && beautyOn) drawEyeBrighten(fxCtx, lastLandmarks, project, state.beauty);
+    if (project && filterOn) drawFilterSet(fxCtx, lastLandmarks, project);
+  }
+
+  function startLoop() { if (rafId == null) rafId = requestAnimationFrame(loop); }
+  function stopLoop() {
+    if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+    fxCtx.setTransform(1, 0, 0, 1, 0, 0);
+    fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+  }
+  function ensureLoop() { if (rafId == null) startLoop(); }
+
+  /* ============================================================
+     Filter picker
+  ============================================================ */
+  FILTERS.forEach(f => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "f-chip";
+    btn.dataset.filter = f.id;
+    btn.innerHTML = '<span class="emoji">' + f.emoji + "</span>" + f.label;
+    btn.addEventListener("click", () => setFilter(f.id));
+    filtersEl.appendChild(btn);
+  });
+
+  function setFilter(id) {
+    state.filter = id;
+    filtersEl.querySelectorAll(".f-chip").forEach(c =>
+      c.classList.toggle("on", c.dataset.filter === id)
+    );
+    save();
+    if (id === "none") {
+      lastLandmarks = null;
+      return;
+    }
+    initFaceTracking();
+    ensureLoop();
+  }
+
+  /* ============================================================
+     Snapshot (snap)
+  ============================================================ */
+  function renderFull(vw, vh) {
+    const out = document.createElement("canvas");
+    out.width = vw; out.height = vh;
+    const octx = out.getContext("2d");
+    const mirrored = !!state.mirrored;
+
+    octx.save();
+    octx.fillStyle = "#000";
+    octx.fillRect(0, 0, vw, vh);
+    if (state.beauty > 0 && "filter" in octx) octx.filter = BEAUTY_GRADE[state.beauty];
+    if (mirrored) { octx.translate(vw, 0); octx.scale(-1, 1); }
+    octx.drawImage(video, 0, 0, vw, vh);
+    octx.restore();
+
+    if (state.beauty > 0) {
+      const bw = Math.max(1, Math.round(vw / 3));
+      const bh = Math.max(1, Math.round(vh / 3));
+      const bc = document.createElement("canvas");
+      bc.width = bw; bc.height = bh;
+      const bctx = bc.getContext("2d");
+      bctx.save();
+      if (mirrored) { bctx.translate(bw, 0); bctx.scale(-1, 1); }
+      bctx.drawImage(video, 0, 0, bw, bh);
+      bctx.restore();
+      octx.save();
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = "high";
+      octx.globalAlpha = state.beauty === 1 ? 0.40 : 0.58;
+      octx.drawImage(bc, 0, 0, bw, bh, 0, 0, vw, vh);
+      octx.restore();
+      if (state.beauty >= 2) {
+        octx.save();
+        octx.imageSmoothingEnabled = true;
+        octx.imageSmoothingQuality = "high";
+        octx.globalCompositeOperation = "screen";
+        octx.globalAlpha = 0.16;
+        octx.drawImage(bc, 0, 0, bw, bh, 0, 0, vw, vh);
+        octx.restore();
+      }
+    }
+
+    if (lastLandmarks) {
+      const P = makeProjector(vw, vh, vw, vh, mirrored);
+      if (state.beauty > 0) drawEyeBrighten(octx, lastLandmarks, P, state.beauty);
+      if (state.filter !== "none") drawFilterSet(octx, lastLandmarks, P);
+    }
+
+    return out.toDataURL("image/png");
+  }
+
+  function doCapture() {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!stream || !vw || !vh) return;
+    const data = renderFull(vw, vh);
+    if (!data) return;
+    snapFlash.classList.remove("fire");
+    void snapFlash.offsetWidth;
+    snapFlash.classList.add("fire");
+    showSnapPreview(data, "image");
+  }
+
+  function takeSnapshot() {
+    if (!stream) return;
+    if (state.flash && !hasTorch) {
+      screenFlash.classList.add("burst");
+      setTimeout(() => {
+        screenFlash.classList.remove("burst");
+        if (state.flash) screenFlash.classList.add("on");
+      }, 220);
+      setTimeout(doCapture, 110);
+      return;
+    }
+    doCapture();
+  }
+
+  /* ============================================================
+     RECORDER
   ============================================================ */
   const recorder = {
-    mediaRecorder: null,
-    chunks: [],
-    canvas: null,
-    canvasCtx: null,
-    canvasStream: null,
-    audioStream: null,
-    audioCtx: null,
-    mimeType: "",
-    fileExt: "webm",
-    isRecording: false,
-    isPaused: false,
-    pausedAt: 0,
-    totalPaused: 0,
-    startedAt: 0,
-    timerInterval: null,
-    mode: null,
-    pendingBlob: null,
-    pendingMeta: null,
-    displayStream: null,
-    displayVideo: null,
-    displayCanvasStream: null,
-    displayStopLoop: null
+    mediaRecorder: null, chunks: [],
+    canvas: null, canvasCtx: null, canvasStream: null,
+    audioStream: null, audioCtx: null,
+    mimeType: "", fileExt: "webm",
+    isRecording: false, isPaused: false,
+    pausedAt: 0, totalPaused: 0, startedAt: 0,
+    timerInterval: null, mode: null,
+    pendingBlob: null, pendingMeta: null,
+    displayStream: null, displayVideo: null,
+    displayCanvasStream: null, displayStopLoop: null
   };
 
   function pickMimeType() {
@@ -2769,8 +2064,6 @@
       { mime: "video/mp4", ext: "mp4" },
       { mime: "video/webm;codecs=vp9,opus", ext: "webm" },
       { mime: "video/webm;codecs=vp8,opus", ext: "webm" },
-      { mime: "video/webm;codecs=vp9", ext: "webm" },
-      { mime: "video/webm;codecs=vp8", ext: "webm" },
       { mime: "video/webm", ext: "webm" }
     ];
     if (typeof MediaRecorder === "undefined") return null;
@@ -2780,49 +2073,23 @@
     return { mime: "", ext: "webm" };
   }
 
-  async function getMicStream() {
+  async function getMicForRecording() {
+    if (micStream && micStream.getAudioTracks().length) {
+      return micStream.getAudioTracks()[0];
+    }
     if (!state.mic) return null;
     try {
-      return await navigator.mediaDevices.getUserMedia({
+      const s = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
       });
+      micStream = s;
+      return s.getAudioTracks()[0];
     } catch (err) {
-      console.warn("[mic]", err);
-      state.mic = false;
-      save();
-      updateMicUI();
       return null;
     }
   }
 
-  async function mixAudioTracks(tracks) {
-    const valid = tracks.filter(Boolean);
-    if (valid.length === 0) return null;
-    if (valid.length === 1) return valid[0];
-
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return valid[0];
-      const ctx = new Ctx();
-      recorder.audioCtx = ctx;
-      const dest = ctx.createMediaStreamDestination();
-      valid.forEach(t => {
-        try {
-          const src = ctx.createMediaStreamSource(new MediaStream([t]));
-          src.connect(dest);
-        } catch (e) {}
-      });
-      return dest.stream.getAudioTracks()[0] || valid[0];
-    } catch (e) {
-      return valid[0];
-    }
-  }
-
   function cleanupRecordStreams() {
-    if (recorder.audioStream) {
-      recorder.audioStream.getTracks().forEach(t => t.stop());
-      recorder.audioStream = null;
-    }
     if (recorder.canvasStream) {
       recorder.canvasStream.getTracks().forEach(t => t.stop());
       recorder.canvasStream = null;
@@ -2876,7 +2143,6 @@
     const ctx = recorder.canvasCtx;
     const vw = video.videoWidth, vh = video.videoHeight;
     if (!vw || !vh) return;
-
     const mirrored = !!state.mirrored;
     const r = coverRect(vw, vh, w, h);
 
@@ -2903,14 +2169,12 @@
       if (mirrored) { blurCtx.translate(bw, 0); blurCtx.scale(-1, 1); }
       blurCtx.drawImage(video, r.dx * s, r.dy * s, r.dw * s, r.dh * s);
       blurCtx.restore();
-
       ctx.save();
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.globalAlpha = state.beauty === 1 ? 0.40 : 0.58;
       ctx.drawImage(blurCanvas, 0, 0, bw, bh, 0, 0, w, h);
       ctx.restore();
-
       if (state.beauty >= 2) {
         ctx.save();
         ctx.imageSmoothingEnabled = true;
@@ -2936,23 +2200,21 @@
     recRaf = requestAnimationFrame(recLoop);
   }
 
+  /* ---------- Start camera recording (long-press on shutter) ---------- */
   async function startCameraRecording() {
     const pick = pickMimeType();
-    if (!pick) { alert("Recording is not supported in this browser."); return; }
-
+    if (!pick) { showToast("Recording not supported", "⚠️"); return; }
     drawRecordFrame();
-
     try {
       recorder.canvasStream = recorder.canvas.captureStream(state.recFps);
     } catch (e) {
-      alert("Could not capture the video stream for recording.");
+      showToast("Cannot capture stream", "⚠️");
       return;
     }
 
-    recorder.audioStream = await getMicStream();
-
+    const micTrack = await getMicForRecording();
     const tracks = [...recorder.canvasStream.getVideoTracks()];
-    if (recorder.audioStream) tracks.push(...recorder.audioStream.getAudioTracks());
+    if (micTrack) tracks.push(micTrack);
     const mixed = new MediaStream(tracks);
 
     let mr;
@@ -2966,7 +2228,6 @@
     recorder.mode = "cam";
 
     mr.ondataavailable = e => { if (e.data && e.data.size > 0) recorder.chunks.push(e.data); };
-    mr.onerror = e => console.warn("[record] error", e);
     mr.onstop = () => {
       const blob = new Blob(recorder.chunks, { type: recorder.mimeType });
       const duration = (performance.now() - recorder.startedAt - recorder.totalPaused) / 1000;
@@ -2976,7 +2237,7 @@
         ext: recorder.fileExt, source: "cam"
       };
       cleanupRecordStreams();
-      showRecordingPreview();
+      showSnapPreview(null, "video", recorder.pendingMeta, URL.createObjectURL(blob));
     };
 
     mr.start(250);
@@ -2984,12 +2245,101 @@
     recLoop();
   }
 
-  async function startStageRecording() {
+  /* ---------- Screen recording (long-press when source=screen) ---------- */
+  async function startScreenRecording() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      alert("Screen recording is not supported in this browser."); return;
+      showToast("Screen recording not supported", "⚠️");
+      return;
     }
     const pick = pickMimeType();
-    if (!pick) { alert("Recording is not supported in this browser."); return; }
+    if (!pick) return;
+
+    let displayStream;
+    try {
+      displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: state.recFps }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: {
+          echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+          suppressLocalAudioPlayback: false
+        },
+        selfBrowserSurface: "include",
+        surfaceSwitching: "include",
+        systemAudio: "include"
+      });
+    } catch (err) { return; }
+
+    const screenAudio = displayStream.getAudioTracks();
+    const micTrack = await getMicForRecording();
+
+    let mixedAudio = null;
+    try {
+      const all = [];
+      if (screenAudio.length) all.push(screenAudio[0]);
+      if (micTrack) all.push(micTrack);
+      if (all.length === 1) mixedAudio = all[0];
+      else if (all.length > 1) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          const ctx = new Ctx();
+          recorder.audioCtx = ctx;
+          const dest = ctx.createMediaStreamDestination();
+          all.forEach(t => {
+            try { ctx.createMediaStreamSource(new MediaStream([t])).connect(dest); } catch (e) {}
+          });
+          mixedAudio = dest.stream.getAudioTracks()[0] || all[0];
+        } else {
+          mixedAudio = all[0];
+        }
+      }
+    } catch (e) { mixedAudio = screenAudio[0] || micTrack || null; }
+
+    const videoTrack = displayStream.getVideoTracks()[0];
+    const outTracks = [videoTrack];
+    if (mixedAudio) outTracks.push(mixedAudio);
+    const outStream = new MediaStream(outTracks);
+
+    let mr;
+    try { mr = new MediaRecorder(outStream, pick.mime ? { mimeType: pick.mime } : undefined); }
+    catch (e) { mr = new MediaRecorder(outStream); }
+
+    recorder.mimeType = mr.mimeType || pick.mime || "video/webm";
+    recorder.fileExt = recorder.mimeType.includes("mp4") ? "mp4" : "webm";
+    recorder.chunks = [];
+    recorder.mediaRecorder = mr;
+    recorder.mode = "screen";
+    recorder.displayStream = displayStream;
+
+    mr.ondataavailable = e => { if (e.data && e.data.size > 0) recorder.chunks.push(e.data); };
+    mr.onstop = () => {
+      const blob = new Blob(recorder.chunks, { type: recorder.mimeType });
+      const duration = (performance.now() - recorder.startedAt - recorder.totalPaused) / 1000;
+      recorder.pendingBlob = blob;
+      recorder.pendingMeta = {
+        duration, size: blob.size, mime: recorder.mimeType,
+        ext: recorder.fileExt, source: "screen"
+      };
+      cleanupRecordStreams();
+      showSnapPreview(null, "video", recorder.pendingMeta, URL.createObjectURL(blob));
+    };
+
+    if (videoTrack) {
+      videoTrack.addEventListener("ended", () => {
+        if (recorder.isRecording && recorder.mode === "screen") stopRecording();
+      });
+    }
+
+    mr.start(250);
+    beginRecordingSession("screen");
+  }
+
+  /* ---------- Stage recording (auto-crops the app view) ---------- */
+  async function startStageRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      showToast("Stage recording not supported", "⚠️");
+      return;
+    }
+    const pick = pickMimeType();
+    if (!pick) return;
 
     let displayStream;
     try {
@@ -3019,11 +2369,8 @@
     const vTrack = displayStream.getVideoTracks()[0];
     const vSettings = (vTrack && vTrack.getSettings) ? vTrack.getSettings() : {};
     const surface = vSettings.displaySurface;
-
     const capW = capVideo.videoWidth || 1280;
     const capH = capVideo.videoHeight || 720;
-
-    const cropTarget = (state.layout === "pip") ? stageInner : stage;
 
     let cx = 0, cy = 0, cw = capW, ch = capH;
 
@@ -3032,13 +2379,11 @@
       const innerH = Math.max(1, window.innerHeight);
       const scaleX = capW / innerW;
       const scaleY = capH / innerH;
-      const sr = cropTarget.getBoundingClientRect();
-
+      const sr = stage.getBoundingClientRect();
       cx = Math.round(sr.left * scaleX);
       cy = Math.round(sr.top * scaleY);
       cw = Math.round(sr.width * scaleX);
       ch = Math.round(sr.height * scaleY);
-
       cx = Math.max(0, Math.min(capW - 4, cx));
       cy = Math.max(0, Math.min(capH - 4, cy));
       cw = Math.max(4, Math.min(capW - cx, cw));
@@ -3047,7 +2392,6 @@
 
     const recW = cw - (cw % 2);
     const recH = ch - (ch % 2);
-
     const recCanvas = document.createElement("canvas");
     recCanvas.width = recW;
     recCanvas.height = recH;
@@ -3065,14 +2409,12 @@
     catch (e) {
       displayStream.getTracks().forEach(t => t.stop());
       if (rafId) cancelAnimationFrame(rafId);
-      alert("Could not capture the recording stream.");
       return;
     }
 
-    recorder.audioStream = await getMicStream();
-
+    const micTrack = await getMicForRecording();
     const tracks = [...canvasStream.getVideoTracks()];
-    if (recorder.audioStream) tracks.push(...recorder.audioStream.getAudioTracks());
+    if (micTrack) tracks.push(micTrack);
     const mixed = new MediaStream(tracks);
 
     let mr;
@@ -3090,7 +2432,6 @@
     recorder.displayStopLoop = () => { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } };
 
     mr.ondataavailable = e => { if (e.data && e.data.size > 0) recorder.chunks.push(e.data); };
-    mr.onerror = e => console.warn("[record] error", e);
     mr.onstop = () => {
       const blob = new Blob(recorder.chunks, { type: recorder.mimeType });
       const duration = (performance.now() - recorder.startedAt - recorder.totalPaused) / 1000;
@@ -3100,7 +2441,7 @@
         ext: recorder.fileExt, source: "stage"
       };
       cleanupRecordStreams();
-      showRecordingPreview();
+      showSnapPreview(null, "video", recorder.pendingMeta, URL.createObjectURL(blob));
     };
 
     if (vTrack) {
@@ -3113,158 +2454,28 @@
     beginRecordingSession("stage");
   }
 
-  async function startScreenRecording() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      alert("Screen recording is not supported in this browser."); return;
-    }
-    const pick = pickMimeType();
-    if (!pick) { alert("Recording is not supported in this browser."); return; }
-
-    let displayStream;
-    try {
-      displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          frameRate: { ideal: state.recFps },
-          width:  { ideal: 1920 },
-          height: { ideal: 1080 }
-        },
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          suppressLocalAudioPlayback: false
-        },
-        selfBrowserSurface: "include",
-        surfaceSwitching: "include",
-        systemAudio: "include"
-      });
-    } catch (err) { return; }
-
-    const screenAudioTracks = displayStream.getAudioTracks();
-    recorder.audioStream = await getMicStream();
-
-    let mixedAudioTrack = null;
-    try {
-      const allAudio = [];
-      if (screenAudioTracks.length) allAudio.push(screenAudioTracks[0]);
-      if (recorder.audioStream && recorder.audioStream.getAudioTracks().length) {
-        allAudio.push(recorder.audioStream.getAudioTracks()[0]);
-      }
-      mixedAudioTrack = await mixAudioTracks(allAudio);
-    } catch (e) {
-      mixedAudioTrack = screenAudioTracks[0] ||
-        (recorder.audioStream && recorder.audioStream.getAudioTracks()[0]) || null;
-    }
-
-    const videoTrack = displayStream.getVideoTracks()[0];
-    const outTracks = [videoTrack];
-    if (mixedAudioTrack) outTracks.push(mixedAudioTrack);
-    const outStream = new MediaStream(outTracks);
-
-    let mr;
-    try { mr = new MediaRecorder(outStream, pick.mime ? { mimeType: pick.mime } : undefined); }
-    catch (e) { mr = new MediaRecorder(outStream); }
-
-    recorder.mimeType = mr.mimeType || pick.mime || "video/webm";
-    recorder.fileExt = recorder.mimeType.includes("mp4") ? "mp4" : "webm";
-    recorder.chunks = [];
-    recorder.mediaRecorder = mr;
-    recorder.mode = "screen";
-    recorder.displayStream = displayStream;
-    recorder.displayVideo = null;
-    recorder.displayCanvasStream = null;
-    recorder.displayStopLoop = null;
-
-    mr.ondataavailable = e => { if (e.data && e.data.size > 0) recorder.chunks.push(e.data); };
-    mr.onerror = e => console.warn("[record] error", e);
-    mr.onstop = () => {
-      const blob = new Blob(recorder.chunks, { type: recorder.mimeType });
-      const duration = (performance.now() - recorder.startedAt - recorder.totalPaused) / 1000;
-      recorder.pendingBlob = blob;
-      recorder.pendingMeta = {
-        duration, size: blob.size, mime: recorder.mimeType,
-        ext: recorder.fileExt, source: "screen"
-      };
-      cleanupRecordStreams();
-      showRecordingPreview();
-    };
-
-    if (videoTrack) {
-      videoTrack.addEventListener("ended", () => {
-        if (recorder.isRecording && recorder.mode === "screen") stopRecording();
-      });
-    }
-
-    mr.start(250);
-    beginRecordingSession("screen");
-  }
-
   function beginRecordingSession(mode) {
     recorder.isRecording = true;
     recorder.isPaused = false;
     recorder.pausedAt = 0;
     recorder.totalPaused = 0;
     recorder.startedAt = performance.now();
-    enterRecordingUI(mode);
-  }
 
-  function enterRecordingUI(mode) {
-    recTimer.classList.add("show");
-    recTimer.classList.remove("stage", "screen", "paused");
-    if (mode === "stage") recTimer.classList.add("stage");
-    else if (mode === "screen") recTimer.classList.add("screen");
-
-    recSrcFlag.textContent = (mode === "cam" ? "📷 Cam" : mode === "stage" ? "🖥️ Stage" : "🌐 Screen");
-
-    const hasAudio = (recorder.audioStream && recorder.audioStream.getAudioTracks().length > 0) ||
-                     (mode === "screen" && recorder.displayStream &&
-                      recorder.displayStream.getAudioTracks().length > 0);
-    recMicFlag.textContent = hasAudio ? "🎤" : "";
-    recPausedTag.style.display = "none";
-
-    btnRec.classList.add("live");
-    btnRec.classList.remove("paused");
-    recTopBtn.classList.add("live");
-    recTopBtn.querySelector(".label").textContent = "Stop";
-
-    recDot.classList.remove("paused");
-    recDot.classList.add("on");
-
-    camPane.classList.add("recording");
-
-    updateSrcUI(true);
-    btnSrc.classList.add("recording");
-    btnSrc.classList.remove("is-paused");
-    btnSrc.textContent = "⏸";
-    btnSrc.title = "Pause recording";
-
-    stage.classList.remove("recording", "stage-mode", "screen-mode");
-    if (mode === "stage") stage.classList.add("recording", "stage-mode");
-    else if (mode === "screen") stage.classList.add("recording", "screen-mode");
-
+    recPill.classList.add("show");
+    recPill.classList.remove("paused");
+    recMicFlag.textContent = (state.mic || mode === "screen") ? "🎤" : "";
     updateRecTimer();
     clearInterval(recorder.timerInterval);
     recorder.timerInterval = setInterval(updateRecTimer, 250);
+
+    btnSource.classList.add("recording");
+    btnSource.textContent = "⏸";
   }
 
   function exitRecordingUI() {
-    recTimer.classList.remove("show", "stage", "screen", "paused");
-    recPausedTag.style.display = "none";
-
-    btnRec.classList.remove("live", "paused");
-    recTopBtn.classList.remove("live");
-    recTopBtn.querySelector(".label").textContent = "Record";
-
-    recDot.classList.remove("on", "paused");
-    recDot.classList.toggle("on", !!stream);
-
-    camPane.classList.remove("recording");
-
-    btnSrc.classList.remove("recording", "is-paused");
-    updateSrcUI(false);
-
-    stage.classList.remove("recording", "stage-mode", "screen-mode");
-
+    recPill.classList.remove("show", "paused");
+    btnSource.classList.remove("recording", "is-paused");
+    updateSourceUI();
     clearInterval(recorder.timerInterval);
     recorder.timerInterval = null;
   }
@@ -3274,15 +2485,9 @@
     try { recorder.mediaRecorder.pause(); } catch (e) { return; }
     recorder.isPaused = true;
     recorder.pausedAt = performance.now();
-
-    btnSrc.textContent = "▶";
-    btnSrc.classList.add("is-paused");
-    btnSrc.title = "Resume recording";
-    recTimer.classList.add("paused");
-    recPausedTag.style.display = "";
-    btnRec.classList.add("paused");
-    recDot.classList.remove("on");
-    recDot.classList.add("paused");
+    recPill.classList.add("paused");
+    btnSource.classList.add("is-paused");
+    btnSource.textContent = "▶";
   }
 
   function resumeRecording() {
@@ -3293,36 +2498,21 @@
       recorder.totalPaused += performance.now() - recorder.pausedAt;
       recorder.pausedAt = 0;
     }
-
-    btnSrc.textContent = "⏸";
-    btnSrc.classList.remove("is-paused");
-    btnSrc.title = "Pause recording";
-    recTimer.classList.remove("paused");
-    recPausedTag.style.display = "none";
-    btnRec.classList.remove("paused");
-    recDot.classList.remove("paused");
-    recDot.classList.add("on");
-  }
-
-  function togglePause() {
-    if (!recorder.isRecording) return;
-    if (recorder.isPaused) resumeRecording();
-    else pauseRecording();
+    recPill.classList.remove("paused");
+    btnSource.classList.remove("is-paused");
+    btnSource.textContent = "⏸";
   }
 
   function stopRecording() {
     if (!recorder.isRecording) return;
     recorder.isRecording = false;
     recorder.isPaused = false;
-
     if (recRaf != null) { cancelAnimationFrame(recRaf); recRaf = null; }
-
     try {
       if (recorder.mediaRecorder && recorder.mediaRecorder.state !== "inactive") {
         recorder.mediaRecorder.stop();
       }
     } catch (e) { cleanupRecordStreams(); }
-
     exitRecordingUI();
     recorder.mode = null;
   }
@@ -3334,100 +2524,85 @@
     const s = Math.max(0, Math.floor(elapsed / 1000));
     const mm = String(Math.floor(s / 60)).padStart(2, "0");
     const ss = String(s % 60).padStart(2, "0");
-    recTime.textContent = mm + ":" + ss;
-  }
-
-  function startRecording() {
-    if (state.recSource === "stage") startStageRecording();
-    else if (state.recSource === "screen") startScreenRecording();
-    else startCameraRecording();
-  }
-
-  function toggleRecording() {
-    if (recorder.isRecording) stopRecording();
-    else startRecording();
+    recTimeEl.textContent = mm + ":" + ss;
   }
 
   /* ============================================================
-     PREVIEW MODAL
+     Snapshot preview modal
   ============================================================ */
-  function showRecordingPreview() {
-    const blob = recorder.pendingBlob;
-    const meta = recorder.pendingMeta;
-    if (!blob || !meta) return;
+  let previewUrl = null;
 
-    const url = URL.createObjectURL(blob);
-
-    modalImg.style.display = "none";
-    modalVideo.style.display = "block";
-    modalMeta.style.display = "flex";
-    modalVideo.src = url;
-    modalIcon.textContent = "●";
-    modalTitle.textContent = "Recording";
-
-    const src = meta.source;
-    const isStage = src === "stage";
-    const isScreen = src === "screen";
-
-    metaSource.textContent = isScreen ? "🌐 Screen capture"
-                          : isStage ? "🖥️ Whole stage"
-                          : "📷 Camera pane";
-    metaSource.classList.remove("stage", "screen");
-    if (isStage) metaSource.classList.add("stage");
-    if (isScreen) metaSource.classList.add("screen");
-
-    metaDuration.textContent = "⏱ " + formatDuration(meta.duration);
-    metaSize.textContent = "📦 " + formatSize(meta.size);
-    metaType.textContent = "🎬 " + (meta.ext === "mp4" ? "MP4" : "WebM");
-
-    modal.dataset.mode = "video";
-    modal.dataset.url = url;
-
-    modal.classList.add("show");
-  }
-
-  function showSnapshotPreview(dataUrl) {
-    try { modalVideo.pause(); } catch (e) {}
-    modalVideo.style.display = "none";
-    modalVideo.removeAttribute("src");
-    modalImg.style.display = "block";
-    modalMeta.style.display = "none";
-    modalImg.src = dataUrl;
-    modalIcon.textContent = "◉";
-    modalTitle.textContent = "Snapshot";
-
-    modal.dataset.mode = "image";
-    modal.dataset.url = dataUrl;
-
-    modal.classList.add("show");
-  }
-
-  function revokeModalUrl() {
-    const mode = modal.dataset.mode;
-    const url = modal.dataset.url;
-    if (mode === "video" && url && url.startsWith("blob:")) {
-      try { URL.revokeObjectURL(url); } catch (e) {}
+  function showSnapPreview(dataUrl, kind, meta, videoUrl) {
+    // Cleanup any old video URL
+    if (previewUrl && previewUrl !== videoUrl) {
+      try { URL.revokeObjectURL(previewUrl); } catch (e) {}
     }
+    previewUrl = videoUrl || null;
+
+    previewMeta.innerHTML = "";
+
+    if (kind === "image") {
+      previewImg.style.display = "block";
+      previewVideo.style.display = "none";
+      previewVideo.removeAttribute("src");
+      previewImg.src = dataUrl;
+
+      // Save last snap thumbnail for the gallery button
+      setGalleryThumb(dataUrl);
+
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = "📷 Snap";
+      previewMeta.appendChild(tag);
+    } else {
+      previewImg.style.display = "none";
+      previewVideo.style.display = "block";
+      previewImg.removeAttribute("src");
+      previewVideo.src = videoUrl;
+
+      const src = meta.source;
+      const t1 = document.createElement("span");
+      t1.className = "tag";
+      t1.textContent = src === "stage" ? "🖥️ Stage"
+                     : src === "screen" ? "🌐 Screen"
+                     : "📷 Camera";
+      previewMeta.appendChild(t1);
+
+      const t2 = document.createElement("span");
+      t2.className = "tag";
+      t2.textContent = "⏱ " + formatDuration(meta.duration);
+      previewMeta.appendChild(t2);
+
+      const t3 = document.createElement("span");
+      t3.className = "tag";
+      t3.textContent = "📦 " + formatSize(meta.size);
+      previewMeta.appendChild(t3);
+    }
+
+    preview.dataset.kind = kind;
+    preview.dataset.dataUrl = dataUrl || "";
+    preview.dataset.videoUrl = videoUrl || "";
+
+    preview.classList.add("show");
   }
 
-  function closeModal() {
-    revokeModalUrl();
-    modal.classList.remove("show");
-    modalImg.src = "";
-    try { modalVideo.pause(); } catch (e) {}
-    modalVideo.removeAttribute("src");
-    modalVideo.load && modalVideo.load();
-    modal.dataset.mode = "";
-    modal.dataset.url = "";
+  function closePreview() {
+    preview.classList.remove("show");
+    previewImg.removeAttribute("src");
+    try { previewVideo.pause(); } catch (e) {}
+    previewVideo.removeAttribute("src");
+    previewVideo.load && previewVideo.load();
+
+    if (previewUrl) {
+      try { URL.revokeObjectURL(previewUrl); } catch (e) {}
+      previewUrl = null;
+    }
     recorder.pendingBlob = null;
     recorder.pendingMeta = null;
   }
 
   function downloadCurrent() {
-    const mode = modal.dataset.mode;
-    const url = modal.dataset.url;
-    if (!url) return;
-
+    const kind = preview.dataset.kind;
     const pad = n => String(n).padStart(2, "0");
     const d = new Date();
     const stamp =
@@ -3435,776 +2610,228 @@
       pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
 
     const a = document.createElement("a");
-    a.href = url;
 
-    if (mode === "video") {
+    if (kind === "video") {
+      const url = preview.dataset.videoUrl;
+      if (!url) return;
       const meta = recorder.pendingMeta;
       const ext = meta && meta.ext ? meta.ext : "webm";
-      const prefix = meta && meta.source === "stage" ? "stage"
-                    : meta && meta.source === "screen" ? "screen"
+      const prefix = meta && meta.source === "screen" ? "screen"
+                    : meta && meta.source === "stage" ? "stage"
                     : "camera";
+      a.href = url;
       a.download = prefix + "-" + stamp + "." + ext;
     } else {
-      a.download = "snapshot-" + stamp + ".png";
+      const url = preview.dataset.dataUrl;
+      if (!url) return;
+      a.href = url;
+      a.download = "snap-" + stamp + ".png";
     }
 
     document.body.appendChild(a);
     a.click();
     a.remove();
+    showToast("Saved to downloads", "💾");
   }
 
-  function formatDuration(sec) {
-    sec = Math.max(0, Math.round(sec));
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  function saveCurrent() {
+    // Same as download for the web app
+    downloadCurrent();
   }
 
-  function formatSize(bytes) {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + " MB";
-    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
-  }
+  previewClose.addEventListener("click", closePreview);
+  pDiscard.addEventListener("click", () => { closePreview(); showToast("Discarded", "🗑️"); });
+  pSave.addEventListener("click", saveCurrent);
+  pShare.addEventListener("click", downloadCurrent);
 
   /* ============================================================
-     MIC + SOURCE UI
+     Gallery thumbnail (last snap)
   ============================================================ */
-  function updateMicUI() {
-    micToggle.classList.toggle("on", !!state.mic);
-    micToggle.title = state.mic
-      ? "Microphone ON — audio will be recorded"
-      : "Microphone OFF — tap to record with audio";
+  let lastSnapThumb = null;
+  function setGalleryThumb(dataUrl) {
+    lastSnapThumb = dataUrl;
+    btnGallery.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = dataUrl;
+    img.alt = "Last snap";
+    btnGallery.appendChild(img);
   }
 
-  function updateSrcUI(recording) {
-    const src = state.recSource;
-    const meta = SRC_META[src];
+  btnGallery.addEventListener("click", () => {
+    if (!lastSnapThumb) {
+      showToast("No snaps yet", "🖼️");
+      return;
+    }
+    showSnapPreview(lastSnapThumb, "image");
+  });
 
-    if (recording) return;
+  /* ============================================================
+     Long-press to record (on the shutter)
+  ============================================================ */
+  let pressTimer = null;
+  let isLongPress = false;
+  let pressStartTime = 0;
 
-    btnSrc.classList.remove("stage", "screen");
-    if (src === "stage") btnSrc.classList.add("stage");
-    if (src === "screen") btnSrc.classList.add("screen");
-
-    btnSrc.innerHTML = meta.icon;
-
-    btnSrc.title = src === "cam"
-      ? "Recording source: camera pane (tap to switch to stage)"
-      : src === "stage"
-      ? "Recording source: whole stage (tap to switch to screen recorder)"
-      : "Recording source: full screen recorder (tap to switch to camera)";
-
-    btnRec.classList.remove("stage-src", "screen-src");
-    if (src === "stage") btnRec.classList.add("stage-src");
-    if (src === "screen") btnRec.classList.add("screen-src");
-
-    recTopBtn.classList.remove("stage", "screen");
-    if (src === "stage") recTopBtn.classList.add("stage");
-    if (src === "screen") recTopBtn.classList.add("screen");
-
-    recTopBtn.title = src === "cam"
-      ? "Record the camera pane"
-      : src === "stage"
-      ? "Record the whole stage (auto-cropped to the video area)"
-      : "Open the screen recorder (any screen, window, or tab — with system audio)";
-  }
-
-  function cycleSource() {
+  function onShutterDown(e) {
+    if (!stream) return;
     if (recorder.isRecording) return;
+    isLongPress = false;
+    pressStartTime = performance.now();
+
+    pressTimer = setTimeout(() => {
+      isLongPress = true;
+      // Start recording based on current source
+      if (state.recSource === "screen") startScreenRecording();
+      else if (state.recSource === "stage") startStageRecording();
+      else startCameraRecording();
+    }, 350);
+  }
+
+  function onShutterUp(e) {
+    clearTimeout(pressTimer);
+    if (!isLongPress) {
+      // Short tap = snapshot
+      const elapsed = performance.now() - pressStartTime;
+      if (elapsed < 350) takeSnapshot();
+    }
+    isLongPress = false;
+  }
+
+  btnShutter.addEventListener("pointerdown", onShutterDown);
+  btnShutter.addEventListener("pointerup", onShutterUp);
+  btnShutter.addEventListener("pointerleave", () => clearTimeout(pressTimer));
+  btnShutter.addEventListener("pointercancel", () => clearTimeout(pressTimer));
+
+  /* Prevent context menu on long press on mobile */
+  btnShutter.addEventListener("contextmenu", e => e.preventDefault());
+
+  /* ============================================================
+     Source picker (tap to cycle, tap again during recording = pause)
+  ============================================================ */
+  function updateSourceUI() {
+    const src = state.recSource;
+    btnSource.classList.remove("stage", "screen", "recording", "is-paused");
+    if (src === "stage") { btnSource.classList.add("stage"); btnSource.textContent = "🖥️"; }
+    else if (src === "screen") { btnSource.classList.add("screen"); btnSource.textContent = "🌐"; }
+    else { btnSource.textContent = "📷"; }
+
+    if (recorder.isRecording) {
+      btnSource.classList.add("recording");
+      btnSource.textContent = recorder.isPaused ? "▶" : "⏸";
+      if (recorder.isPaused) btnSource.classList.add("is-paused");
+    }
+  }
+
+  btnSource.addEventListener("click", () => {
+    if (recorder.isRecording) {
+      if (recorder.isPaused) resumeRecording();
+      else pauseRecording();
+      return;
+    }
     const i = SRC_ORDER.indexOf(state.recSource);
     state.recSource = SRC_ORDER[(i + 1) % SRC_ORDER.length];
     save();
-    updateSrcUI(false);
-  }
-
-  /* ============================================================
-     RICH NOTE EDITOR
-  ============================================================ */
-  let savedRange = null;
-
-  function saveEditorSelection() {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    if (noteEditor.contains(range.commonAncestorContainer)) {
-      savedRange = range.cloneRange();
-    }
-  }
-
-  function restoreEditorSelection() {
-    if (!savedRange) { noteEditor.focus(); return; }
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(savedRange);
-    noteEditor.focus();
-  }
-
-  function exec(cmd, value) {
-    restoreEditorSelection();
-    try {
-      document.execCommand("styleWithCSS", false, true);
-      document.execCommand(cmd, false, value || null);
-    } catch (e) {}
-    saveEditorSelection();
-    syncToolbarState();
-    persistNote();
-  }
-
-  function persistNote() {
-    state.content.noteHtml = noteEditor.innerHTML;
-    save();
-  }
-
-  noteEditor.addEventListener("keyup", saveEditorSelection);
-  noteEditor.addEventListener("mouseup", saveEditorSelection);
-  noteEditor.addEventListener("focus", saveEditorSelection);
-  noteEditor.addEventListener("blur", saveEditorSelection);
-
-  let noteSaveTimer = null;
-  noteEditor.addEventListener("input", () => {
-    clearTimeout(noteSaveTimer);
-    noteSaveTimer = setTimeout(persistNote, 300);
-  });
-
-  noteEditor.addEventListener("paste", e => {
-    e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData).getData("text/plain");
-    if (!text) return;
-    document.execCommand("insertText", false, text);
-  });
-
-  noteEditor.addEventListener("blur", () => {
-    let dirty = false;
-    noteEditor.querySelectorAll("script, iframe, object, embed, style, link, meta").forEach(el => {
-      el.remove();
-      dirty = true;
-    });
-    if (dirty) persistNote();
-  });
-
-  noteToolbar.querySelectorAll(".tb-btn").forEach(btn => {
-    btn.addEventListener("mousedown", e => e.preventDefault());
-    btn.addEventListener("click", () => {
-      const cmd = btn.dataset.cmd;
-      const block = btn.dataset.block;
-      const hilite = btn.dataset.hilite;
-      if (block) exec("formatBlock", block === "p" ? "p" : block);
-      else if (hilite) exec("hiliteColor", hilite);
-      else if (cmd) exec(cmd);
-    });
-  });
-
-  fontFamily.addEventListener("mousedown", saveEditorSelection);
-  fontFamily.addEventListener("change", () => exec("fontName", fontFamily.value));
-
-  fontSize.addEventListener("mousedown", saveEditorSelection);
-  fontSize.addEventListener("change", () => exec("fontSize", fontSize.value));
-
-  noteEditor.addEventListener("keydown", e => {
-    const mod = e.ctrlKey || e.metaKey;
-    if (!mod) return;
-    const k = e.key.toLowerCase();
-    if (k === "b" || k === "i" || k === "u") {
-      setTimeout(() => { syncToolbarState(); persistNote(); }, 0);
-    }
-  });
-
-  function syncToolbarState() {
-    const check = (cmd) => {
-      try { return document.queryCommandState(cmd); } catch (e) { return false; }
-    };
-    noteToolbar.querySelectorAll(".tb-btn[data-cmd]").forEach(b => {
-      const c = b.dataset.cmd;
-      if (c === "bold" || c === "italic" || c === "underline" ||
-          c === "insertUnorderedList" || c === "insertOrderedList") {
-        b.classList.toggle("on", check(c));
-      }
-    });
-
-    let block = "";
-    try { block = (document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch (e) {}
-    noteToolbar.querySelectorAll(".tb-btn[data-block]").forEach(b => {
-      b.classList.toggle("on", b.dataset.block === block);
-    });
-
-    try {
-      const fname = document.queryCommandValue("fontName") || "";
-      if (fname) {
-        const opts = [...fontFamily.options];
-        const found = opts.find(o =>
-          fname.toLowerCase().includes(o.value.split(",")[0].replace(/['"]/g, "").toLowerCase())
-        );
-        if (found) fontFamily.value = found.value;
-      }
-    } catch (e) {}
-
-    try {
-      const fsize = document.queryCommandValue("fontSize") || "";
-      if (fsize && [...fontSize.options].some(o => o.value === fsize)) {
-        fontSize.value = fsize;
-      }
-    } catch (e) {}
-
-    // Text color — reflect what's at the caret
-    try {
-      const fg = document.queryCommandValue("foreColor") || "";
-      const hex = rgbToHex(fg);
-      if (hex) {
-        txtColor.value = hex;
-        txtSwatch.style.setProperty("--sw", hex);
-      }
-    } catch (e) {}
-  }
-
-  function rgbToHex(rgb) {
-    if (!rgb) return "";
-    if (rgb.startsWith("#")) return rgb;
-    const m = rgb.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
-    if (!m) return "";
-    const toHex = (n) => clamp(parseInt(n, 10), 0, 255).toString(16).padStart(2, "0");
-    return "#" + toHex(m[1]) + toHex(m[2]) + toHex(m[3]);
-  }
-
-  document.addEventListener("selectionchange", () => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    if (noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-      saveEditorSelection();
-      syncToolbarState();
-    }
-  });
-
-  /* ---------- Color pickers ---------- */
-
-  // Note text color
-  txtColor.addEventListener("mousedown", () => saveEditorSelection());
-  txtColor.addEventListener("input", () => {
-    const v = txtColor.value;
-    txtSwatch.style.setProperty("--sw", v);
-  });
-  txtColor.addEventListener("change", () => {
-    const v = txtColor.value;
-    state.colors.noteText = v;
-    save();
-    applyColors();
-    // Apply to the current selection inside the note (if any)
-    restoreEditorSelection();
-    try {
-      document.execCommand("styleWithCSS", false, true);
-      document.execCommand("foreColor", false, v);
-    } catch (e) {}
-    saveEditorSelection();
-    persistNote();
-  });
-
-  txtClear.addEventListener("click", () => {
-    state.colors.noteText = "#e8eef5";
-    txtColor.value = "#e8eef5";
-    txtSwatch.style.setProperty("--sw", "#e8eef5");
-    save();
-    applyColors();
-    // Also reset the current selection back to default
-    restoreEditorSelection();
-    try {
-      document.execCommand("styleWithCSS", false, true);
-      document.execCommand("foreColor", false, "#e8eef5");
-    } catch (e) {}
-    saveEditorSelection();
-    persistNote();
-  });
-
-  // Frame color (note)
-  frameColor.addEventListener("input", () => {
-    frameSwatch.style.setProperty("--sw", frameColor.value);
-  });
-  frameColor.addEventListener("change", () => {
-    state.colors.noteFrame = frameColor.value;
-    save();
-    applyColors();
-  });
-
-  frameClear.addEventListener("click", () => {
-    state.colors.noteFrame = "";
-    save();
-    applyColors();
-  });
-
-  /* ---------- Preset swatches for stage / camera frames ---------- */
-  /* We add small swatch buttons to the frame color group, to quickly
-     set the stage and camera frame at once for a cohesive look. */
-  function buildFrameSwatches() {
-    const group = frameSwatch.closest(".color-group");
-    if (!group) return;
-    const row = document.createElement("div");
-    row.className = "swatches";
-    row.style.marginLeft = "4px";
-
-    const presets = [
-      "#4f8ef7", "#8b5cf6", "#ef4444", "#22c55e",
-      "#f59e0b", "#ec4899", "#14b8a6", "#e8eef5"
-    ];
-
-    presets.forEach(c => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "sw-btn";
-      b.style.background = c;
-      b.title = "Set note, stage, and camera frames to " + c;
-      b.addEventListener("click", () => {
-        state.colors.noteFrame  = c;
-        state.colors.stageFrame = c;
-        state.colors.camFrame   = c;
-        frameColor.value = c;
-        frameSwatch.style.setProperty("--sw", c);
-        save();
-        applyColors();
-      });
-      row.appendChild(b);
-    });
-
-    group.parentNode.insertBefore(row, group.nextSibling);
-  }
-
-  /* ============================================================
-     RENDER LOOP
-  ============================================================ */
-  let rafId = null;
-
-  function loop() {
-    rafId = requestAnimationFrame(loop);
-
-    const vw = video.videoWidth, vh = video.videoHeight;
-    if (!vw || !vh || !stream) return;
-
-    resizeFx();
-    fxCtx.setTransform(fxDpr, 0, 0, fxDpr, 0, 0);
-    fxCtx.clearRect(0, 0, fxW, fxH);
-
-    const beautyOn = state.beauty > 0;
-    const filterOn = state.filter !== "none";
-    const needsCanvas = beautyOn || filterOn;
-
-    const now = performance.now();
-    if (filterOn && faceLandmarker && now - lastDetectAt > 28) {
-      lastDetectAt = now;
-      try {
-        const res = faceLandmarker.detectForVideo(video, now);
-        lastLandmarks = (res && res.faceLandmarks && res.faceLandmarks[0]) || null;
-      } catch (e) {}
-    }
-    if (!filterOn) lastLandmarks = null;
-
-    if (!needsCanvas) return;
-
-    const mirrored = !!state.mirrored;
-    const r = coverRect(vw, vh, fxW, fxH);
-
-    fxCtx.save();
-    fxCtx.fillStyle = "#05080b";
-    fxCtx.fillRect(0, 0, fxW, fxH);
-    fxCtx.filter = beautyOn ? BEAUTY_GRADE[state.beauty] : "none";
-    if (mirrored) { fxCtx.translate(fxW, 0); fxCtx.scale(-1, 1); }
-    fxCtx.drawImage(video, r.dx, r.dy, r.dw, r.dh);
-    fxCtx.restore();
-
-    if (beautyOn) drawSoftFocus(fxCtx, fxW, fxH, state.beauty, mirrored);
-
-    let project = null;
-    if (lastLandmarks) project = makeProjector(vw, vh, fxW, fxH, mirrored);
-    if (project && beautyOn) drawEyeBrighten(fxCtx, lastLandmarks, project, state.beauty);
-    if (project && filterOn) drawFilterSet(fxCtx, lastLandmarks, project);
-  }
-
-  function startLoop() { if (rafId == null) rafId = requestAnimationFrame(loop); }
-  function stopLoop() {
-    if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-    fxCtx.setTransform(1, 0, 0, 1, 0, 0);
-    fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
-  }
-  function ensureLoop() { if (rafId == null) startLoop(); }
-
-  /* ============================================================
-     FILTER PICKER
-  ============================================================ */
-  FILTERS.forEach(f => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "chip";
-    btn.dataset.filter = f.id;
-    btn.innerHTML = '<span class="emoji">' + f.emoji + "</span>" + f.label;
-    btn.addEventListener("click", () => setFilter(f.id));
-    filterStrip.appendChild(btn);
-  });
-
-  function setFilter(id) {
-    state.filter = id;
-    filterStrip.querySelectorAll(".chip").forEach(c =>
-      c.classList.toggle("on", c.dataset.filter === id)
-    );
-    save();
-    if (id === "none") { lastLandmarks = null; updateFxStatus(); return; }
-    updateFxStatus();
-    initFaceTracking();
-    ensureLoop();
-  }
-
-  /* ============================================================
-     SNAPSHOT
-  ============================================================ */
-  function renderFull(vw, vh) {
-    const out = document.createElement("canvas");
-    out.width = vw; out.height = vh;
-    const octx = out.getContext("2d");
-    const mirrored = !!state.mirrored;
-
-    octx.save();
-    octx.fillStyle = "#000";
-    octx.fillRect(0, 0, vw, vh);
-    if (state.beauty > 0 && "filter" in octx) octx.filter = BEAUTY_GRADE[state.beauty];
-    if (mirrored) { octx.translate(vw, 0); octx.scale(-1, 1); }
-    octx.drawImage(video, 0, 0, vw, vh);
-    octx.restore();
-
-    if (state.beauty > 0) {
-      const bw = Math.max(1, Math.round(vw / 3));
-      const bh = Math.max(1, Math.round(vh / 3));
-      const bc = document.createElement("canvas");
-      bc.width = bw; bc.height = bh;
-      const bctx = bc.getContext("2d");
-      bctx.save();
-      if (mirrored) { bctx.translate(bw, 0); bctx.scale(-1, 1); }
-      bctx.drawImage(video, 0, 0, bw, bh);
-      bctx.restore();
-
-      octx.save();
-      octx.imageSmoothingEnabled = true;
-      octx.imageSmoothingQuality = "high";
-      octx.globalAlpha = state.beauty === 1 ? 0.40 : 0.58;
-      octx.drawImage(bc, 0, 0, bw, bh, 0, 0, vw, vh);
-      octx.restore();
-
-      if (state.beauty >= 2) {
-        octx.save();
-        octx.imageSmoothingEnabled = true;
-        octx.imageSmoothingQuality = "high";
-        octx.globalCompositeOperation = "screen";
-        octx.globalAlpha = 0.16;
-        octx.drawImage(bc, 0, 0, bw, bh, 0, 0, vw, vh);
-        octx.restore();
-      }
-    }
-
-    if (lastLandmarks) {
-      const P = makeProjector(vw, vh, vw, vh, mirrored);
-      if (state.beauty > 0) drawEyeBrighten(octx, lastLandmarks, P, state.beauty);
-      if (state.filter !== "none") drawFilterSet(octx, lastLandmarks, P);
-    }
-
-    return out.toDataURL("image/png");
-  }
-
-  function capture() {
-    const vw = video.videoWidth, vh = video.videoHeight;
-    if (!stream || !vw || !vh) return null;
-    return renderFull(vw, vh);
-  }
-
-  function doCapture() {
-    const data = capture();
-    if (!data) return;
-    flash.classList.remove("fire");
-    void flash.offsetWidth;
-    flash.classList.add("fire");
-    showSnapshotPreview(data);
-  }
-
-  function takeSnapshot() {
-    if (!stream) return;
-    if (state.flash && !hasTorch) {
-      screenFlash.classList.add("burst");
-      setTimeout(() => {
-        screenFlash.classList.remove("burst");
-        if (state.flash) screenFlash.classList.add("on");
-      }, 220);
-      setTimeout(doCapture, 110);
-      return;
-    }
-    doCapture();
-  }
-
-  /* ============================================================
-     CONTENT PANE (web + note)
-  ============================================================ */
-  function normalizeUrl(raw) {
-    let v = (raw || "").trim();
-    if (!v) return "";
-    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) v = "https://" + v.replace(/^\/+/, "");
-    return v;
-  }
-
-  function renderContent() {
-    const c = state.content;
-    contentPane.classList.toggle("mode-web",  c.mode === "web");
-    contentPane.classList.toggle("mode-note", c.mode === "note");
-    contentPane.querySelectorAll(".seg-btn").forEach(b =>
-      b.classList.toggle("on", b.dataset.mode === c.mode)
-    );
-
-    if (document.activeElement !== urlInput) urlInput.value = c.url || "";
-    if (document.activeElement !== noteEditor) {
-      if (noteEditor.innerHTML !== (c.noteHtml || "")) {
-        noteEditor.innerHTML = c.noteHtml || "";
-      }
-    }
-
-    contentBody.classList.toggle("empty", c.mode === "web" && !c.url);
-
-    if (c.mode === "web" && c.url && frame.dataset.src !== c.url) {
-      frame.src = c.url;
-      frame.dataset.src = c.url;
-    }
-  }
-
-  contentPane.querySelectorAll(".seg-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      persistNote();
-      state.content.mode = btn.dataset.mode;
-      renderContent();
-      save();
-      if (btn.dataset.mode === "note") setTimeout(() => noteEditor.focus(), 30);
-    });
-  });
-
-  urlForm.addEventListener("submit", e => {
-    e.preventDefault();
-    const url = normalizeUrl(urlInput.value);
-    if (!url) return;
-    state.content.url = url;
-    state.content.mode = "web";
-    urlInput.value = url;
-    renderContent();
-    save();
-  });
-
-  contentPane.querySelector('[data-act="reload"]').addEventListener("click", () => {
-    const c = state.content;
-    if (c.mode !== "web" || !c.url) return;
-    frame.dataset.src = "";
-    frame.src = "about:blank";
-    setTimeout(() => { frame.src = c.url; frame.dataset.src = c.url; }, 40);
-  });
-
-  contentPane.querySelector('[data-act="open"]').addEventListener("click", () => {
-    const c = state.content;
-    if (c.mode === "web" && c.url) window.open(c.url, "_blank", "noopener");
+    updateSourceUI();
+    showToast(SRC_META[state.recSource].label + " mode", SRC_META[state.recSource].icon);
   });
 
   /* ============================================================
-     CAMERA CONTROLS
+     Right rail
   ============================================================ */
-  camToggle.addEventListener("click", toggleCamera);
-  csBtn.addEventListener("click", () => startCamera(state.deviceId || ""));
-  btnSnap.addEventListener("click", takeSnapshot);
-  btnRec.addEventListener("click", toggleRecording);
-  btnFlip.addEventListener("click", flipCamera);
-  btnFlash.addEventListener("click", toggleFlash);
   btnBeauty.addEventListener("click", cycleBeauty);
-
-  btnSrc.addEventListener("click", () => {
-    if (recorder.isRecording) togglePause();
-    else cycleSource();
-  });
-
-  micToggle.addEventListener("click", () => {
-    if (recorder.isRecording) return;
-    state.mic = !state.mic;
-    save();
-    updateMicUI();
-  });
-
+  btnFlash.addEventListener("click", toggleFlash);
   btnMirror.addEventListener("click", () => {
     state.mirrored = !state.mirrored;
     applyMirror();
     save();
   });
+  btnFlip.addEventListener("click", flipCamera);
 
-  camSelect.addEventListener("change", () => {
-    if (recorder.isRecording) { camSelect.value = state.deviceId; return; }
-    state.deviceId = camSelect.value;
-    save();
-    startCamera(state.deviceId);
+  /* ============================================================
+     Top bar
+  ============================================================ */
+  btnLayout.addEventListener("click", () => {
+    // The layout is always PiP for Snapchat look; here we just toggle content pane visibility
+    showToast("Snapchat mode active", "▣");
   });
 
-  btnFull.addEventListener("click", () => {
-    const el = camWrap;
-    if (document.fullscreenElement) document.exitFullscreen();
-    else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-    else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+  btnSettings.addEventListener("click", () => {
+    const lines = [
+      "Snapchat Camera — settings",
+      "",
+      "• Camera: " + (perms.camera || "unknown"),
+      "• Microphone: " + (perms.mic || "unknown"),
+      "• Recording source: " + SRC_META[state.recSource].label,
+      "• Beauty: " + BEAUTY_TITLES[state.beauty],
+      "• Filter: " + (state.filter === "none" ? "None" : state.filter),
+      "• Mirror: " + (state.mirrored ? "On" : "Off"),
+      "• Resolution: " + (video.videoWidth || "?") + "×" + (video.videoHeight || "?"),
+      "",
+      "Long-press the yellow button to record. Tap to snap."
+    ];
+    alert(lines.join("\n"));
   });
 
   /* ============================================================
-     MODAL
+     Initial filter carousel highlight
   ============================================================ */
-  document.getElementById("modalClose").addEventListener("click", closeModal);
-  document.getElementById("modalDiscard").addEventListener("click", closeModal);
-  document.getElementById("modalDownload").addEventListener("click", downloadCurrent);
-  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
-
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape") {
-      if (modal.classList.contains("show")) { closeModal(); return; }
-      if (recorder.isRecording) { stopRecording(); return; }
-    }
-
-    const ae = document.activeElement;
-    const tag = (ae && ae.tagName) || "";
-    const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||
-                   (ae && ae.isContentEditable);
-    if (typing || modal.classList.contains("show")) return;
-
-    if (e.code === "Space") {
-      if (stream) { e.preventDefault(); takeSnapshot(); }
-    } else if (e.key.toLowerCase() === "r") {
-      if (stream) { e.preventDefault(); toggleRecording(); }
-    } else if (e.key.toLowerCase() === "s") {
-      if (stream) { e.preventDefault(); takeSnapshot(); }
-    } else if (e.key.toLowerCase() === "p") {
-      if (recorder.isRecording) { e.preventDefault(); togglePause(); }
-    }
-  });
+  function syncFiltersUI() {
+    filtersEl.querySelectorAll(".f-chip").forEach(c =>
+      c.classList.toggle("on", c.dataset.filter === state.filter)
+    );
+  }
 
   /* ============================================================
-     GLOBAL CONTROLS
+     Boot
   ============================================================ */
-  layoutBtn.addEventListener("click", () => {
-    const i = LAYOUT_ORDER.indexOf(state.layout);
-    state.layout = LAYOUT_ORDER[(i + 1) % LAYOUT_ORDER.length];
-    save();
-    applyLayout();
-  });
-
-  swapBtn.addEventListener("click", () => {
-    if (state.layout === "pip") {
-      const iw = stageInner.clientWidth;
-      const ih = stageInner.clientHeight;
-      if (!iw || !ih) return;
-      const cw = camPane.offsetWidth;
-      const ch = camPane.offsetHeight;
-      const maxX = Math.max(0, iw - cw);
-      const maxY = Math.max(0, ih - ch);
-      const px = state.pip.x * iw;
-      const py = state.pip.y * ih;
-      const nx = maxX - px;
-      const ny = maxY - py;
-      state.pip.x = iw > 0 ? nx / iw : 0.5;
-      state.pip.y = ih > 0 ? ny / ih : 0.5;
-      save();
-      camPane.classList.add("snapping");
-      applyPipPosition(false);
-      setTimeout(() => camPane.classList.remove("snapping"), 260);
-    } else {
-      state.camFirst = !state.camFirst;
-      mountPanes();
-      save();
-    }
-  });
-
-  snapTopBtn.addEventListener("click", takeSnapshot);
-  recTopBtn.addEventListener("click", toggleRecording);
-
-  resetBtn.addEventListener("click", () => {
-    if (recorder.isRecording) stopRecording();
-    state = defaults();
+  async function boot() {
+    // Set up mirror / beauty UI from stored state
     applyMirror();
-    setFilter("none");
     updateBeautyUI();
     updateFlashUI();
-    updateMicUI();
-    updateSrcUI(false);
-    screenFlash.classList.remove("on", "burst");
-    mountPanes();
-    applyLayout();
-    noteEditor.innerHTML = "";
-    renderContent();
-    applyColors();
-    save();
-    startCamera(state.deviceId || "");
-  });
+    updateSourceUI();
+    syncFiltersUI();
 
-  /* ============================================================
-     LIFECYCLE
-  ============================================================ */
+    // Check whether we already have permission granted from a previous session
+    await refreshPermissionStatus();
+    paintGate();
+
+    if (perms.camera === "granted") {
+      // Already granted — skip the gate and start immediately
+      hideGate();
+      await startCamera(state.deviceId || "", { requestMic: state.mic });
+    } else {
+      // Show the gate
+      gate.classList.remove("hide");
+    }
+
+    startLoop();
+  }
+
+  /* Re-poll permissions when the tab becomes visible */
   document.addEventListener("visibilitychange", () => {
-    if (!stream) return;
-    if (document.hidden) { video.pause(); stopLoop(); }
-    else {
-      video.play().catch(() => {});
-      if (state.filter !== "none" || state.beauty > 0) startLoop();
+    if (!document.hidden) {
+      refreshPermissionStatus().then(paintGate);
     }
   });
 
-  let resizeTimer = null;
-  window.addEventListener("resize", () => {
-    resizeFx();
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      sizePipStage();
-      applyPipPosition(false);
-    }, 30);
-  });
+  /* Handle window resize for the FX canvas */
+  window.addEventListener("resize", resizeFx);
 
+  /* Cleanup on unload */
   window.addEventListener("beforeunload", () => {
     if (recorder.isRecording) {
-      try {
-        if (recorder.mediaRecorder && recorder.mediaRecorder.state !== "inactive") {
-          recorder.mediaRecorder.stop();
-        }
-      } catch (e) {}
+      try { recorder.mediaRecorder && recorder.mediaRecorder.stop(); } catch (e) {}
       cleanupRecordStreams();
     }
-    if (stream) {
-      const track = stream.getVideoTracks()[0];
-      if (track) { try { track.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) {} }
-      stream.getTracks().forEach(t => t.stop());
-    }
+    stopCamera();
+    stopMic();
     stopLoop();
+    if (previewUrl) { try { URL.revokeObjectURL(previewUrl); } catch (e) {} }
   });
 
-  /* ============================================================
-     INIT
-  ============================================================ */
-  mountPanes();
-  applyLayout();
-  applyMirror();
-  updateBeautyUI();
-  updateFlashUI();
-  updateMicUI();
-  updateSrcUI(false);
-
-  noteEditor.innerHTML = state.content.noteHtml || "";
-  renderContent();
-  applyColors();
-  buildFrameSwatches();
-
-  setLive(false);
-
-  filterStrip.querySelectorAll(".chip").forEach(c =>
-    c.classList.toggle("on", c.dataset.filter === state.filter)
-  );
-
-  startCamera(state.deviceId || "").then(() => {
-    if (state.filter !== "none") {
-      initFaceTracking();
-      ensureLoop();
-    }
-    updateFxStatus();
-    updateFlashUI();
-  });
-
-  ensureLoop();
-
-  setTimeout(() => { sizePipStage(); applyPipPosition(false); }, 100);
+  /* Kick off */
+  boot();
 
 })();
 </script>
