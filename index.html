@@ -89,6 +89,7 @@
         border-color: #1e7e34;
     }
 
+    /* Quality selector */
     .quality-select {
         background: #f0f0f0;
         color: #333;
@@ -101,29 +102,6 @@
         outline: none;
     }
     .quality-select:hover { background: #e6e6e6; }
-
-    /* Noise reduction toggle */
-    .noise-toggle {
-        background: #f0f0f0;
-        color: #555;
-        border: 2px solid transparent;
-        border-radius: 8px;
-        padding: 12px 14px;
-        font-size: 13px;
-        font-weight: bold;
-        cursor: pointer;
-        outline: none;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        transition: all 0.2s;
-    }
-    .noise-toggle.active {
-        background: var(--success-green);
-        color: white;
-        border-color: #1e7e34;
-    }
-    .noise-toggle:hover { opacity: 0.9; }
 
     button:hover:not(:disabled) { transform: translateY(-1px); opacity: 0.9; }
     button:disabled { opacity: 0.2; cursor: not-allowed; }
@@ -407,15 +385,6 @@
         font-weight: 700;
         letter-spacing: 0.4px;
     }
-    .preview-header .noise-badge {
-        background: #16a34a;
-        color: #fff;
-        font-size: 10px;
-        padding: 2px 8px;
-        border-radius: 10px;
-        font-weight: 700;
-        letter-spacing: 0.4px;
-    }
 
     .preview-canvas {
         width: 100%;
@@ -455,9 +424,6 @@
                 <option value="1080" selected>1080p (Full HD)</option>
                 <option value="1440">1440p (QHD)</option>
             </select>
-            <button class="noise-toggle active" id="noiseBtn" title="Réduction automatique du bruit ambiant">
-                🔇 Anti-bruit : ON
-            </button>
             <div class="rec-timer" id="recTimer">
                 ⏺ <span id="recTime">00:00</span>
                 <span class="mic-bars" id="micBars">
@@ -478,7 +444,6 @@
             <span class="live-dot"></span>
             <span class="label">REC — Aperçu en direct</span>
             <span class="quality-badge" id="qualityBadge">1080p</span>
-            <span class="noise-badge" id="noiseBadge">🔇 Anti-bruit</span>
             <span class="hint">Ce que la vidéo enregistrée contient</span>
         </div>
         <canvas class="preview-canvas" id="previewCanvas" width="1920" height="1080"></canvas>
@@ -514,29 +479,6 @@
         qualitySelect.addEventListener('change', () => {
             currentQuality = QUALITY_PRESETS[qualitySelect.value] || QUALITY_PRESETS['1080'];
             qualityBadge.textContent = currentQuality.label;
-        });
-
-        // Noise reduction toggle state (default ON)
-        let noiseReductionEnabled = true;
-        const noiseBtn = document.getElementById('noiseBtn');
-        const noiseBadge = document.getElementById('noiseBadge');
-
-        function updateNoiseUI() {
-            if (noiseReductionEnabled) {
-                noiseBtn.classList.add('active');
-                noiseBtn.innerText = '🔇 Anti-bruit : ON';
-                noiseBadge.style.display = 'inline-block';
-            } else {
-                noiseBtn.classList.remove('active');
-                noiseBtn.innerText = '🔇 Anti-bruit : OFF';
-                noiseBadge.style.display = 'none';
-            }
-        }
-        updateNoiseUI();
-
-        noiseBtn.addEventListener('click', () => {
-            noiseReductionEnabled = !noiseReductionEnabled;
-            updateNoiseUI();
         });
 
         // ============================================================
@@ -691,7 +633,7 @@
         }
 
         // ============================================================
-        //  FLOATING CAMERA
+        //  FLOATING CAMERA — HD quality
         // ============================================================
         let currentStream = null;
         let currentTrack = null;
@@ -742,6 +684,7 @@
                 torchEnabled = false;
                 flashBtn.classList.remove('flash-active');
 
+                // Ask for the highest camera resolution we can
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: {
@@ -759,6 +702,7 @@
                     await videoEl.play();
                     cameraAvailable = true;
 
+                    // Log actual camera resolution
                     const s = currentTrack.getSettings();
                     console.log(`Camera ${facingMode} — ${s.width}x${s.height} @ ${s.frameRate}fps`);
                     
@@ -775,6 +719,7 @@
                     flashBtn.title = torchSupported ? 'Flash (torche matérielle)' : 'Flash (écran)';
                 } catch (err) {
                     console.warn('HD camera failed, trying fallback:', err);
+                    // Fallback to any resolution
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({
                             video: { facingMode: facingMode },
@@ -977,7 +922,7 @@
         })();
 
         // ============================================================
-        //  RECORDING — HD video + AUTO NOISE-CLEANED microphone audio
+        //  RECORDING — HD video (canvas composite) + YOUR MICROPHONE audio
         // ============================================================
         (function initRecorder() {
             const recordBtn = document.getElementById('recordBtn');
@@ -993,19 +938,21 @@
             const micBarEls = micBars.querySelectorAll('span');
             const cameraFloat = document.getElementById('cameraFloat');
 
-            // Recording canvas
+            // Recording canvas — size follows selected quality
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
             // Preview canvas
             const previewCtx = previewCanvas.getContext('2d');
 
+            // Apply quality to both canvases
             function applyQuality() {
                 canvas.width = currentQuality.w;
                 canvas.height = currentQuality.h;
                 previewCanvas.width = currentQuality.w;
                 previewCanvas.height = currentQuality.h;
                 qualityBadge.textContent = currentQuality.label;
+                console.log(`Quality set: ${currentQuality.w}x${currentQuality.h} @ ${currentQuality.fps}fps, ${currentQuality.videoBitrate/1e6}Mbps`);
             }
             applyQuality();
 
@@ -1016,12 +963,11 @@
             let recStart = 0;
             let isRecording = false;
 
-            // Audio processing chain
+            // Mic capture state
             let micStream = null;
             let audioCtx = null;
             let analyser = null;
             let micRafId = null;
-            let processedDestination = null;   // MediaStreamDestination carrying the cleaned audio
 
             function fmtTime(ms) {
                 const s = Math.floor(ms / 1000);
@@ -1044,14 +990,17 @@
                 return '';
             }
 
-            // ---- Draw composite frame ----
+            // ---- Draw composite frame (high quality) ----
             function drawComposite(targetCtx, W, H) {
+                // Crisp rendering
                 targetCtx.imageSmoothingEnabled = true;
                 targetCtx.imageSmoothingQuality = 'high';
 
+                // White background
                 targetCtx.fillStyle = '#ffffff';
                 targetCtx.fillRect(0, 0, W, H);
 
+                // ---- Active sentence text ----
                 targetCtx.textAlign = 'center';
                 targetCtx.textBaseline = 'middle';
 
@@ -1061,10 +1010,12 @@
                     const color = isEnglish ? '#d9534f' : '#0275d8';
                     const text = activeEl.innerText;
 
+                    // Font size scales with canvas height
                     const fontSize = Math.round(H * 0.12);
                     targetCtx.font = `700 ${fontSize}px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`;
                     targetCtx.fillStyle = color;
 
+                    // Wrap
                     const maxWidth = W * 0.82;
                     const words = text.split(' ');
                     const lines = [];
@@ -1092,6 +1043,7 @@
                     targetCtx.fillText('(aucune phrase active)', W / 2, H / 2);
                 }
 
+                // ---- Circular camera overlay (crisp) ----
                 if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
                     const bubble = document.getElementById('cameraFloat');
                     const bubbleRect = bubble.getBoundingClientRect();
@@ -1115,6 +1067,7 @@
                         targetCtx.scale(-1, 1);
                     }
 
+                    // Draw the camera frame at high quality, cropped square
                     const vw = videoEl.videoWidth;
                     const vh = videoEl.videoHeight;
                     const side = Math.min(vw, vh);
@@ -1126,6 +1079,7 @@
 
                     targetCtx.restore();
 
+                    // White ring
                     targetCtx.save();
                     targetCtx.beginPath();
                     targetCtx.arc(cx, cy, radius, 0, Math.PI * 2);
@@ -1185,109 +1139,10 @@
                 }
             }
 
-            // ============================================================
-            //  NOISE REMOVAL CHAIN
-            //  mic → highpass (kill rumble/hum) → lowpass (kill hiss)
-            //        → notch @ 50Hz + 60Hz (electrical hum)
-            //        → dynamics compressor (even out + limit)
-            //        → noise gate (silence below threshold)
-            //        → destination (MediaStreamDestination for recorder)
-            // ============================================================
-            function buildNoiseRemovalChain(sourceNode) {
-                const ctxLocal = audioCtx;
-
-                // --- High-pass filter: remove low-frequency rumble (< 85 Hz) ---
-                const highpass = ctxLocal.createBiquadFilter();
-                highpass.type = 'highpass';
-                highpass.frequency.value = 85;
-                highpass.Q.value = 0.7;
-
-                // --- Low-pass filter: remove high-frequency hiss (> 9 kHz) ---
-                const lowpass = ctxLocal.createBiquadFilter();
-                lowpass.type = 'lowpass';
-                lowpass.frequency.value = 9000;
-                lowpass.Q.value = 0.7;
-
-                // --- Notch filter @ 50 Hz (European mains hum) ---
-                const notch50 = ctxLocal.createBiquadFilter();
-                notch50.type = 'notch';
-                notch50.frequency.value = 50;
-                notch50.Q.value = 12;
-
-                // --- Notch filter @ 60 Hz (US mains hum) ---
-                const notch60 = ctxLocal.createBiquadFilter();
-                notch60.type = 'notch';
-                notch60.frequency.value = 60;
-                notch60.Q.value = 12;
-
-                // --- Notch @ 100 Hz (2nd harmonic of 50 Hz hum) ---
-                const notch100 = ctxLocal.createBiquadFilter();
-                notch100.type = 'notch';
-                notch100.frequency.value = 100;
-                notch100.Q.value = 10;
-
-                // --- Notch @ 120 Hz (2nd harmonic of 60 Hz hum) ---
-                const notch120 = ctxLocal.createBiquadFilter();
-                notch120.type = 'notch';
-                notch120.frequency.value = 120;
-                notch120.Q.value = 10;
-
-                // --- Noise gate: silence anything below threshold ---
-                // Implemented as a DynamicsCompressor with high threshold acting as a limiter
-                // for the low end. Combined with a soft expander feel via compressor settings.
-                const gate = ctxLocal.createDynamicsCompressor();
-                gate.threshold.value = -45;    // gate silence below -45 dB
-                gate.knee.value = 6;
-                gate.ratio.value = 20;         // aggressive
-                gate.attack.value = 0.003;
-                gate.release.value = 0.15;
-
-                // --- Presence boost @ 3 kHz (voice clarity) ---
-                const presence = ctxLocal.createBiquadFilter();
-                presence.type = 'peaking';
-                presence.frequency.value = 3000;
-                presence.Q.value = 1.0;
-                presence.gain.value = 3;
-
-                // --- Final limiter ---
-                const limiter = ctxLocal.createDynamicsCompressor();
-                limiter.threshold.value = -3;
-                limiter.knee.value = 0;
-                limiter.ratio.value = 20;
-                limiter.attack.value = 0.002;
-                limiter.release.value = 0.08;
-
-                // --- Output gain ---
-                const outGain = ctxLocal.createGain();
-                outGain.gain.value = 1.0;
-
-                // Chain them up
-                sourceNode
-                    .connect(highpass)
-                    .connect(lowpass)
-                    .connect(notch50)
-                    .connect(notch60)
-                    .connect(notch100)
-                    .connect(notch120)
-                    .connect(gate)
-                    .connect(presence)
-                    .connect(limiter)
-                    .connect(outGain);
-
-                return outGain;
-            }
-
-            // Simple pass-through (for when noise reduction is OFF)
-            function buildPassThroughChain(sourceNode) {
-                const gain = audioCtx.createGain();
-                gain.gain.value = 1.0;
-                sourceNode.connect(gain);
-                return gain;
-            }
-
             async function startRecording() {
                 if (isRecording) return;
 
+                // Re-apply quality in case it changed
                 applyQuality();
 
                 // 1. Acquire microphone
@@ -1297,35 +1152,19 @@
                     return;
                 }
 
-                // 2. Set up AudioContext + noise removal chain
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)({
-                    sampleRate: 48000
-                });
-
+                // 2. Audio analyser for the level meter
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioCtx.createMediaStreamSource(micStream);
-
-                // Analyser for the level meter (taps the raw mic so meter is responsive)
                 analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 256;
                 analyser.smoothingTimeConstant = 0.6;
                 source.connect(analyser);
 
-                // Build the cleanup chain (or pass-through if OFF)
-                const chainOutput = noiseReductionEnabled
-                    ? buildNoiseRemovalChain(source)
-                    : buildPassThroughChain(source);
-
-                // Destination stream to hand the cleaned audio to MediaRecorder
-                processedDestination = audioCtx.createMediaStreamDestination();
-                chainOutput.connect(processedDestination);
-
-                console.log(`🎙 Recording — noise reduction: ${noiseReductionEnabled ? 'ON' : 'OFF'}`);
-
-                // 3. Combined stream: canvas video + CLEANED mic audio
+                // 3. Combined stream: canvas video (at selected quality) + mic audio
                 const canvasStream = canvas.captureStream(currentQuality.fps);
                 const combinedStream = new MediaStream();
                 combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
-                processedDestination.stream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
+                micStream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
 
                 const mimeType = pickMimeType();
                 const options = mimeType 
@@ -1355,9 +1194,8 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                    const tag = noiseReductionEnabled ? 'clean' : 'raw';
                     a.href = url;
-                    a.download = `lecon-bilingue-${currentQuality.label}-${tag}-${ts}.webm`;
+                    a.download = `lecon-bilingue-${currentQuality.label}-${ts}.webm`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
@@ -1400,7 +1238,6 @@
                     audioCtx = null;
                 }
                 analyser = null;
-                processedDestination = null;
                 micBarEls.forEach(bar => {
                     bar.style.height = '3px';
                     bar.style.background = 'rgba(255,138,128,0.3)';
@@ -1451,6 +1288,7 @@
                 }
             });
 
+            // Re-apply quality on change
             qualitySelect.addEventListener('change', () => {
                 if (!isRecording) applyQuality();
             });
