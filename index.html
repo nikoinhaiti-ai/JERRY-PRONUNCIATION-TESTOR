@@ -1,389 +1,585 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>Floating Note</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Caveat:wght@500&family=Playfair+Display:wght@500&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-<style>
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0; height: 100%;
-    font-family: 'Inter', sans-serif;
-    background: transparent;
-    overflow: hidden;
-    user-select: none;
-  }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apprentissage Bilingue TTS + Caméra flottante</title>
+    <style>
+        :root {
+            --en-red: #d9534f;
+            --fr-blue: #0275d8;
+            --border-color: #eeeeee;
+            --success-green: #28a745;
+        }
 
-  /* ===== THEME VARIABLES ===== */
-  :root {
-    --bg: rgba(24, 24, 28, 0.85);
-    --text: #f0f0f0;
-    --muted: #9a9aa2;
-    --accent: #6ea8fe;
-    --bar: rgba(255,255,255,0.06);
-    --border: rgba(255,255,255,0.10);
-  }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ffffff;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
 
-  .app {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg);
-    backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow: 0 12px 40px rgba(0,0,0,.45);
-    overflow: hidden;
-    color: var(--text);
-  }
+        .input-section {
+            width: 100%;
+            max-width: 850px;
+            margin-bottom: 30px;
+        }
 
-  /* ===== TOP BAR (drag handle) ===== */
-  .topbar {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 12px;
-    background: var(--bar);
-    border-bottom: 1px solid var(--border);
-    cursor: grab;
-  }
-  .topbar:active { cursor: grabbing; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; }
-  .dot.r { background: #ff5f57; }
-  .dot.y { background: #febc2e; }
-  .dot.g { background: #28c840; }
-  .title {
-    font-size: 12.5px; font-weight: 600;
-    color: var(--muted); margin-left: 6px;
-    letter-spacing: .3px;
-  }
-  .spacer { flex: 1; }
+        textarea {
+            width: 100%;
+            height: 100px;
+            background: #fafafa;
+            color: #333;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 16px;
+            resize: none;
+            box-sizing: border-box;
+            outline: none;
+        }
 
-  /* ===== BUTTONS ===== */
-  button, select {
-    font-family: inherit;
-    font-size: 12px;
-    color: var(--text);
-    background: rgba(255,255,255,0.07);
-    border: 1px solid var(--border);
-    padding: 5px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all .15s ease;
-    outline: none;
-  }
-  button:hover, select:hover { background: rgba(255,255,255,0.14); }
-  button:active { transform: translateY(1px); }
-  button.danger { background: rgba(255,80,80,.15); border-color: rgba(255,80,80,.3); }
-  button.danger:hover { background: rgba(255,80,80,.28); }
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
 
-  /* ===== TOOLBAR ===== */
-  .toolbar {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-    padding: 8px 12px;
-    background: rgba(0,0,0,0.15);
-    border-bottom: 1px solid var(--border);
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .group { display: flex; align-items: center; gap: 6px; }
-  .group label { font-size: 11px; letter-spacing: .4px; text-transform: uppercase; opacity: .8; }
+        button {
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
 
-  input[type="color"] {
-    width: 28px; height: 28px; padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: transparent;
-    cursor: pointer;
-  }
-  input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
-  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+        #loadBtn { background: #f0f0f0; color: #555; }
+        #playBtn { background: #ff0000; color: white; }
+        #pauseBtn { background: #f0ad4e; color: white; display: none; }
+        #stopBtn { background: #333; color: white; }
+        #loopBtn { background: #f0f0f0; color: #555; border: 2px solid transparent; }
+        
+        #loopBtn.active { 
+            background: var(--success-green); 
+            color: white; 
+            border-color: #1e7e34;
+        }
 
-  input[type="range"] {
-    -webkit-appearance: none; appearance: none;
-    height: 4px; border-radius: 4px;
-    background: rgba(255,255,255,0.18);
-    outline: none; cursor: pointer;
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid #fff2;
-  }
+        button:hover:not(:disabled) { transform: translateY(-1px); opacity: 0.9; }
+        button:disabled { opacity: 0.2; cursor: not-allowed; }
 
-  /* ===== EDITOR ===== */
-  #editor {
-    flex: 1;
-    width: 100%;
-    resize: none;
-    border: none;
-    outline: none;
-    padding: 16px 18px;
-    background: transparent;
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    font-size: 15px;
-    line-height: 1.55;
-    overflow-y: auto;
-    user-select: text;
-  }
-  #editor::placeholder { color: var(--muted); opacity: .55; }
+        /* CONTENEUR FORMAT YOUTUBE (16:9) */
+        .stage {
+            width: 100%;
+            max-width: 850px;
+            aspect-ratio: 16 / 9;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+            border: 1px solid var(--border-color);
+            margin-top: 10px;
+        }
 
-  /* scrollbar */
-  #editor::-webkit-scrollbar { width: 8px; }
-  #editor::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.15); border-radius: 8px;
-  }
+        #scroller {
+            position: absolute;
+            width: 100%;
+            top: 50%; 
+            left: 0;
+            transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+            will-change: transform;
+        }
 
-  /* ===== RESIZE HANDLE ===== */
-  .resizer {
-    position: absolute;
-    right: 2px; bottom: 2px;
-    width: 18px; height: 18px;
-    cursor: nwse-resize;
-    opacity: .5;
-  }
-  .resizer::after {
-    content: ""; position: absolute; right: 4px; bottom: 4px;
-    width: 8px; height: 8px;
-    border-right: 2px solid var(--muted);
-    border-bottom: 2px solid var(--muted);
-    border-bottom-right-radius: 3px;
-  }
+        .sentence-item {
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 0 60px;
+            font-size: 40px;
+            font-weight: 700;
+            box-sizing: border-box;
+            transition: opacity 0.5s, transform 0.5s;
+            opacity: 0.05; 
+        }
 
-  /* ===== LIGHT THEME ===== */
-  body.light {
-    --bg: rgba(250, 250, 252, 0.92);
-    --text: #1a1a1e;
-    --muted: #6b6b74;
-    --accent: #3b82f6;
-    --bar: rgba(0,0,0,0.04);
-    --border: rgba(0,0,0,0.10);
-  }
-</style>
+        .sentence-item.active {
+            opacity: 1;
+            transform: scale(1.08);
+        }
+
+        .english { color: var(--en-red); }
+        .french { color: var(--fr-blue); }
+
+        .center-guide {
+            position: absolute;
+            top: 50%;
+            left: 5%;
+            right: 5%;
+            height: 1px;
+            background: rgba(0,0,0,0.02);
+            pointer-events: none;
+            transform: translateY(-50%);
+        }
+
+        /* --- FLOATING CAMERA WIDGET (small, draggable) --- */
+        .camera-float {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 220px;
+            height: 165px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+            border: 3px solid #fff;
+            background: #111;
+            z-index: 1000;
+            cursor: grab;
+            transition: box-shadow 0.2s;
+            user-select: none;
+        }
+
+        .camera-float:active {
+            cursor: grabbing;
+            box-shadow: 0 18px 40px rgba(0,0,0,0.5);
+        }
+
+        .camera-float video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            background: #000;
+            transform: scaleX(-1); /* mirror */
+        }
+
+        /* tiny status light / label */
+        .camera-badge {
+            position: absolute;
+            top: 8px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 3px 9px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .camera-badge::before {
+            content: '';
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            background: #00e676;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00e676;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        /* On small screens, adapt size */
+        @media (max-width: 600px) {
+            .camera-float {
+                width: 150px;
+                height: 112px;
+                bottom: 15px;
+                right: 15px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="app" id="app">
-    <div class="topbar" id="topbar">
-      <span class="dot r"></span>
-      <span class="dot y"></span>
-      <span class="dot g"></span>
-      <span class="title">✎ Floating Note</span>
-      <div class="spacer"></div>
-      <button id="themeBtn" title="Toggle light/dark">🌓</button>
-      <button id="saveBtn">Save</button>
-      <button id="clearBtn" class="danger">Clear</button>
+
+    <div class="input-section">
+        <textarea id="textInput" placeholder="Ligne 1 : Anglais&#10;Ligne 2 : Français&#10;Ligne 3 : Anglais..."></textarea>
+        <div class="controls">
+            <button id="loadBtn" onclick="processText()">1. Charger la liste</button>
+            <button id="playBtn" onclick="startPlayAll()" disabled>▶ Lire tout</button>
+            <button id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
+            <button id="stopBtn" onclick="stopSpeech()">⏹ Arrêter</button>
+            <button id="loopBtn" onclick="toggleLoop()">🔁 Boucle : OFF</button>
+        </div>
     </div>
 
-    <div class="toolbar">
-      <div class="group">
-        <label>Font</label>
-        <select id="fontSelect">
-          <option value="Inter">Inter</option>
-          <option value="JetBrains Mono">JetBrains Mono</option>
-          <option value="Poppins">Poppins</option>
-          <option value="Playfair Display">Playfair Display</option>
-          <option value="Caveat">Caveat (handwriting)</option>
-          <option value="Georgia">Georgia</option>
-          <option value="system-ui">System UI</option>
-        </select>
-      </div>
-
-      <div class="group">
-        <label>Size</label>
-        <input type="range" id="sizeRange" min="12" max="36" value="15">
-        <span id="sizeVal" style="min-width:28px;text-align:right;">15</span>
-      </div>
-
-      <div class="group">
-        <label>Text</label>
-        <input type="color" id="textColor" value="#f0f0f0">
-      </div>
-
-      <div class="group">
-        <label>BG</label>
-        <input type="color" id="bgColor" value="#18181c">
-      </div>
-
-      <div class="group">
-        <label>Opacity</label>
-        <input type="range" id="opacity" min="20" max="100" value="85">
-      </div>
+    <div class="stage">
+        <div class="center-guide"></div>
+        <div id="scroller"></div>
     </div>
 
-    <textarea id="editor" placeholder="Start typing… everything saves automatically."></textarea>
+    <!-- Floating camera widget -->
+    <div class="camera-float" id="cameraFloat" tabindex="0">
+        <video id="cameraVideo" autoplay playsinline muted></video>
+        <div class="camera-badge">CAM LIVE</div>
+    </div>
 
-    <div class="resizer" id="resizer"></div>
-  </div>
+    <script>
+        // ---------- TTS LOGIC ----------
+        const synth = window.speechSynthesis;
+        let sentenceData = [];
+        let currentIndex = 0;
+        let repeatCounter = 0;
+        let isPlaying = false;
+        let isPaused = false;
+        let isLooping = false;
+        const ITEM_HEIGHT = 150; 
 
-<script>
-  // ===== Load saved settings & text =====
-  const LS = {
-    text: 'fn_text',
-    font: 'fn_font',
-    size: 'fn_size',
-    textColor: 'fn_textcolor',
-    bgColor: 'fn_bgcolor',
-    opacity: 'fn_opacity',
-    theme: 'fn_theme',
-    width: 'fn_w', height: 'fn_h'
-  };
-  const $ = id => document.getElementById(id);
+        function processText() {
+            stopSpeech();
+            const input = document.getElementById('textInput').value;
+            const scroller = document.getElementById('scroller');
+            const lines = input.split('\n').map(l => l.trim()).filter(l => l !== "");
 
-  const editor = $('editor');
-  const app = $('app');
-  const sizeRange = $('sizeRange');
-  const sizeVal = $('sizeVal');
-  const opacity = $('opacity');
+            scroller.innerHTML = "";
+            sentenceData = [];
 
-  // Restore
-  editor.value = localStorage.getItem(LS.text) || '';
-  editor.style.fontFamily = `'${localStorage.getItem(LS.font) || 'Inter'}', sans-serif`;
-  $('fontSelect').value = localStorage.getItem(LS.font) || 'Inter';
-  const sz = localStorage.getItem(LS.size) || 15;
-  editor.style.fontSize = sz + 'px';
-  sizeRange.value = sz; sizeVal.textContent = sz;
+            lines.forEach((line, index) => {
+                const isEnglish = index % 2 === 0;
+                const langCode = isEnglish ? 'en-US' : 'fr-FR';
+                const colorClass = isEnglish ? 'english' : 'french';
+                const totalRepeats = isEnglish ? 3 : 2; 
 
-  const tc = localStorage.getItem(LS.textColor);
-  if (tc) { editor.style.color = tc; $('textColor').value = tc; }
-  const bc = localStorage.getItem(LS.bgColor);
-  if (bc) { app.style.background = hexToRgba(bc, (localStorage.getItem(LS.opacity)||85)/100); $('bgColor').value = bc; }
-  const op = localStorage.getItem(LS.opacity) || 85;
-  opacity.value = op;
-  applyOpacity(op);
+                const div = document.createElement('div');
+                div.className = `sentence-item ${colorClass}`;
+                div.innerText = line;
+                scroller.appendChild(div);
 
-  if (localStorage.getItem(LS.theme) === 'light') document.body.classList.add('light');
-  if (localStorage.getItem(LS.width)) {
-    document.body.style.width = localStorage.getItem(LS.width) + 'px';
-    document.body.style.height = localStorage.getItem(LS.height) + 'px';
-  }
+                sentenceData.push({ 
+                    text: line, 
+                    lang: langCode, 
+                    element: div,
+                    isEnglish: isEnglish,
+                    maxRepeats: totalRepeats
+                });
+            });
 
-  // ===== Auto-save text =====
-  let saveTimer;
-  editor.addEventListener('input', () => {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      localStorage.setItem(LS.text, editor.value);
-    }, 200);
-  });
+            if (sentenceData.length > 0) {
+                scroller.style.transform = `translateY(${-ITEM_HEIGHT / 2}px)`;
+                document.getElementById('playBtn').disabled = false;
+            }
+        }
 
-  // ===== Font family =====
-  $('fontSelect').addEventListener('change', e => {
-    const f = e.target.value;
-    editor.style.fontFamily = `'${f}', sans-serif`;
-    localStorage.setItem(LS.font, f);
-  });
+        function updateDisplay(index) {
+            sentenceData.forEach(s => s.element.classList.remove('active'));
+            const item = sentenceData[index];
+            if (item) {
+                item.element.classList.add('active');
+                const offset = -(index * ITEM_HEIGHT) - (ITEM_HEIGHT / 2);
+                document.getElementById('scroller').style.transform = `translateY(${offset}px)`;
+            }
+        }
 
-  // ===== Font size =====
-  sizeRange.addEventListener('input', e => {
-    editor.style.fontSize = e.target.value + 'px';
-    sizeVal.textContent = e.target.value;
-    localStorage.setItem(LS.size, e.target.value);
-  });
+        function speakStep() {
+            if (!isPlaying || isPaused) return;
 
-  // ===== Text color =====
-  $('textColor').addEventListener('input', e => {
-    editor.style.color = e.target.value;
-    localStorage.setItem(LS.textColor, e.target.value);
-  });
+            if (currentIndex >= sentenceData.length) {
+                if (isLooping) {
+                    currentIndex = 0;
+                    repeatCounter = 0;
+                    setTimeout(speakStep, 1000);
+                } else {
+                    stopSpeech();
+                }
+                return;
+            }
 
-  // ===== BG color =====
-  $('bgColor').addEventListener('input', e => {
-    applyOpacity(opacity.value, e.target.value);
-    localStorage.setItem(LS.bgColor, e.target.value);
-  });
+            const currentItem = sentenceData[currentIndex];
+            updateDisplay(currentIndex);
 
-  // ===== Opacity =====
-  opacity.addEventListener('input', e => {
-    applyOpacity(e.target.value);
-    localStorage.setItem(LS.opacity, e.target.value);
-  });
+            const utterance = new SpeechSynthesisUtterance(currentItem.text);
+            utterance.lang = currentItem.lang;
 
-  function applyOpacity(alphaPct, bgOverride) {
-    const bgHex = bgOverride || $('bgColor').value;
-    const a = alphaPct / 100;
-    app.style.background = hexToRgba(bgHex, a);
-    app.style.backdropFilter = `blur(${a < 0.5 ? 8 : 18}px) saturate(140%)`;
-    app.style.webkitBackdropFilter = app.style.backdropFilter;
-  }
+            const voices = synth.getVoices();
+            const voice = voices.find(v => v.lang.startsWith(currentItem.lang));
+            if (voice) utterance.voice = voice;
 
-  function hexToRgba(hex, a) {
-    const h = hex.replace('#','');
-    const r = parseInt(h.substring(0,2),16);
-    const g = parseInt(h.substring(2,4),16);
-    const b = parseInt(h.substring(4,6),16);
-    return `rgba(${r},${g},${b},${a})`;
-  }
+            utterance.onend = () => {
+                if (!isPlaying || isPaused) return;
 
-  // ===== Save to file =====
-  $('saveBtn').addEventListener('click', () => {
-    const blob = new Blob([editor.value], {type:'text/plain'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'note.txt';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
+                repeatCounter++;
+                if (repeatCounter < currentItem.maxRepeats) {
+                    setTimeout(speakStep, 400); 
+                } else {
+                    currentIndex++;
+                    repeatCounter = 0;
+                    setTimeout(speakStep, 800); 
+                }
+            };
 
-  // ===== Clear =====
-  $('clearBtn').addEventListener('click', () => {
-    if (editor.value.trim() && !confirm('Clear the note?')) return;
-    editor.value = '';
-    localStorage.removeItem(LS.text);
-    editor.focus();
-  });
+            utterance.onerror = () => {
+                if (isPlaying) stopSpeech();
+            };
 
-  // ===== Theme toggle =====
-  $('themeBtn').addEventListener('click', () => {
-    document.body.classList.toggle('light');
-    localStorage.setItem(LS.theme, document.body.classList.contains('light') ? 'light' : 'dark');
-  });
+            synth.speak(utterance);
+        }
 
-  // ===== Drag to move (uses window.moveTo in opened window) =====
-  const topbar = $('topbar');
-  let dragStart = null;
-  topbar.addEventListener('mousedown', e => {
-    if (e.target.tagName === 'BUTTON') return;
-    // Only try to move if opened as popup window
-    dragStart = { x: e.screenX, y: e.screenY,
-                  winX: window.screenX, winY: window.screenY };
-    e.preventDefault();
-  });
-  window.addEventListener('mousemove', e => {
-    if (!dragStart) return;
-    try {
-      window.moveTo(
-        dragStart.winX + (e.screenX - dragStart.x),
-        dragStart.winY + (e.screenY - dragStart.y)
-      );
-    } catch(_) {}
-  });
-  window.addEventListener('mouseup', () => dragStart = null);
+        function startPlayAll() {
+            if (sentenceData.length === 0) return;
+            synth.cancel(); 
+            isPlaying = true;
+            isPaused = false;
+            currentIndex = 0;
+            repeatCounter = 0;
+            
+            document.getElementById('playBtn').style.display = 'none';
+            document.getElementById('pauseBtn').style.display = 'flex';
+            document.getElementById('pauseBtn').innerText = "⏸ Pause";
+            
+            speakStep();
+        }
 
-  // ===== Resize handle =====
-  const resizer = $('resizer');
-  let rz = null;
-  resizer.addEventListener('mousedown', e => {
-    rz = { x: e.screenX, y: e.screenY,
-           w: document.body.offsetWidth, h: document.body.offsetHeight };
-    e.preventDefault(); e.stopPropagation();
-  });
-  window.addEventListener('mousemove', e => {
-    if (!rz) return;
-    const w = Math.max(260, rz.w + (e.screenX - rz.x));
-    const h = Math.max(200, rz.h + (e.screenY - rz.y));
-    document.body.style.width = w + 'px';
-    document.body.style.height = h + 'px';
-  });
-  window.addEventListener('mouseup', () => {
-    if (rz) {
-      localStorage.setItem(LS.width, document.body.offsetWidth);
-      localStorage.setItem(LS.height, document.body.offsetHeight);
-      rz = null;
-    }
-  });
+        function togglePause() {
+            if (!isPlaying) return;
 
-  editor.focus();
-</script>
+            if (!isPaused) {
+                isPaused = true;
+                synth.pause();
+                document.getElementById('pauseBtn').innerText = "▶ Reprendre";
+            } else {
+                isPaused = false;
+                document.getElementById('pauseBtn').innerText = "⏸ Pause";
+                if (synth.paused) {
+                    synth.resume();
+                } else {
+                    speakStep();
+                }
+            }
+        }
+
+        function stopSpeech() {
+            isPlaying = false;
+            isPaused = false;
+            synth.cancel();
+            document.getElementById('playBtn').style.display = 'flex';
+            document.getElementById('playBtn').disabled = (sentenceData.length === 0);
+            document.getElementById('pauseBtn').style.display = 'none';
+        }
+
+        function toggleLoop() {
+            isLooping = !isLooping;
+            const btn = document.getElementById('loopBtn');
+            if (isLooping) {
+                btn.classList.add('active');
+                btn.innerText = "🔁 Boucle : ON";
+            } else {
+                btn.classList.remove('active');
+                btn.innerText = "🔁 Boucle : OFF";
+            }
+        }
+
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = () => synth.getVoices();
+        }
+
+        // ---------- FLOATING CAMERA ----------
+        (function initFloatingCamera() {
+            const videoEl = document.getElementById('cameraVideo');
+            const floatContainer = document.getElementById('cameraFloat');
+            
+            // Request camera with multiple fallbacks
+            async function startCamera() {
+                try {
+                    // First attempt: front camera
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: 'user',
+                            width: { ideal: 640 },
+                            height: { ideal: 480 }
+                        }, 
+                        audio: false 
+                    });
+                    videoEl.srcObject = stream;
+                    await videoEl.play();
+                    console.log('Camera started (front)');
+                } catch (err) {
+                    console.warn('Front camera failed, trying default...', err);
+                    try {
+                        // Second attempt: any camera
+                        const stream = await navigator.mediaDevices.getUserMedia({ 
+                            video: true, 
+                            audio: false 
+                        });
+                        videoEl.srcObject = stream;
+                        await videoEl.play();
+                        console.log('Camera started (default)');
+                    } catch (err2) {
+                        console.error('Camera unavailable:', err2);
+                        showCameraFallback(err2.message || 'Caméra indisponible');
+                    }
+                }
+            }
+
+            function showCameraFallback(message) {
+                videoEl.style.display = 'none';
+                const fallback = document.createElement('div');
+                fallback.style.cssText = `
+                    width: 100%; height: 100%; display: flex; flex-direction: column;
+                    align-items: center; justify-content: center;
+                    background: #1e1e1e; color: #ccc; font-size: 12px; 
+                    text-align: center; padding: 10px; box-sizing: border-box; gap: 6px;
+                `;
+                fallback.innerHTML = `
+                    <div style="font-size: 28px;">📷</div>
+                    <div>${message}</div>
+                    <div style="font-size: 10px; opacity: 0.7;">Vérifiez les permissions</div>
+                `;
+                floatContainer.appendChild(fallback);
+            }
+
+            // Check if mediaDevices API is available
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                startCamera();
+            } else {
+                showCameraFallback('API caméra non supportée');
+            }
+
+            // ---------- DRAGGABLE BEHAVIOR ----------
+            let isDragging = false;
+            let startX, startY, startLeft, startTop;
+
+            function setInitialPosition() {
+                const rect = floatContainer.getBoundingClientRect();
+                floatContainer.style.bottom = 'auto';
+                floatContainer.style.right = 'auto';
+                floatContainer.style.left = rect.left + 'px';
+                floatContainer.style.top = rect.top + 'px';
+                floatContainer.style.position = 'fixed';
+            }
+
+            setInitialPosition();
+            
+            window.addEventListener('resize', () => {
+                const rect = floatContainer.getBoundingClientRect();
+                const maxLeft = window.innerWidth - rect.width;
+                const maxTop = window.innerHeight - rect.height;
+                let left = Math.min(parseFloat(floatContainer.style.left) || rect.left, maxLeft);
+                let top = Math.min(parseFloat(floatContainer.style.top) || rect.top, maxTop);
+                left = Math.max(0, left);
+                top = Math.max(0, top);
+                floatContainer.style.left = left + 'px';
+                floatContainer.style.top = top + 'px';
+            });
+
+            floatContainer.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                isDragging = true;
+                const rect = floatContainer.getBoundingClientRect();
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = rect.left;
+                startTop = rect.top;
+                floatContainer.style.cursor = 'grabbing';
+                floatContainer.style.transition = 'none';
+                floatContainer.style.willChange = 'left, top';
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                let newLeft = startLeft + dx;
+                let newTop = startTop + dy;
+
+                const rect = floatContainer.getBoundingClientRect();
+                const maxLeft = window.innerWidth - rect.width;
+                const maxTop = window.innerHeight - rect.height;
+                newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+                newTop = Math.max(0, Math.min(newTop, maxTop));
+
+                floatContainer.style.left = newLeft + 'px';
+                floatContainer.style.top = newTop + 'px';
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    floatContainer.style.cursor = 'grab';
+                    floatContainer.style.transition = 'box-shadow 0.2s';
+                    floatContainer.style.willChange = 'auto';
+                }
+            });
+
+            // Touch support
+            floatContainer.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                if (!touch) return;
+                e.preventDefault();
+                isDragging = true;
+                const rect = floatContainer.getBoundingClientRect();
+                startX = touch.clientX;
+                startY = touch.clientY;
+                startLeft = rect.left;
+                startTop = rect.top;
+                floatContainer.style.cursor = 'grabbing';
+                floatContainer.style.transition = 'none';
+            }, { passive: false });
+
+            window.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                const touch = e.touches[0];
+                if (!touch) return;
+                e.preventDefault();
+
+                const dx = touch.clientX - startX;
+                const dy = touch.clientY - startY;
+                let newLeft = startLeft + dx;
+                let newTop = startTop + dy;
+
+                const rect = floatContainer.getBoundingClientRect();
+                const maxLeft = window.innerWidth - rect.width;
+                const maxTop = window.innerHeight - rect.height;
+                newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+                newTop = Math.max(0, Math.min(newTop, maxTop));
+
+                floatContainer.style.left = newLeft + 'px';
+                floatContainer.style.top = newTop + 'px';
+            }, { passive: false });
+
+            window.addEventListener('touchend', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    floatContainer.style.cursor = 'grab';
+                    floatContainer.style.transition = 'box-shadow 0.2s';
+                }
+            });
+
+            floatContainer.style.cursor = 'grab';
+        })();
+
+        // Prefill sample text
+        window.addEventListener('load', () => {
+            const ta = document.getElementById('textInput');
+            if (!ta.value) {
+                ta.value = "Hello, how are you?\nBonjour, comment allez-vous ?\nI am learning English.\nJ'apprends l'anglais.";
+            }
+        });
+    </script>
 </body>
 </html>
