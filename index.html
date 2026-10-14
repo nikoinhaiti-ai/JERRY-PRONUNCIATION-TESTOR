@@ -69,7 +69,6 @@
         100% { opacity:0;   transform:scale(1); }
     }
 
-    /* Strobe variant when recording starts */
     .cam .flash.auto {
         animation: flashPop 0.6s ease-out forwards;
     }
@@ -119,7 +118,7 @@
     <div class="btns">
         <button class="rec" id="camRec" title="Enregistrer">📷</button>
         <button id="camSwitch" title="Changer">🔄</button>
-        <button id="camFilter" title="Filtre">✨</button>
+        <!-- ⚡ Flash icon now in place of filter -->
         <button id="camFlashBtn" title="Flash">⚡</button>
     </div>
 </div>
@@ -223,25 +222,24 @@ document.getElementById('loopBtn').onclick = e => {
 };
 speechSynthesis.onvoiceschanged = () => synth.getVoices();
 
-// ============ CAMERA (small feed, draggable) ============
+// ============ CAMERA ============
 const camEl = document.getElementById('cam');
 const videoEl = document.getElementById('camVideo');
 const flashEl = document.getElementById('camFlash');
-let stream = null, facing = 'user', filter = true, dragging = false, sx, sy, sl, st;
-let flashTimer = null;      // current "fire" timeout
-let strobeInterval = null;  // ongoing strobe during recording
+let stream = null, facing = 'user', dragging = false, sx, sy, sl, st;
+let flashTimer = null;
+let strobeInterval = null;
 
-// ⚡ Trigger a single flash (add class, remove after animation)
+// ⚡ Trigger a single flash
 function fireFlash() {
-    // restart animation cleanly
     flashEl.classList.remove('fire');
-    void flashEl.offsetWidth; // force reflow
+    void flashEl.offsetWidth;
     flashEl.classList.add('fire');
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => flashEl.classList.remove('fire'), 500);
 }
 
-// ⚡ Start continuous strobe (every ~1.2s) while recording
+// ⚡ Start continuous strobe while recording
 function startStrobe() {
     stopStrobe();
     fireFlash();
@@ -273,12 +271,7 @@ document.getElementById('camSwitch').onclick = e => {
     facing = facing === 'user' ? 'environment' : 'user';
     startCam(facing);
 };
-document.getElementById('camFilter').onclick = e => {
-    e.stopPropagation();
-    filter = !filter;
-    videoEl.style.filter = filter ? 'brightness(1.03) contrast(1.06) saturate(1.1)' : 'none';
-};
-// ⚡ Manual flash button
+// ⚡ Manual flash button (replaces filter button)
 document.getElementById('camFlashBtn').onclick = e => {
     e.stopPropagation();
     fireFlash();
@@ -312,7 +305,6 @@ camEl.addEventListener('pointerup', () => {
     camEl.style.cursor = 'grab';
 });
 
-// Init cam position (converted from bottom/right to left/top)
 requestAnimationFrame(() => {
     const r = camEl.getBoundingClientRect();
     setPos(r.left, r.top);
@@ -329,7 +321,7 @@ document.addEventListener('visibilitychange', () => {
 
 startCam('user');
 
-// ============ RECORDING (single canvas, throttled) ============
+// ============ RECORDING ============
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 const previewCanvas = document.getElementById('previewCanvas');
@@ -348,15 +340,14 @@ document.getElementById('qualitySelect').addEventListener('change', () => {
 let recorder = null, chunks = [], recording = false;
 let rafId = null, timerId = null, t0 = 0;
 let micStream = null, audioCtx = null, analyser = null;
-
-const MAX_CHUNKS = 400; // cap memory
+const MAX_CHUNKS = 400;
 
 function draw(targetCtx, W, Hh, fast) {
     targetCtx.imageSmoothingQuality = fast ? 'low' : 'medium';
     targetCtx.fillStyle = '#fff';
     targetCtx.fillRect(0, 0, W, Hh);
 
-    // Sentence
+    // Sentence text
     const active = document.querySelector('.sentence-item.active');
     if (active) {
         const color = active.classList.contains('english') ? '#d9534f' : '#0275d8';
@@ -403,8 +394,7 @@ function draw(targetCtx, W, Hh, fast) {
         targetCtx.drawImage(videoEl, sxv, syv, side, side, -rad, -rad, rad * 2, rad * 2);
         targetCtx.restore();
 
-        // ✨ Render flash overlay onto the recording canvas
-        // We compute the flash opacity from the DOM element's computed style
+        // Flash overlay in recording
         const flashOpacity = parseFloat(getComputedStyle(flashEl).opacity || '0');
         if (flashOpacity > 0.01) {
             targetCtx.save();
@@ -428,14 +418,13 @@ function draw(targetCtx, W, Hh, fast) {
 let lastFrame = 0, lastPreview = 0;
 function loop(now) {
     rafId = requestAnimationFrame(loop);
-    if (now - lastFrame < 33) return; // ~30fps
+    if (now - lastFrame < 33) return;
     lastFrame = now;
     draw(ctx, canvas.width, canvas.height, true);
-    if (now - lastPreview > 125) { // ~8fps preview
+    if (now - lastPreview > 125) {
         draw(previewCtx, previewCanvas.width, previewCanvas.height, true);
         lastPreview = now;
     }
-    // Mic level on the timer dot
     if (analyser) {
         const d = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(d);
@@ -512,7 +501,6 @@ async function startRec() {
     camEl.classList.add('recording');
     document.getElementById('timer').classList.add('active');
 
-    // ⚡ Auto flash + strobe on record start
     startStrobe();
 
     loop(performance.now());
@@ -535,7 +523,7 @@ function stopRec() {
     if (timerId) { clearInterval(timerId); timerId = null; }
     try { recorder.stop(); } catch(e){}
     cleanup();
-    stopStrobe(); // ⚡ stop flash
+    stopStrobe();
 
     document.getElementById('recordBtn').classList.remove('recording');
     document.getElementById('recordBtn').innerText = '⏺ Enregistrer';
