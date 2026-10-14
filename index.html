@@ -89,7 +89,6 @@
         border-color: #1e7e34;
     }
 
-    /* Quality selector */
     .quality-select {
         background: #f0f0f0;
         color: #333;
@@ -106,7 +105,6 @@
     button:hover:not(:disabled) { transform: translateY(-1px); opacity: 0.9; }
     button:disabled { opacity: 0.2; cursor: not-allowed; }
 
-    /* CONTENEUR FORMAT YOUTUBE (16:9) */
     .stage {
         width: 100%;
         max-width: 850px;
@@ -125,7 +123,7 @@
         width: 100%;
         top: 50%; 
         left: 0;
-        transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
         will-change: transform;
     }
 
@@ -162,7 +160,6 @@
         transform: translateY(-50%);
     }
 
-    /* --- FLOATING CAMERA WIDGET --- */
     .camera-float {
         position: fixed;
         bottom: 30px;
@@ -335,7 +332,6 @@
         transition: height 0.06s linear;
     }
 
-    /* ---------- PREVIEW PANEL ---------- */
     .preview-panel {
         display: none;
         width: 100%;
@@ -438,7 +434,6 @@
         <div id="scroller"></div>
     </div>
 
-    <!-- Live preview of the recorded composition -->
     <div class="preview-panel" id="previewPanel">
         <div class="preview-header">
             <span class="live-dot"></span>
@@ -449,7 +444,6 @@
         <canvas class="preview-canvas" id="previewCanvas" width="1920" height="1080"></canvas>
     </div>
 
-    <!-- Floating camera widget -->
     <div class="camera-float" id="cameraFloat" tabindex="0">
         <video id="cameraVideo" autoplay playsinline muted></video>
         <div class="flash-overlay" id="flashOverlay"></div>
@@ -482,7 +476,7 @@
         });
 
         // ============================================================
-        //  TTS LOGIC
+        //  TTS LOGIC — NO PAUSES, halved animation
         // ============================================================
         const synth = window.speechSynthesis;
         let sentenceData = [];
@@ -506,7 +500,8 @@
                 const isEnglish = index % 2 === 0;
                 const langCode = isEnglish ? 'en-US' : 'fr-FR';
                 const colorClass = isEnglish ? 'english' : 'french';
-                const totalRepeats = isEnglish ? 3 : 2; 
+                // Halved repeats: EN 2×, FR 1×
+                const totalRepeats = isEnglish ? 2 : 1;
 
                 const div = document.createElement('div');
                 div.className = `sentence-item ${colorClass}`;
@@ -545,7 +540,7 @@
                 if (isLooping) {
                     currentIndex = 0;
                     repeatCounter = 0;
-                    setTimeout(speakStep, 1000);
+                    speakStep();          // ← NO 1s pause
                 } else {
                     stopSpeech();
                 }
@@ -566,11 +561,11 @@
                 if (!isPlaying || isPaused) return;
                 repeatCounter++;
                 if (repeatCounter < currentItem.maxRepeats) {
-                    setTimeout(speakStep, 400); 
+                    speakStep();          // ← NO 0.4s pause (was 400ms)
                 } else {
                     currentIndex++;
                     repeatCounter = 0;
-                    setTimeout(speakStep, 800); 
+                    speakStep();          // ← NO 0.8s pause (was 800ms)
                 }
             };
 
@@ -633,7 +628,7 @@
         }
 
         // ============================================================
-        //  FLOATING CAMERA — HD quality
+        //  FLOATING CAMERA
         // ============================================================
         let currentStream = null;
         let currentTrack = null;
@@ -684,7 +679,6 @@
                 torchEnabled = false;
                 flashBtn.classList.remove('flash-active');
 
-                // Ask for the highest camera resolution we can
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: {
@@ -702,7 +696,6 @@
                     await videoEl.play();
                     cameraAvailable = true;
 
-                    // Log actual camera resolution
                     const s = currentTrack.getSettings();
                     console.log(`Camera ${facingMode} — ${s.width}x${s.height} @ ${s.frameRate}fps`);
                     
@@ -719,7 +712,6 @@
                     flashBtn.title = torchSupported ? 'Flash (torche matérielle)' : 'Flash (écran)';
                 } catch (err) {
                     console.warn('HD camera failed, trying fallback:', err);
-                    // Fallback to any resolution
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({
                             video: { facingMode: facingMode },
@@ -809,7 +801,6 @@
                 filterBtn.style.color = '#ffaa00';
             }
 
-            // DRAGGABLE
             function setInitialPosition() {
                 const rect = floatContainer.getBoundingClientRect();
                 floatContainer.style.bottom = 'auto';
@@ -922,7 +913,7 @@
         })();
 
         // ============================================================
-        //  RECORDING — HD video (canvas composite) + YOUR MICROPHONE audio
+        //  RECORDING
         // ============================================================
         (function initRecorder() {
             const recordBtn = document.getElementById('recordBtn');
@@ -938,14 +929,10 @@
             const micBarEls = micBars.querySelectorAll('span');
             const cameraFloat = document.getElementById('cameraFloat');
 
-            // Recording canvas — size follows selected quality
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-
-            // Preview canvas
             const previewCtx = previewCanvas.getContext('2d');
 
-            // Apply quality to both canvases
             function applyQuality() {
                 canvas.width = currentQuality.w;
                 canvas.height = currentQuality.h;
@@ -963,7 +950,6 @@
             let recStart = 0;
             let isRecording = false;
 
-            // Mic capture state
             let micStream = null;
             let audioCtx = null;
             let analyser = null;
@@ -990,17 +976,13 @@
                 return '';
             }
 
-            // ---- Draw composite frame (high quality) ----
             function drawComposite(targetCtx, W, H) {
-                // Crisp rendering
                 targetCtx.imageSmoothingEnabled = true;
                 targetCtx.imageSmoothingQuality = 'high';
 
-                // White background
                 targetCtx.fillStyle = '#ffffff';
                 targetCtx.fillRect(0, 0, W, H);
 
-                // ---- Active sentence text ----
                 targetCtx.textAlign = 'center';
                 targetCtx.textBaseline = 'middle';
 
@@ -1010,12 +992,10 @@
                     const color = isEnglish ? '#d9534f' : '#0275d8';
                     const text = activeEl.innerText;
 
-                    // Font size scales with canvas height
                     const fontSize = Math.round(H * 0.12);
                     targetCtx.font = `700 ${fontSize}px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`;
                     targetCtx.fillStyle = color;
 
-                    // Wrap
                     const maxWidth = W * 0.82;
                     const words = text.split(' ');
                     const lines = [];
@@ -1043,7 +1023,6 @@
                     targetCtx.fillText('(aucune phrase active)', W / 2, H / 2);
                 }
 
-                // ---- Circular camera overlay (crisp) ----
                 if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
                     const bubble = document.getElementById('cameraFloat');
                     const bubbleRect = bubble.getBoundingClientRect();
@@ -1067,7 +1046,6 @@
                         targetCtx.scale(-1, 1);
                     }
 
-                    // Draw the camera frame at high quality, cropped square
                     const vw = videoEl.videoWidth;
                     const vh = videoEl.videoHeight;
                     const side = Math.min(vw, vh);
@@ -1079,7 +1057,6 @@
 
                     targetCtx.restore();
 
-                    // White ring
                     targetCtx.save();
                     targetCtx.beginPath();
                     targetCtx.arc(cx, cy, radius, 0, Math.PI * 2);
@@ -1096,7 +1073,6 @@
                 rafId = requestAnimationFrame(renderLoop);
             }
 
-            // ---- Mic level meter ----
             function updateMicLevel() {
                 if (!analyser) return;
                 const data = new Uint8Array(analyser.frequencyBinCount);
@@ -1142,17 +1118,14 @@
             async function startRecording() {
                 if (isRecording) return;
 
-                // Re-apply quality in case it changed
                 applyQuality();
 
-                // 1. Acquire microphone
                 micStream = await acquireMicrophone();
                 if (!micStream) {
                     alert("Impossible d'accéder au microphone. Vérifiez les permissions.");
                     return;
                 }
 
-                // 2. Audio analyser for the level meter
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioCtx.createMediaStreamSource(micStream);
                 analyser = audioCtx.createAnalyser();
@@ -1160,7 +1133,6 @@
                 analyser.smoothingTimeConstant = 0.6;
                 source.connect(analyser);
 
-                // 3. Combined stream: canvas video (at selected quality) + mic audio
                 const canvasStream = canvas.captureStream(currentQuality.fps);
                 const combinedStream = new MediaStream();
                 combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
@@ -1288,7 +1260,6 @@
                 }
             });
 
-            // Re-apply quality on change
             qualitySelect.addEventListener('change', () => {
                 if (!isRecording) applyQuality();
             });
