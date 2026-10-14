@@ -42,15 +42,37 @@
     .cam video { width:100%; height:100%; object-fit:cover; display:block; background:#000;
                  transform:scaleX(-1); filter:brightness(1.03) contrast(1.06) saturate(1.1); }
     .cam .btns { position:absolute; bottom:5px; left:50%; transform:translateX(-50%);
-                 display:flex; gap:4px; opacity:.8; }
+                 display:flex; gap:4px; opacity:.8; z-index:5; }
     .cam .btns button { background:rgba(0,0,0,.6); color:#fff; border-radius:50%; width:24px; height:24px;
                         font-size:12px; padding:0; display:flex; align-items:center; justify-content:center; }
     .cam .btns .rec { width:28px; height:28px; font-size:14px; background:rgba(255,255,255,.85); color:#111; }
     .cam .btns .rec.active { background:#f33; color:#fff; }
     .cam .rec-tag { position:absolute; top:6px; left:50%; transform:translateX(-50%);
                     background:rgba(229,57,53,.9); color:#fff; font-size:9px; font-weight:700;
-                    padding:2px 8px; border-radius:12px; display:none; }
+                    padding:2px 8px; border-radius:12px; display:none; z-index:5; }
     .cam.recording .rec-tag { display:block; }
+
+    /* ✨ FLASH overlay */
+    .cam .flash {
+        position:absolute; inset:0; border-radius:50%;
+        background: radial-gradient(circle, #fff 0%, #fff 60%, rgba(255,255,255,0) 100%);
+        opacity:0; pointer-events:none; z-index:4;
+        mix-blend-mode: screen;
+    }
+    .cam .flash.fire {
+        animation: flashPop 0.45s ease-out forwards;
+    }
+    @keyframes flashPop {
+        0%   { opacity:0;   transform:scale(0.6); }
+        15%  { opacity:1;   transform:scale(1.05); }
+        60%  { opacity:0.55; transform:scale(1); }
+        100% { opacity:0;   transform:scale(1); }
+    }
+
+    /* Strobe variant when recording starts */
+    .cam .flash.auto {
+        animation: flashPop 0.6s ease-out forwards;
+    }
 
     .preview { display:none; width:100%; max-width:820px; margin-top:14px; background:#0d1117;
                border-radius:12px; padding:10px; border:1px solid #30363d; }
@@ -92,11 +114,13 @@
 
 <div class="cam" id="cam">
     <video id="camVideo" autoplay playsinline muted></video>
+    <div class="flash" id="camFlash"></div>
     <div class="rec-tag">REC</div>
     <div class="btns">
         <button class="rec" id="camRec" title="Enregistrer">📷</button>
         <button id="camSwitch" title="Changer">🔄</button>
         <button id="camFilter" title="Filtre">✨</button>
+        <button id="camFlashBtn" title="Flash">⚡</button>
     </div>
 </div>
 
@@ -202,7 +226,32 @@ speechSynthesis.onvoiceschanged = () => synth.getVoices();
 // ============ CAMERA (small feed, draggable) ============
 const camEl = document.getElementById('cam');
 const videoEl = document.getElementById('camVideo');
+const flashEl = document.getElementById('camFlash');
 let stream = null, facing = 'user', filter = true, dragging = false, sx, sy, sl, st;
+let flashTimer = null;      // current "fire" timeout
+let strobeInterval = null;  // ongoing strobe during recording
+
+// ⚡ Trigger a single flash (add class, remove after animation)
+function fireFlash() {
+    // restart animation cleanly
+    flashEl.classList.remove('fire');
+    void flashEl.offsetWidth; // force reflow
+    flashEl.classList.add('fire');
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => flashEl.classList.remove('fire'), 500);
+}
+
+// ⚡ Start continuous strobe (every ~1.2s) while recording
+function startStrobe() {
+    stopStrobe();
+    fireFlash();
+    strobeInterval = setInterval(fireFlash, 1200);
+}
+function stopStrobe() {
+    if (strobeInterval) { clearInterval(strobeInterval); strobeInterval = null; }
+    flashEl.classList.remove('fire');
+    clearTimeout(flashTimer);
+}
 
 async function startCam(mode) {
     if (stream) stream.getTracks().forEach(t => t.stop());
@@ -228,6 +277,11 @@ document.getElementById('camFilter').onclick = e => {
     e.stopPropagation();
     filter = !filter;
     videoEl.style.filter = filter ? 'brightness(1.03) contrast(1.06) saturate(1.1)' : 'none';
+};
+// ⚡ Manual flash button
+document.getElementById('camFlashBtn').onclick = e => {
+    e.stopPropagation();
+    fireFlash();
 };
 
 // Drag
@@ -267,6 +321,7 @@ requestAnimationFrame(() => {
 document.addEventListener('visibilitychange', () => {
     if (document.hidden && stream) {
         stream.getTracks().forEach(t => t.stop());
+        stopStrobe();
     } else if (!document.hidden && !stream) {
         startCam(facing);
     }
@@ -347,6 +402,20 @@ function draw(targetCtx, W, Hh, fast) {
         const sxv = (vw - side) / 2, syv = (vh - side) / 2;
         targetCtx.drawImage(videoEl, sxv, syv, side, side, -rad, -rad, rad * 2, rad * 2);
         targetCtx.restore();
+
+        // ✨ Render flash overlay onto the recording canvas
+        // We compute the flash opacity from the DOM element's computed style
+        const flashOpacity = parseFloat(getComputedStyle(flashEl).opacity || '0');
+        if (flashOpacity > 0.01) {
+            targetCtx.save();
+            targetCtx.beginPath();
+            targetCtx.arc(cx, cy, rad, 0, Math.PI * 2);
+            targetCtx.clip();
+            targetCtx.globalCompositeOperation = 'screen';
+            targetCtx.fillStyle = `rgba(255,255,255,${flashOpacity})`;
+            targetCtx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
+            targetCtx.restore();
+        }
 
         targetCtx.beginPath();
         targetCtx.arc(cx, cy, rad, 0, Math.PI * 2);
@@ -443,6 +512,9 @@ async function startRec() {
     camEl.classList.add('recording');
     document.getElementById('timer').classList.add('active');
 
+    // ⚡ Auto flash + strobe on record start
+    startStrobe();
+
     loop(performance.now());
     recorder.start(2000);
     timerId = setInterval(() => {
@@ -463,6 +535,7 @@ function stopRec() {
     if (timerId) { clearInterval(timerId); timerId = null; }
     try { recorder.stop(); } catch(e){}
     cleanup();
+    stopStrobe(); // ⚡ stop flash
 
     document.getElementById('recordBtn').classList.remove('recording');
     document.getElementById('recordBtn').innerText = '⏺ Enregistrer';
