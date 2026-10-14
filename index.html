@@ -350,7 +350,7 @@
             <button id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
             <button id="stopBtn" onclick="stopSpeech()">⏹ Arrêter</button>
             <button id="loopBtn" onclick="toggleLoop()">🔁 Boucle : OFF</button>
-            <button id="recordBtn" title="Enregistrer l'écran + la caméra">⏺ Enregistrer</button>
+            <button id="recordBtn" title="Enregistrer l'écran + la caméra + le son">⏺ Enregistrer</button>
             <div class="rec-timer" id="recTimer">⏺ <span id="recTime">00:00</span></div>
         </div>
     </div>
@@ -799,8 +799,7 @@
         })();
 
         // ============================================================
-        //  RECORDING (Canvas composite: sentences + circular camera)
-        //  + LIVE PREVIEW of what's being recorded
+        //  RECORDING — video (canvas) + AUDIO (tab capture via getDisplayMedia)
         // ============================================================
         (function initRecorder() {
             const recordBtn = document.getElementById('recordBtn');
@@ -812,13 +811,13 @@
             const previewPanel = document.getElementById('previewPanel');
             const previewCanvas = document.getElementById('previewCanvas');
 
-            // The actual recording canvas (offscreen, 1280x720)
-            let canvas = document.createElement('canvas');
+            // Recording canvas (offscreen, 1280x720)
+            const canvas = document.createElement('canvas');
             canvas.width = 1280;
             canvas.height = 720;
             const ctx = canvas.getContext('2d');
 
-            // Preview canvas context (visible to the user)
+            // Preview canvas
             const previewCtx = previewCanvas.getContext('2d');
             previewCanvas.width = 1280;
             previewCanvas.height = 720;
@@ -829,6 +828,12 @@
             let timerInterval = null;
             let recStart = 0;
             let isRecording = false;
+
+            // Audio capture state
+            let displayStream = null;        // getDisplayMedia stream (for audio)
+            let audioCtx = null;
+            let mixDest = null;
+            let combinedStream = null;
 
             function fmtTime(ms) {
                 const s = Math.floor(ms / 1000);
@@ -851,13 +856,11 @@
                 return '';
             }
 
-            // ---- Draw one frame of the composite onto a given context ----
+            // ---- Draw composite frame ----
             function drawComposite(targetCtx, W, H) {
-                // White background
                 targetCtx.fillStyle = '#ffffff';
                 targetCtx.fillRect(0, 0, W, H);
 
-                // ---- 1. Active sentence text ----
                 targetCtx.textAlign = 'center';
                 targetCtx.textBaseline = 'middle';
 
@@ -889,7 +892,6 @@
                     const lineH = fontSize * 1.15;
                     const totalH = lines.length * lineH;
                     const startY = H / 2 - totalH / 2 + lineH / 2;
-
                     lines.forEach((line, i) => {
                         targetCtx.fillText(line, W / 2, startY + i * lineH);
                     });
@@ -899,7 +901,7 @@
                     targetCtx.fillText('(aucune phrase active)', W / 2, H / 2);
                 }
 
-                // ---- 2. Camera feed as circular overlay ----
+                // Circular camera overlay
                 if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
                     const bubble = document.getElementById('cameraFloat');
                     const bubbleRect = bubble.getBoundingClientRect();
@@ -922,13 +924,10 @@
                     if (currentFacingMode === 'user') {
                         targetCtx.scale(-1, 1);
                     }
-
                     const size = radius * 2;
                     targetCtx.drawImage(videoEl, -size / 2, -size / 2, size, size);
-
                     targetCtx.restore();
 
-                    // White ring
                     targetCtx.save();
                     targetCtx.beginPath();
                     targetCtx.arc(cx, cy, radius, 0, Math.PI * 2);
@@ -939,30 +938,79 @@
                 }
             }
 
-            // ---- Render loop: draws to BOTH the recording canvas and the preview ----
             function renderLoop() {
                 drawComposite(ctx, canvas.width, canvas.height);
                 drawComposite(previewCtx, previewCanvas.width, previewCanvas.height);
                 rafId = requestAnimationFrame(renderLoop);
             }
 
+            // ---- Acquire tab audio via getDisplayMedia ----
+            async function acquireAudioStream() {
+                try {
+                    // This prompts the user to pick "This tab" + share audio.
+                    const stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: true,      // needed to satisfy API; we won't use the video
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                            sampleRate: 48000
+                        },
+                        preferCurrentTab: true,
+                        selfBrowserSurface: 'include',
+                        systemAudio: 'include'
+                    });
+
+                    // We only need the audio tracks
+                    const audioTracks = stream.getAudioTracks();
+                    if (audioTracks.length === 0) {
+                        console.warn('Aucune piste audio obtenue. L\'utilisateur doit cocher "Partager l\'audio".');
+                        // Stop the video track we don't use
+                        stream.getVideoTracks().forEach(t => t.stop());
+                        return { stream: null, hasAudio: false };
+                    }
+
+                    // Stop the unnecessary video tracks to save resources
+                    stream.getVideoTracks().forEach(t => t.stop());
+
+                    return { stream, hasAudio: true };
+                } catch (err) {
+                    console.warn('getDisplayMedia failed or cancelled:', err);
+                    return { stream: null, hasAudio: false };
+                }
+            }
+
             async function startRecording() {
                 if (isRecording) return;
 
-                // Show preview panel
-                previewPanel.classList.add('active');
+                // 1. Acquire tab audio (this is what captures speechSynthesis output)
+                const { stream: audioStream, hasAudio } = await acquireAudioStream();
+                displayStream = audioStream;
 
-                // Get stream from the offscreen canvas
+                // 2. Build combined stream: canvas video + (optionally) tab audio
                 const canvasStream = canvas.captureStream(30);
+                const videoTrack = canvasStream.getVideoTracks()[0];
+
+                combinedStream = new MediaStream();
+                combinedStream.addTrack(videoTrack);
+
+                if (hasAudio && audioStream) {
+                    audioStream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
+                    console.log('✓ Audio track added to recording');
+                } else {
+                    console.warn('⚠ Recording without audio — user did not share tab audio');
+                }
 
                 const mimeType = pickMimeType();
-                const options = mimeType ? { mimeType, videoBitsPerSecond: 4_000_000 } : {};
+                const options = mimeType 
+                    ? { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 128_000 } 
+                    : {};
 
                 try {
-                    recorder = new MediaRecorder(canvasStream, options);
+                    recorder = new MediaRecorder(combinedStream, options);
                 } catch (err) {
                     alert("Impossible de démarrer l'enregistrement : " + err.message);
-                    previewPanel.classList.remove('active');
+                    cleanupAudio();
                     return;
                 }
 
@@ -985,14 +1033,14 @@
                     setTimeout(() => URL.revokeObjectURL(url), 2000);
                 };
 
-                // Start render loop (draws canvas + preview)
+                // 3. Start rendering loop + recorder
+                previewPanel.classList.add('active');
                 renderLoop();
                 recorder.start(1000);
 
                 isRecording = true;
                 recStart = Date.now();
 
-                // UI updates
                 recordBtn.classList.add('recording');
                 recordBtn.innerText = '⏹ Stop';
                 recTimer.classList.add('active');
@@ -1002,6 +1050,30 @@
                 timerInterval = setInterval(() => {
                     recTime.textContent = fmtTime(Date.now() - recStart);
                 }, 250);
+
+                // If user stops sharing the tab, auto-stop recording
+                if (audioStream) {
+                    audioStream.getAudioTracks().forEach(track => {
+                        track.onended = () => {
+                            if (isRecording) stopRecording();
+                        };
+                    });
+                }
+            }
+
+            function cleanupAudio() {
+                if (displayStream) {
+                    displayStream.getTracks().forEach(t => {
+                        try { t.stop(); } catch(e){}
+                    });
+                    displayStream = null;
+                }
+                if (audioCtx) {
+                    try { audioCtx.close(); } catch(e){}
+                    audioCtx = null;
+                }
+                mixDest = null;
+                combinedStream = null;
             }
 
             function stopRecording() {
@@ -1012,14 +1084,13 @@
                 if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 
                 try { recorder.stop(); } catch (e) {}
+                cleanupAudio();
 
-                // UI
                 recordBtn.classList.remove('recording');
                 recordBtn.innerText = '⏺ Enregistrer';
                 recTimer.classList.remove('active');
                 recIndicator.classList.remove('active');
 
-                // Keep preview visible briefly so user sees the final frame, then hide
                 setTimeout(() => {
                     previewPanel.classList.remove('active');
                 }, 600);
@@ -1030,10 +1101,10 @@
                 else startRecording();
             });
 
-            // Also stop cleanly when leaving the page
             window.addEventListener('beforeunload', () => {
                 if (isRecording) {
                     try { recorder.stop(); } catch(e){}
+                    cleanupAudio();
                 }
             });
         })();
