@@ -3,1274 +3,488 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Apprentissage Bilingue TTS + Caméra flottante</title>
+<title>TTS Bilingue + Caméra flottante</title>
 <style>
-    :root {
-        --en-red: #d9534f;
-        --fr-blue: #0275d8;
-        --border-color: #eeeeee;
-        --success-green: #28a745;
-        --record-red: #e53935;
-    }
+    :root { --en:#d9534f; --fr:#0275d8; --rec:#e53935; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background:#fff; color:#333; margin:0; padding:16px;
+           display:flex; flex-direction:column; align-items:center; }
+    .wrap { width:100%; max-width:820px; }
+    textarea { width:100%; height:90px; background:#fafafa; border:1px solid #ddd; padding:12px;
+               border-radius:10px; font-size:15px; resize:none; outline:none; }
+    .controls { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; }
+    button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:600; font-size:13px; }
+    button:hover:not(:disabled){ opacity:.9; }
+    button:disabled{ opacity:.25; cursor:not-allowed; }
+    #loadBtn{background:#eee;color:#555;} #playBtn{background:#e00;color:#fff;}
+    #pauseBtn{background:#f0ad4e;color:#fff;display:none;} #stopBtn{background:#333;color:#fff;}
+    #loopBtn{background:#eee;color:#555;} #loopBtn.active{background:#28a745;color:#fff;}
+    #recordBtn{background:var(--rec);color:#fff;} #recordBtn.recording{background:#b71c1c;}
+    select { padding:9px; border-radius:8px; border:1px solid #ddd; background:#eee; font-weight:600; font-size:13px; }
+    .stage { width:100%; max-width:820px; aspect-ratio:16/9; background:#fff; border-radius:14px;
+             overflow:hidden; position:relative; box-shadow:0 8px 30px rgba(0,0,0,.08); border:1px solid #eee; margin-top:10px; }
+    #scroller { position:absolute; width:100%; top:50%; transition:transform .35s cubic-bezier(.19,1,.22,1); }
+    .sentence-item { height:150px; display:flex; align-items:center; justify-content:center; text-align:center;
+                     padding:0 50px; font-size:38px; font-weight:700; opacity:.05; transition:opacity .4s, transform .4s; }
+    .sentence-item.active { opacity:1; transform:scale(1.06); }
+    .english{color:var(--en);} .french{color:var(--fr);}
+    .timer { display:none; align-items:center; gap:6px; background:#b71c1c; color:#fff;
+             padding:10px 12px; border-radius:8px; font-family:monospace; font-size:12px; font-weight:700; }
+    .timer.active{display:flex;}
+    .timer .dot{width:8px;height:8px;background:#fff;border-radius:50%;animation:blink 1s infinite;}
+    @keyframes blink{50%{opacity:.2;}}
 
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #ffffff;
-        color: #333;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin: 0;
-        padding: 20px;
-    }
+    .cam { position:fixed; bottom:24px; right:24px; width:130px; height:130px; border-radius:50%;
+           overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,.35); border:3px solid #fff;
+           background:#111; z-index:1000; cursor:grab; touch-action:none; user-select:none; }
+    .cam.recording { border-color:#f33; animation:ring 1.4s infinite; }
+    @keyframes ring{50%{box-shadow:0 0 0 8px rgba(255,51,51,.15),0 10px 25px rgba(0,0,0,.35);}}
+    .cam video { width:100%; height:100%; object-fit:cover; display:block; background:#000;
+                 transform:scaleX(-1); filter:brightness(1.03) contrast(1.06) saturate(1.1); }
+    .cam .btns { position:absolute; bottom:5px; left:50%; transform:translateX(-50%);
+                 display:flex; gap:4px; opacity:.8; }
+    .cam .btns button { background:rgba(0,0,0,.6); color:#fff; border-radius:50%; width:24px; height:24px;
+                        font-size:12px; padding:0; display:flex; align-items:center; justify-content:center; }
+    .cam .btns .rec { width:28px; height:28px; font-size:14px; background:rgba(255,255,255,.85); color:#111; }
+    .cam .btns .rec.active { background:#f33; color:#fff; }
+    .cam .rec-tag { position:absolute; top:6px; left:50%; transform:translateX(-50%);
+                    background:rgba(229,57,53,.9); color:#fff; font-size:9px; font-weight:700;
+                    padding:2px 8px; border-radius:12px; display:none; }
+    .cam.recording .rec-tag { display:block; }
 
-    .input-section {
-        width: 100%;
-        max-width: 850px;
-        margin-bottom: 30px;
-    }
+    .preview { display:none; width:100%; max-width:820px; margin-top:14px; background:#0d1117;
+               border-radius:12px; padding:10px; border:1px solid #30363d; }
+    .preview.active{ display:block; }
+    .preview h4 { margin:0 0 8px; color:#e6edf3; font-size:11px; font-weight:600;
+                  display:flex; align-items:center; gap:6px; }
+    .preview h4 .dot{width:7px;height:7px;background:#f33;border-radius:50%;animation:blink 1s infinite;}
+    .preview canvas { width:100%; height:auto; display:block; border-radius:6px; background:#fff; aspect-ratio:16/9; }
 
-    textarea {
-        width: 100%;
-        height: 100px;
-        background: #fafafa;
-        color: #333;
-        border: 1px solid #ddd;
-        padding: 15px;
-        border-radius: 12px;
-        font-size: 16px;
-        resize: none;
-        box-sizing: border-box;
-        outline: none;
-    }
-
-    .controls {
-        margin-top: 15px;
-        display: flex;
-        gap: 10px;
-        justify-content: center;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-
-    button {
-        padding: 12px 20px;
-        border-radius: 8px;
-        border: none;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 14px;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-    }
-
-    #loadBtn { background: #f0f0f0; color: #555; }
-    #playBtn { background: #ff0000; color: white; }
-    #pauseBtn { background: #f0ad4e; color: white; display: none; }
-    #stopBtn { background: #333; color: white; }
-    #loopBtn { background: #f0f0f0; color: #555; border: 2px solid transparent; }
-    #recordBtn { background: var(--record-red); color: white; border: 2px solid transparent; }
-    #recordBtn.recording {
-        background: #b71c1c;
-        border-color: #ff8a80;
-        animation: recPulse 1.2s infinite;
-    }
-
-    @keyframes recPulse {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.6); }
-        50%      { box-shadow: 0 0 0 8px rgba(229, 57, 53, 0); }
-    }
-
-    #loopBtn.active { 
-        background: var(--success-green); 
-        color: white; 
-        border-color: #1e7e34;
-    }
-
-    .quality-select {
-        background: #f0f0f0;
-        color: #333;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 11px 12px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        outline: none;
-    }
-    .quality-select:hover { background: #e6e6e6; }
-
-    button:hover:not(:disabled) { transform: translateY(-1px); opacity: 0.9; }
-    button:disabled { opacity: 0.2; cursor: not-allowed; }
-
-    .stage {
-        width: 100%;
-        max-width: 850px;
-        aspect-ratio: 16 / 9;
-        background: #ffffff;
-        border-radius: 16px;
-        overflow: hidden;
-        position: relative;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
-        border: 1px solid var(--border-color);
-        margin-top: 10px;
-    }
-
-    #scroller {
-        position: absolute;
-        width: 100%;
-        top: 50%; 
-        left: 0;
-        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-        will-change: transform;
-    }
-
-    .sentence-item {
-        height: 150px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        padding: 0 60px;
-        font-size: 40px;
-        font-weight: 700;
-        box-sizing: border-box;
-        transition: opacity 0.5s, transform 0.5s;
-        opacity: 0.05; 
-    }
-
-    .sentence-item.active {
-        opacity: 1;
-        transform: scale(1.08);
-    }
-
-    .english { color: var(--en-red); }
-    .french { color: var(--fr-blue); }
-
-    .center-guide {
-        position: absolute;
-        top: 50%;
-        left: 5%;
-        right: 5%;
-        height: 1px;
-        background: rgba(0,0,0,0.02);
-        pointer-events: none;
-        transform: translateY(-50%);
-    }
-
-    .camera-float {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        width: 140px;
-        height: 140px;
-        border-radius: 50%;
-        overflow: hidden;
-        box-shadow: 0 12px 30px rgba(0,0,0,0.35);
-        border: 3px solid #fff;
-        background: #111;
-        z-index: 1000;
-        cursor: grab;
-        transition: box-shadow 0.2s, transform 0.15s, border-color 0.2s;
-        user-select: none;
-        touch-action: none;
-    }
-
-    .camera-float:active {
-        cursor: grabbing;
-        box-shadow: 0 18px 40px rgba(0,0,0,0.5);
-    }
-
-    .camera-float:hover { transform: scale(1.03); }
-
-    .camera-float.recording {
-        border-color: #ff3b30;
-        box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.35), 0 18px 40px rgba(0,0,0,0.5);
-        animation: recRing 1.4s infinite;
-    }
-
-    @keyframes recRing {
-        0%, 100% { box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.35), 0 18px 40px rgba(0,0,0,0.5); }
-        50%      { box-shadow: 0 0 0 8px rgba(255, 59, 48, 0.10), 0 18px 40px rgba(0,0,0,0.5); }
-    }
-
-    .camera-float video {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-        background: #000;
-        transform: scaleX(-1);
-        transition: transform 0.3s ease, filter 0.3s ease;
-        filter: brightness(1.03) contrast(1.06) saturate(1.1);
-        border-radius: 50%;
-    }
-
-    .flash-overlay {
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: white;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.08s ease;
-        z-index: 10;
-        border-radius: 50%;
-    }
-    .flash-overlay.active { opacity: 1; }
-
-    .camera-controls {
-        position: absolute;
-        bottom: 6px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 5px;
-        z-index: 30;
-        opacity: 0.75;
-        transition: opacity 0.2s;
-    }
-    .camera-controls:hover { opacity: 1; }
-
-    .cam-btn {
-        background: rgba(0,0,0,0.6);
-        border: none;
-        color: white;
-        border-radius: 50%;
-        width: 26px; height: 26px;
-        font-size: 13px;
-        display: flex; align-items: center; justify-content: center;
-        cursor: pointer;
-        backdrop-filter: blur(4px);
-        transition: background 0.2s, transform 0.1s, color 0.2s, box-shadow 0.2s;
-        padding: 0;
-    }
-    .cam-btn:hover { background: rgba(0,0,0,0.9); transform: scale(1.1); }
-    .cam-btn.flash-active {
-        background: #ffaa00;
-        color: #000;
-        box-shadow: 0 0 12px #ffaa00, 0 0 4px #ffaa00;
-    }
-
-    .cam-btn.cam-record {
-        background: rgba(255,255,255,0.85);
-        color: #111;
-        width: 30px; height: 30px;
-        font-size: 15px;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.35);
-    }
-    .cam-btn.cam-record:hover {
-        background: #ffffff;
-        transform: scale(1.12);
-    }
-    .cam-btn.cam-record.active {
-        background: #ff3b30;
-        color: #fff;
-        box-shadow: 0 0 0 3px rgba(255,59,48,0.35), 0 0 14px rgba(255,59,48,0.7);
-        animation: recBlink 1s infinite;
-    }
-
-    .rec-indicator {
-        position: absolute;
-        top: 8px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(229, 57, 53, 0.92);
-        color: #fff;
-        font-size: 10px;
-        font-weight: bold;
-        padding: 3px 10px;
-        border-radius: 20px;
-        display: none;
-        align-items: center;
-        gap: 5px;
-        z-index: 25;
-        letter-spacing: 0.5px;
-        box-shadow: 0 0 12px rgba(229,57,53,0.6);
-    }
-    .rec-indicator.active { display: flex; }
-
-    .rec-dot {
-        width: 7px; height: 7px;
-        background: #fff;
-        border-radius: 50%;
-        animation: recBlink 1s infinite;
-    }
-    @keyframes recBlink {
-        0%, 100% { opacity: 1; }
-        50%      { opacity: 0.2; }
-    }
-
-    .rec-timer {
-        display: none;
-        align-items: center;
-        gap: 6px;
-        background: #b71c1c;
-        color: #fff;
-        padding: 12px 14px;
-        border-radius: 8px;
-        font-family: ui-monospace, monospace;
-        font-size: 13px;
-        font-weight: bold;
-        letter-spacing: 0.5px;
-    }
-    .rec-timer.active { display: flex; }
-
-    .mic-bars {
-        display: inline-flex;
-        align-items: flex-end;
-        gap: 2px;
-        height: 12px;
-        margin-left: 4px;
-    }
-    .mic-bars span {
-        width: 2px;
-        background: #ff8a80;
-        border-radius: 1px;
-        transition: height 0.06s linear;
-    }
-
-    .preview-panel {
-        display: none;
-        width: 100%;
-        max-width: 850px;
-        margin-top: 18px;
-        background: #0d1117;
-        border: 1px solid #30363d;
-        border-radius: 14px;
-        padding: 14px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.18);
-    }
-    .preview-panel.active { display: block; }
-
-    .preview-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 10px;
-        color: #e6edf3;
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.4px;
-    }
-    .preview-header .live-dot {
-        width: 8px; height: 8px;
-        background: #ff3b30;
-        border-radius: 50%;
-        box-shadow: 0 0 8px #ff3b30;
-        animation: recBlink 1s infinite;
-    }
-    .preview-header .label {
-        text-transform: uppercase;
-        color: #ff6b6b;
-    }
-    .preview-header .hint {
-        margin-left: auto;
-        font-weight: 400;
-        color: #8b949e;
-        font-size: 11px;
-    }
-    .preview-header .quality-badge {
-        background: #1f6feb;
-        color: #fff;
-        font-size: 10px;
-        padding: 2px 8px;
-        border-radius: 10px;
-        font-weight: 700;
-        letter-spacing: 0.4px;
-    }
-
-    .preview-canvas {
-        width: 100%;
-        height: auto;
-        display: block;
-        border-radius: 8px;
-        background: #fff;
-        aspect-ratio: 16 / 9;
-        image-rendering: -webkit-optimize-contrast;
-    }
-
-    @media (max-width: 600px) {
-        .camera-float {
-            width: 110px;
-            height: 110px;
-            bottom: 15px;
-            right: 15px;
-        }
-        .cam-btn { width: 22px; height: 22px; font-size: 11px; }
-        .cam-btn.cam-record { width: 26px; height: 26px; font-size: 13px; }
-    }
+    @media (max-width:600px){ .cam{width:100px;height:100px;bottom:12px;right:12px;}
+                              .sentence-item{font-size:26px;padding:0 24px;height:120px;} }
 </style>
 </head>
 <body>
 
-    <div class="input-section">
-        <textarea id="textInput" placeholder="Ligne 1 : Anglais&#10;Ligne 2 : Français&#10;Ligne 3 : Anglais..."></textarea>
-        <div class="controls">
-            <button id="loadBtn" onclick="processText()">1. Charger la liste</button>
-            <button id="playBtn" onclick="startPlayAll()" disabled>▶ Lire tout</button>
-            <button id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
-            <button id="stopBtn" onclick="stopSpeech()">⏹ Arrêter</button>
-            <button id="loopBtn" onclick="toggleLoop()">🔁 Boucle : OFF</button>
-            <button id="recordBtn" title="Enregistrer l'écran + la caméra + votre voix">⏺ Enregistrer</button>
-            <select class="quality-select" id="qualitySelect" title="Qualité d'enregistrement">
-                <option value="720">720p (HD)</option>
-                <option value="1080" selected>1080p (Full HD)</option>
-                <option value="1440">1440p (QHD)</option>
-            </select>
-            <div class="rec-timer" id="recTimer">
-                ⏺ <span id="recTime">00:00</span>
-                <span class="mic-bars" id="micBars">
-                    <span></span><span></span><span></span><span></span><span></span>
-                </span>
-            </div>
-        </div>
+<div class="wrap">
+    <textarea id="textInput" placeholder="Anglais&#10;Français&#10;Anglais..."></textarea>
+    <div class="controls">
+        <button id="loadBtn">1. Charger</button>
+        <button id="playBtn" disabled>▶ Lire</button>
+        <button id="pauseBtn">⏸ Pause</button>
+        <button id="stopBtn">⏹ Stop</button>
+        <button id="loopBtn">🔁 Boucle</button>
+        <button id="recordBtn">⏺ Enregistrer</button>
+        <select id="qualitySelect">
+            <option value="720" selected>720p</option>
+            <option value="1080">1080p</option>
+        </select>
+        <div class="timer" id="timer"><span class="dot"></span><span id="time">00:00</span></div>
     </div>
+</div>
 
-    <div class="stage" id="stage">
-        <div class="center-guide"></div>
-        <div id="scroller"></div>
+<div class="stage" id="stage"><div id="scroller"></div></div>
+
+<div class="preview" id="previewPanel">
+    <h4><span class="dot"></span>REC — Aperçu (contenu de la vidéo)</h4>
+    <canvas id="previewCanvas"></canvas>
+</div>
+
+<div class="cam" id="cam">
+    <video id="camVideo" autoplay playsinline muted></video>
+    <div class="rec-tag">REC</div>
+    <div class="btns">
+        <button class="rec" id="camRec" title="Enregistrer">📷</button>
+        <button id="camSwitch" title="Changer">🔄</button>
+        <button id="camFilter" title="Filtre">✨</button>
     </div>
+</div>
 
-    <div class="preview-panel" id="previewPanel">
-        <div class="preview-header">
-            <span class="live-dot"></span>
-            <span class="label">REC — Aperçu en direct</span>
-            <span class="quality-badge" id="qualityBadge">1080p</span>
-            <span class="hint">Ce que la vidéo enregistrée contient</span>
-        </div>
-        <canvas class="preview-canvas" id="previewCanvas" width="1920" height="1080"></canvas>
-    </div>
+<script>
+// ============ QUALITY ============
+const PRESETS = {
+    '720':  { w:1280, h:720,  fps:30, bitrate:2_500_000, label:'720p'  },
+    '1080': { w:1920, h:1080, fps:30, bitrate:4_500_000, label:'1080p' }
+};
+let quality = PRESETS['720'];
+document.getElementById('qualitySelect').onchange = e => quality = PRESETS[e.target.value];
 
-    <div class="camera-float" id="cameraFloat" tabindex="0">
-        <video id="cameraVideo" autoplay playsinline muted></video>
-        <div class="flash-overlay" id="flashOverlay"></div>
-        <div class="rec-indicator" id="recIndicator"><span class="rec-dot"></span>REC</div>
-        
-        <div class="camera-controls">
-            <button class="cam-btn cam-record" id="camRecordBtn" title="Enregistrer (vidéo + votre voix)">📷</button>
-            <button class="cam-btn" id="switchCamBtn" title="Changer caméra avant/arrière">🔄</button>
-            <button class="cam-btn" id="flashBtn" title="Flash (torche)">⚡</button>
-            <button class="cam-btn" id="filterBtn" title="Filtre lissant">✨</button>
-        </div>
-    </div>
+// ============ TTS ============
+const synth = speechSynthesis;
+let data = [], idx = 0, rep = 0, playing = false, paused = false, looping = false;
+const H = 150;
 
-    <script>
-        // ============================================================
-        //  QUALITY SETTINGS
-        // ============================================================
-        const QUALITY_PRESETS = {
-            '720':  { w: 1280, h: 720,  fps: 30, videoBitrate: 5_000_000,  label: '720p'  },
-            '1080': { w: 1920, h: 1080, fps: 30, videoBitrate: 10_000_000, label: '1080p' },
-            '1440': { w: 2560, h: 1440, fps: 30, videoBitrate: 16_000_000, label: '1440p' }
-        };
-        let currentQuality = QUALITY_PRESETS['1080'];
+function processText() {
+    stopSpeech();
+    const scroller = document.getElementById('scroller');
+    const lines = document.getElementById('textInput').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    scroller.innerHTML = ''; data = [];
+    lines.forEach((line, i) => {
+        const isEN = i % 2 === 0;
+        const div = document.createElement('div');
+        div.className = 'sentence-item ' + (isEN ? 'english' : 'french');
+        div.innerText = line;
+        scroller.appendChild(div);
+        data.push({ text: line, lang: isEN ? 'en-US' : 'fr-FR', el: div, max: isEN ? 2 : 1 });
+    });
+    if (data.length) {
+        scroller.style.transform = `translateY(${-H/2}px)`;
+        document.getElementById('playBtn').disabled = false;
+    }
+}
 
-        const qualitySelect = document.getElementById('qualitySelect');
-        const qualityBadge = document.getElementById('qualityBadge');
-        qualitySelect.addEventListener('change', () => {
-            currentQuality = QUALITY_PRESETS[qualitySelect.value] || QUALITY_PRESETS['1080'];
-            qualityBadge.textContent = currentQuality.label;
+function updateDisplay(i) {
+    data.forEach(s => s.el.classList.remove('active'));
+    if (!data[i]) return;
+    data[i].el.classList.add('active');
+    document.getElementById('scroller').style.transform = `translateY(${-i*H - H/2}px)`;
+}
+
+function speakStep() {
+    if (!playing || paused) return;
+    if (idx >= data.length) {
+        if (looping) { idx = 0; rep = 0; speakStep(); }
+        else stopSpeech();
+        return;
+    }
+    const item = data[idx];
+    updateDisplay(idx);
+    const u = new SpeechSynthesisUtterance(item.text);
+    u.lang = item.lang;
+    const v = synth.getVoices().find(x => x.lang.startsWith(item.lang));
+    if (v) u.voice = v;
+    u.onend = () => {
+        if (!playing || paused) return;
+        rep++;
+        if (rep < item.max) speakStep();
+        else { idx++; rep = 0; speakStep(); }
+    };
+    u.onerror = () => playing && stopSpeech();
+    synth.speak(u);
+}
+
+function startPlayAll() {
+    if (!data.length) return;
+    synth.cancel();
+    playing = true; paused = false; idx = 0; rep = 0;
+    document.getElementById('playBtn').style.display = 'none';
+    document.getElementById('pauseBtn').style.display = 'flex';
+    document.getElementById('pauseBtn').innerText = '⏸ Pause';
+    speakStep();
+}
+
+function togglePause() {
+    if (!playing) return;
+    paused = !paused;
+    const btn = document.getElementById('pauseBtn');
+    if (paused) { synth.pause(); btn.innerText = '▶ Reprendre'; }
+    else { btn.innerText = '⏸ Pause'; synth.paused ? synth.resume() : speakStep(); }
+}
+
+function stopSpeech() {
+    playing = false; paused = false; synth.cancel();
+    document.getElementById('playBtn').style.display = 'flex';
+    document.getElementById('playBtn').disabled = !data.length;
+    document.getElementById('pauseBtn').style.display = 'none';
+}
+
+document.getElementById('loadBtn').onclick = processText;
+document.getElementById('playBtn').onclick = startPlayAll;
+document.getElementById('pauseBtn').onclick = togglePause;
+document.getElementById('stopBtn').onclick = stopSpeech;
+document.getElementById('loopBtn').onclick = e => {
+    looping = !looping;
+    e.target.classList.toggle('active', looping);
+    e.target.innerText = looping ? '🔁 ON' : '🔁 Boucle';
+};
+speechSynthesis.onvoiceschanged = () => synth.getVoices();
+
+// ============ CAMERA (small feed, draggable) ============
+const camEl = document.getElementById('cam');
+const videoEl = document.getElementById('camVideo');
+let stream = null, facing = 'user', filter = true, dragging = false, sx, sy, sl, st;
+
+async function startCam(mode) {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: mode, width:{ideal:640}, height:{ideal:640}, frameRate:{ideal:24} },
+            audio: false
         });
+        videoEl.srcObject = stream;
+        await videoEl.play();
+        videoEl.style.transform = mode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+    } catch (e) {
+        console.warn('Camera error', e);
+    }
+}
 
-        // ============================================================
-        //  TTS LOGIC — NO PAUSES, halved animation
-        // ============================================================
-        const synth = window.speechSynthesis;
-        let sentenceData = [];
-        let currentIndex = 0;
-        let repeatCounter = 0;
-        let isPlaying = false;
-        let isPaused = false;
-        let isLooping = false;
-        const ITEM_HEIGHT = 150; 
+document.getElementById('camSwitch').onclick = e => {
+    e.stopPropagation();
+    facing = facing === 'user' ? 'environment' : 'user';
+    startCam(facing);
+};
+document.getElementById('camFilter').onclick = e => {
+    e.stopPropagation();
+    filter = !filter;
+    videoEl.style.filter = filter ? 'brightness(1.03) contrast(1.06) saturate(1.1)' : 'none';
+};
 
-        function processText() {
-            stopSpeech();
-            const input = document.getElementById('textInput').value;
-            const scroller = document.getElementById('scroller');
-            const lines = input.split('\n').map(l => l.trim()).filter(l => l !== "");
+// Drag
+function setPos(l, t) {
+    const r = camEl.getBoundingClientRect();
+    l = Math.max(0, Math.min(l, innerWidth - r.width));
+    t = Math.max(0, Math.min(t, innerHeight - r.height));
+    camEl.style.left = l + 'px';
+    camEl.style.top = t + 'px';
+    camEl.style.right = 'auto';
+    camEl.style.bottom = 'auto';
+}
 
-            scroller.innerHTML = "";
-            sentenceData = [];
+camEl.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    dragging = true;
+    const r = camEl.getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY; sl = r.left; st = r.top;
+    camEl.style.cursor = 'grabbing';
+    camEl.setPointerCapture(e.pointerId);
+});
+camEl.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    setPos(sl + e.clientX - sx, st + e.clientY - sy);
+});
+camEl.addEventListener('pointerup', () => {
+    dragging = false;
+    camEl.style.cursor = 'grab';
+});
 
-            lines.forEach((line, index) => {
-                const isEnglish = index % 2 === 0;
-                const langCode = isEnglish ? 'en-US' : 'fr-FR';
-                const colorClass = isEnglish ? 'english' : 'french';
-                // Halved repeats: EN 2×, FR 1×
-                const totalRepeats = isEnglish ? 2 : 1;
+// Init cam position (converted from bottom/right to left/top)
+requestAnimationFrame(() => {
+    const r = camEl.getBoundingClientRect();
+    setPos(r.left, r.top);
+});
 
-                const div = document.createElement('div');
-                div.className = `sentence-item ${colorClass}`;
-                div.innerText = line;
-                scroller.appendChild(div);
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && stream) {
+        stream.getTracks().forEach(t => t.stop());
+    } else if (!document.hidden && !stream) {
+        startCam(facing);
+    }
+});
 
-                sentenceData.push({ 
-                    text: line, 
-                    lang: langCode, 
-                    element: div,
-                    isEnglish: isEnglish,
-                    maxRepeats: totalRepeats
-                });
-            });
+startCam('user');
 
-            if (sentenceData.length > 0) {
-                scroller.style.transform = `translateY(${-ITEM_HEIGHT / 2}px)`;
-                document.getElementById('playBtn').disabled = false;
-            }
+// ============ RECORDING (single canvas, throttled) ============
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+const previewCanvas = document.getElementById('previewCanvas');
+const previewCtx = previewCanvas.getContext('2d');
+const stage = document.getElementById('stage');
+
+function applyQuality() {
+    canvas.width = quality.w; canvas.height = quality.h;
+    previewCanvas.width = quality.w / 2; previewCanvas.height = quality.h / 2;
+}
+applyQuality();
+document.getElementById('qualitySelect').addEventListener('change', () => {
+    if (!recording) applyQuality();
+});
+
+let recorder = null, chunks = [], recording = false;
+let rafId = null, timerId = null, t0 = 0;
+let micStream = null, audioCtx = null, analyser = null;
+
+const MAX_CHUNKS = 400; // cap memory
+
+function draw(targetCtx, W, Hh, fast) {
+    targetCtx.imageSmoothingQuality = fast ? 'low' : 'medium';
+    targetCtx.fillStyle = '#fff';
+    targetCtx.fillRect(0, 0, W, Hh);
+
+    // Sentence
+    const active = document.querySelector('.sentence-item.active');
+    if (active) {
+        const color = active.classList.contains('english') ? '#d9534f' : '#0275d8';
+        const text = active.innerText;
+        const fs = Math.round(Hh * 0.12);
+        targetCtx.font = `700 ${fs}px system-ui, sans-serif`;
+        targetCtx.fillStyle = color;
+        targetCtx.textAlign = 'center';
+        targetCtx.textBaseline = 'middle';
+
+        const maxW = W * 0.82;
+        const words = text.split(' ');
+        const lines = []; let cur = '';
+        for (const w of words) {
+            const t = cur ? cur + ' ' + w : w;
+            if (targetCtx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; }
+            else cur = t;
         }
-
-        function updateDisplay(index) {
-            sentenceData.forEach(s => s.element.classList.remove('active'));
-            const item = sentenceData[index];
-            if (item) {
-                item.element.classList.add('active');
-                const offset = -(index * ITEM_HEIGHT) - (ITEM_HEIGHT / 2);
-                document.getElementById('scroller').style.transform = `translateY(${offset}px)`;
-            }
-        }
-
-        function speakStep() {
-            if (!isPlaying || isPaused) return;
-
-            if (currentIndex >= sentenceData.length) {
-                if (isLooping) {
-                    currentIndex = 0;
-                    repeatCounter = 0;
-                    speakStep();          // ← NO 1s pause
-                } else {
-                    stopSpeech();
-                }
-                return;
-            }
-
-            const currentItem = sentenceData[currentIndex];
-            updateDisplay(currentIndex);
-
-            const utterance = new SpeechSynthesisUtterance(currentItem.text);
-            utterance.lang = currentItem.lang;
-
-            const voices = synth.getVoices();
-            const voice = voices.find(v => v.lang.startsWith(currentItem.lang));
-            if (voice) utterance.voice = voice;
-
-            utterance.onend = () => {
-                if (!isPlaying || isPaused) return;
-                repeatCounter++;
-                if (repeatCounter < currentItem.maxRepeats) {
-                    speakStep();          // ← NO 0.4s pause (was 400ms)
-                } else {
-                    currentIndex++;
-                    repeatCounter = 0;
-                    speakStep();          // ← NO 0.8s pause (was 800ms)
-                }
-            };
-
-            utterance.onerror = () => { if (isPlaying) stopSpeech(); };
-            synth.speak(utterance);
-        }
-
-        function startPlayAll() {
-            if (sentenceData.length === 0) return;
-            synth.cancel(); 
-            isPlaying = true;
-            isPaused = false;
-            currentIndex = 0;
-            repeatCounter = 0;
-            
-            document.getElementById('playBtn').style.display = 'none';
-            document.getElementById('pauseBtn').style.display = 'flex';
-            document.getElementById('pauseBtn').innerText = "⏸ Pause";
-            
-            speakStep();
-        }
-
-        function togglePause() {
-            if (!isPlaying) return;
-            if (!isPaused) {
-                isPaused = true;
-                synth.pause();
-                document.getElementById('pauseBtn').innerText = "▶ Reprendre";
-            } else {
-                isPaused = false;
-                document.getElementById('pauseBtn').innerText = "⏸ Pause";
-                if (synth.paused) synth.resume();
-                else speakStep();
-            }
-        }
-
-        function stopSpeech() {
-            isPlaying = false;
-            isPaused = false;
-            synth.cancel();
-            document.getElementById('playBtn').style.display = 'flex';
-            document.getElementById('playBtn').disabled = (sentenceData.length === 0);
-            document.getElementById('pauseBtn').style.display = 'none';
-        }
-
-        function toggleLoop() {
-            isLooping = !isLooping;
-            const btn = document.getElementById('loopBtn');
-            if (isLooping) {
-                btn.classList.add('active');
-                btn.innerText = "🔁 Boucle : ON";
-            } else {
-                btn.classList.remove('active');
-                btn.innerText = "🔁 Boucle : OFF";
-            }
-        }
-
-        if (speechSynthesis.onvoiceschanged !== undefined) {
-            speechSynthesis.onvoiceschanged = () => synth.getVoices();
-        }
-
-        // ============================================================
-        //  FLOATING CAMERA
-        // ============================================================
-        let currentStream = null;
-        let currentTrack = null;
-        let currentFacingMode = 'user';
-        let torchEnabled = false;
-        let filterEnabled = true;
-        let isDragging = false;
-        let startX, startY, startLeft, startTop;
-        let cameraAvailable = false;
-
-        (function initFloatingCamera() {
-            const videoEl = document.getElementById('cameraVideo');
-            const floatContainer = document.getElementById('cameraFloat');
-            const flashOverlay = document.getElementById('flashOverlay');
-            const switchCamBtn = document.getElementById('switchCamBtn');
-            const flashBtn = document.getElementById('flashBtn');
-            const filterBtn = document.getElementById('filterBtn');
-
-            async function checkTorchSupport(track) {
-                if (!track || !track.getCapabilities) return false;
-                try { return !!track.getCapabilities().torch; } catch (e) { return false; }
-            }
-
-            async function setTorch(on) {
-                if (!currentTrack) return false;
-                try {
-                    await currentTrack.applyConstraints({ advanced: [{ torch: on }] });
-                    return true;
-                } catch (err) { return false; }
-            }
-
-            function triggerScreenFlash() {
-                flashOverlay.classList.add('active');
-                setTimeout(() => flashOverlay.classList.remove('active'), 120);
-                setTimeout(() => {
-                    flashOverlay.classList.add('active');
-                    setTimeout(() => flashOverlay.classList.remove('active'), 90);
-                }, 180);
-            }
-
-            async function startCamera(facingMode = 'user') {
-                if (currentStream) {
-                    if (currentTrack && torchEnabled) { try { await setTorch(false); } catch(e){} }
-                    currentStream.getTracks().forEach(track => track.stop());
-                    currentStream = null;
-                    currentTrack = null;
-                }
-                torchEnabled = false;
-                flashBtn.classList.remove('flash-active');
-
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: facingMode,
-                            width: { ideal: 1920, min: 1280 },
-                            height: { ideal: 1080, min: 720 },
-                            frameRate: { ideal: 30, min: 24 },
-                            aspectRatio: { ideal: 1 }
-                        },
-                        audio: false
-                    });
-                    currentStream = stream;
-                    currentTrack = stream.getVideoTracks()[0];
-                    videoEl.srcObject = stream;
-                    await videoEl.play();
-                    cameraAvailable = true;
-
-                    const s = currentTrack.getSettings();
-                    console.log(`Camera ${facingMode} — ${s.width}x${s.height} @ ${s.frameRate}fps`);
-                    
-                    videoEl.style.transform = (facingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
-                    
-                    const fallback = floatContainer.querySelector('.camera-fallback');
-                    if (fallback) fallback.remove();
-                    videoEl.style.display = 'block';
-                    switchCamBtn.style.display = 'flex';
-                    flashBtn.style.display = 'flex';
-                    filterBtn.style.display = 'flex';
-
-                    const torchSupported = await checkTorchSupport(currentTrack);
-                    flashBtn.title = torchSupported ? 'Flash (torche matérielle)' : 'Flash (écran)';
-                } catch (err) {
-                    console.warn('HD camera failed, trying fallback:', err);
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: facingMode },
-                            audio: false
-                        });
-                        currentStream = stream;
-                        currentTrack = stream.getVideoTracks()[0];
-                        videoEl.srcObject = stream;
-                        await videoEl.play();
-                        cameraAvailable = true;
-                        videoEl.style.transform = (facingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
-                    } catch (err2) {
-                        if (facingMode === 'environment') {
-                            try { await startCamera('user'); currentFacingMode = 'user'; }
-                            catch (err3) { showCameraFallback('Caméra indisponible'); }
-                        } else {
-                            showCameraFallback('Caméra indisponible');
-                        }
-                    }
-                }
-            }
-
-            function showCameraFallback(message) {
-                cameraAvailable = false;
-                videoEl.style.display = 'none';
-                switchCamBtn.style.display = 'none';
-                flashBtn.style.display = 'none';
-                filterBtn.style.display = 'none';
-                const existing = floatContainer.querySelector('.camera-fallback');
-                if (existing) existing.remove();
-                const fallback = document.createElement('div');
-                fallback.className = 'camera-fallback';
-                fallback.style.cssText = `
-                    width: 100%; height: 100%; display: flex; flex-direction: column;
-                    align-items: center; justify-content: center;
-                    background: #1e1e1e; color: #ccc; font-size: 10px; 
-                    text-align: center; padding: 8px; box-sizing: border-box; gap: 4px;
-                    border-radius: 50%;
-                `;
-                fallback.innerHTML = `<div style="font-size: 22px;">📷</div><div>${message}</div>`;
-                floatContainer.appendChild(fallback);
-            }
-
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                startCamera('user');
-            } else {
-                showCameraFallback('API non supportée');
-            }
-
-            switchCamBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                if (!cameraAvailable) return;
-                const newMode = currentFacingMode === 'user' ? 'environment' : 'user';
-                currentFacingMode = newMode;
-                await startCamera(newMode);
-            });
-
-            flashBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                if (!cameraAvailable || !currentTrack) return;
-                const torchSupported = await checkTorchSupport(currentTrack);
-                if (torchSupported) {
-                    torchEnabled = !torchEnabled;
-                    const ok = await setTorch(torchEnabled);
-                    if (ok) flashBtn.classList.toggle('flash-active', torchEnabled);
-                    else { torchEnabled = false; triggerScreenFlash(); }
-                } else {
-                    triggerScreenFlash();
-                    flashBtn.classList.add('flash-active');
-                    setTimeout(() => flashBtn.classList.remove('flash-active'), 400);
-                }
-            });
-
-            filterBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                filterEnabled = !filterEnabled;
-                if (filterEnabled) {
-                    videoEl.style.filter = 'brightness(1.03) contrast(1.06) saturate(1.1)';
-                    filterBtn.style.color = '#ffaa00';
-                } else {
-                    videoEl.style.filter = 'none';
-                    filterBtn.style.color = 'white';
-                }
-            });
-            if (filterEnabled) {
-                videoEl.style.filter = 'brightness(1.03) contrast(1.06) saturate(1.1)';
-                filterBtn.style.color = '#ffaa00';
-            }
-
-            function setInitialPosition() {
-                const rect = floatContainer.getBoundingClientRect();
-                floatContainer.style.bottom = 'auto';
-                floatContainer.style.right = 'auto';
-                floatContainer.style.left = rect.left + 'px';
-                floatContainer.style.top = rect.top + 'px';
-                floatContainer.style.position = 'fixed';
-            }
-            setInitialPosition();
-            
-            window.addEventListener('resize', () => {
-                const rect = floatContainer.getBoundingClientRect();
-                const maxLeft = window.innerWidth - rect.width;
-                const maxTop = window.innerHeight - rect.height;
-                let left = Math.min(parseFloat(floatContainer.style.left) || rect.left, maxLeft);
-                let top = Math.min(parseFloat(floatContainer.style.top) || rect.top, maxTop);
-                left = Math.max(0, left);
-                top = Math.max(0, top);
-                floatContainer.style.left = left + 'px';
-                floatContainer.style.top = top + 'px';
-            });
-
-            floatContainer.addEventListener('mousedown', (e) => {
-                if (e.target.closest('.cam-btn')) return;
-                e.preventDefault();
-                isDragging = true;
-                const rect = floatContainer.getBoundingClientRect();
-                startX = e.clientX;
-                startY = e.clientY;
-                startLeft = rect.left;
-                startTop = rect.top;
-                floatContainer.style.cursor = 'grabbing';
-                floatContainer.style.transition = 'none';
-                floatContainer.style.willChange = 'left, top';
-            });
-
-            window.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                e.preventDefault();
-                const dx = e.clientX - startX;
-                const dy = e.clientY - startY;
-                let newLeft = startLeft + dx;
-                let newTop = startTop + dy;
-                const rect = floatContainer.getBoundingClientRect();
-                const maxLeft = window.innerWidth - rect.width;
-                const maxTop = window.innerHeight - rect.height;
-                newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-                newTop = Math.max(0, Math.min(newTop, maxTop));
-                floatContainer.style.left = newLeft + 'px';
-                floatContainer.style.top = newTop + 'px';
-            });
-
-            window.addEventListener('mouseup', () => {
-                if (isDragging) {
-                    isDragging = false;
-                    floatContainer.style.cursor = 'grab';
-                    floatContainer.style.transition = 'box-shadow 0.2s, transform 0.15s';
-                    floatContainer.style.willChange = 'auto';
-                }
-            });
-
-            floatContainer.addEventListener('touchstart', (e) => {
-                if (e.target.closest('.cam-btn')) return;
-                const touch = e.touches[0];
-                if (!touch) return;
-                e.preventDefault();
-                isDragging = true;
-                const rect = floatContainer.getBoundingClientRect();
-                startX = touch.clientX;
-                startY = touch.clientY;
-                startLeft = rect.left;
-                startTop = rect.top;
-                floatContainer.style.cursor = 'grabbing';
-                floatContainer.style.transition = 'none';
-            }, { passive: false });
-
-            window.addEventListener('touchmove', (e) => {
-                if (!isDragging) return;
-                const touch = e.touches[0];
-                if (!touch) return;
-                e.preventDefault();
-                const dx = touch.clientX - startX;
-                const dy = touch.clientY - startY;
-                let newLeft = startLeft + dx;
-                let newTop = startTop + dy;
-                const rect = floatContainer.getBoundingClientRect();
-                const maxLeft = window.innerWidth - rect.width;
-                const maxTop = window.innerHeight - rect.height;
-                newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-                newTop = Math.max(0, Math.min(newTop, maxTop));
-                floatContainer.style.left = newLeft + 'px';
-                floatContainer.style.top = newTop + 'px';
-            }, { passive: false });
-
-            window.addEventListener('touchend', () => {
-                if (isDragging) {
-                    isDragging = false;
-                    floatContainer.style.cursor = 'grab';
-                    floatContainer.style.transition = 'box-shadow 0.2s, transform 0.15s';
-                }
-            });
-
-            floatContainer.style.cursor = 'grab';
-
-            window.addEventListener('beforeunload', () => {
-                if (currentTrack && torchEnabled) {
-                    try { currentTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch(e){}
-                }
-            });
-        })();
-
-        // ============================================================
-        //  RECORDING
-        // ============================================================
-        (function initRecorder() {
-            const recordBtn = document.getElementById('recordBtn');
-            const camRecordBtn = document.getElementById('camRecordBtn');
-            const recTimer = document.getElementById('recTimer');
-            const recTime  = document.getElementById('recTime');
-            const recIndicator = document.getElementById('recIndicator');
-            const stage = document.getElementById('stage');
-            const videoEl = document.getElementById('cameraVideo');
-            const previewPanel = document.getElementById('previewPanel');
-            const previewCanvas = document.getElementById('previewCanvas');
-            const micBars = document.getElementById('micBars');
-            const micBarEls = micBars.querySelectorAll('span');
-            const cameraFloat = document.getElementById('cameraFloat');
-
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const previewCtx = previewCanvas.getContext('2d');
-
-            function applyQuality() {
-                canvas.width = currentQuality.w;
-                canvas.height = currentQuality.h;
-                previewCanvas.width = currentQuality.w;
-                previewCanvas.height = currentQuality.h;
-                qualityBadge.textContent = currentQuality.label;
-                console.log(`Quality set: ${currentQuality.w}x${currentQuality.h} @ ${currentQuality.fps}fps, ${currentQuality.videoBitrate/1e6}Mbps`);
-            }
-            applyQuality();
-
-            let recorder = null;
-            let chunks = [];
-            let rafId = null;
-            let timerInterval = null;
-            let recStart = 0;
-            let isRecording = false;
-
-            let micStream = null;
-            let audioCtx = null;
-            let analyser = null;
-            let micRafId = null;
-
-            function fmtTime(ms) {
-                const s = Math.floor(ms / 1000);
-                const m = Math.floor(s / 60);
-                const ss = s % 60;
-                return String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
-            }
-
-            function pickMimeType() {
-                const candidates = [
-                    'video/webm;codecs=vp9,opus',
-                    'video/webm;codecs=vp8,opus',
-                    'video/webm;codecs=vp9',
-                    'video/webm;codecs=vp8',
-                    'video/webm'
-                ];
-                for (const c of candidates) {
-                    if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
-                }
-                return '';
-            }
-
-            function drawComposite(targetCtx, W, H) {
-                targetCtx.imageSmoothingEnabled = true;
-                targetCtx.imageSmoothingQuality = 'high';
-
-                targetCtx.fillStyle = '#ffffff';
-                targetCtx.fillRect(0, 0, W, H);
-
-                targetCtx.textAlign = 'center';
-                targetCtx.textBaseline = 'middle';
-
-                const activeEl = document.querySelector('.sentence-item.active');
-                if (activeEl) {
-                    const isEnglish = activeEl.classList.contains('english');
-                    const color = isEnglish ? '#d9534f' : '#0275d8';
-                    const text = activeEl.innerText;
-
-                    const fontSize = Math.round(H * 0.12);
-                    targetCtx.font = `700 ${fontSize}px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`;
-                    targetCtx.fillStyle = color;
-
-                    const maxWidth = W * 0.82;
-                    const words = text.split(' ');
-                    const lines = [];
-                    let cur = '';
-                    for (const w of words) {
-                        const test = cur ? cur + ' ' + w : w;
-                        if (targetCtx.measureText(test).width > maxWidth && cur) {
-                            lines.push(cur);
-                            cur = w;
-                        } else {
-                            cur = test;
-                        }
-                    }
-                    if (cur) lines.push(cur);
-
-                    const lineH = fontSize * 1.15;
-                    const totalH = lines.length * lineH;
-                    const startY = H / 2 - totalH / 2 + lineH / 2;
-                    lines.forEach((line, i) => {
-                        targetCtx.fillText(line, W / 2, startY + i * lineH);
-                    });
-                } else {
-                    targetCtx.fillStyle = '#cccccc';
-                    targetCtx.font = `500 ${Math.round(H * 0.055)}px 'Segoe UI', sans-serif`;
-                    targetCtx.fillText('(aucune phrase active)', W / 2, H / 2);
-                }
-
-                if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
-                    const bubble = document.getElementById('cameraFloat');
-                    const bubbleRect = bubble.getBoundingClientRect();
-                    const stageRect = stage.getBoundingClientRect();
-
-                    const scaleX = W / stageRect.width;
-                    const scaleY = H / stageRect.height;
-
-                    const cx = (bubbleRect.left - stageRect.left + bubbleRect.width / 2) * scaleX;
-                    const cy = (bubbleRect.top  - stageRect.top  + bubbleRect.height / 2) * scaleY;
-                    const radius = (bubbleRect.width / 2) * scaleX;
-
-                    targetCtx.save();
-                    targetCtx.beginPath();
-                    targetCtx.arc(cx, cy, radius, 0, Math.PI * 2);
-                    targetCtx.closePath();
-                    targetCtx.clip();
-
-                    targetCtx.translate(cx, cy);
-                    if (currentFacingMode === 'user') {
-                        targetCtx.scale(-1, 1);
-                    }
-
-                    const vw = videoEl.videoWidth;
-                    const vh = videoEl.videoHeight;
-                    const side = Math.min(vw, vh);
-                    const sx = (vw - side) / 2;
-                    const sy = (vh - side) / 2;
-
-                    const size = radius * 2;
-                    targetCtx.drawImage(videoEl, sx, sy, side, side, -size / 2, -size / 2, size, size);
-
-                    targetCtx.restore();
-
-                    targetCtx.save();
-                    targetCtx.beginPath();
-                    targetCtx.arc(cx, cy, radius, 0, Math.PI * 2);
-                    targetCtx.lineWidth = Math.max(3, radius * 0.065);
-                    targetCtx.strokeStyle = '#ffffff';
-                    targetCtx.stroke();
-                    targetCtx.restore();
-                }
-            }
-
-            function renderLoop() {
-                drawComposite(ctx, canvas.width, canvas.height);
-                drawComposite(previewCtx, previewCanvas.width, previewCanvas.height);
-                rafId = requestAnimationFrame(renderLoop);
-            }
-
-            function updateMicLevel() {
-                if (!analyser) return;
-                const data = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(data);
-                let sum = 0;
-                const N = Math.min(40, data.length);
-                for (let i = 0; i < N; i++) sum += data[i];
-                const avg = sum / N;
-                const norm = Math.min(1, avg / 90);
-
-                micBarEls.forEach((bar, i) => {
-                    const threshold = (i + 1) / micBarEls.length;
-                    const active = norm >= threshold * 0.85;
-                    const h = active 
-                        ? 6 + (i * 1.5) + (norm * 6) 
-                        : 3 + (i * 0.4);
-                    bar.style.height = Math.min(12, h) + 'px';
-                    bar.style.background = active ? '#ff8a80' : 'rgba(255,138,128,0.3)';
-                });
-
-                micRafId = requestAnimationFrame(updateMicLevel);
-            }
-
-            async function acquireMicrophone() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                            sampleRate: 48000,
-                            channelCount: 2
-                        },
-                        video: false
-                    });
-                    return stream;
-                } catch (err) {
-                    console.warn('Microphone unavailable:', err);
-                    return null;
-                }
-            }
-
-            async function startRecording() {
-                if (isRecording) return;
-
-                applyQuality();
-
-                micStream = await acquireMicrophone();
-                if (!micStream) {
-                    alert("Impossible d'accéder au microphone. Vérifiez les permissions.");
-                    return;
-                }
-
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const source = audioCtx.createMediaStreamSource(micStream);
-                analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 256;
-                analyser.smoothingTimeConstant = 0.6;
-                source.connect(analyser);
-
-                const canvasStream = canvas.captureStream(currentQuality.fps);
-                const combinedStream = new MediaStream();
-                combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
-                micStream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
-
-                const mimeType = pickMimeType();
-                const options = mimeType 
-                    ? { 
-                        mimeType, 
-                        videoBitsPerSecond: currentQuality.videoBitrate, 
-                        audioBitsPerSecond: 192_000 
-                      } 
-                    : {};
-
-                try {
-                    recorder = new MediaRecorder(combinedStream, options);
-                } catch (err) {
-                    alert("Impossible de démarrer l'enregistrement : " + err.message);
-                    cleanupMedia();
-                    return;
-                }
-
-                chunks = [];
-                recorder.ondataavailable = (e) => {
-                    if (e.data && e.data.size > 0) chunks.push(e.data);
-                };
-
-                recorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: 'video/webm' });
-                    chunks = [];
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                    a.href = url;
-                    a.download = `lecon-bilingue-${currentQuality.label}-${ts}.webm`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    setTimeout(() => URL.revokeObjectURL(url), 2000);
-                };
-
-                previewPanel.classList.add('active');
-                renderLoop();
-                updateMicLevel();
-                recorder.start(1000);
-
-                isRecording = true;
-                recStart = Date.now();
-
-                recordBtn.classList.add('recording');
-                recordBtn.innerText = '⏹ Stop';
-
-                camRecordBtn.classList.add('active');
-                camRecordBtn.innerText = '⏹';
-                camRecordBtn.title = 'Arrêter l\'enregistrement';
-
-                cameraFloat.classList.add('recording');
-                recTimer.classList.add('active');
-                recIndicator.classList.add('active');
-                recTime.textContent = '00:00';
-
-                timerInterval = setInterval(() => {
-                    recTime.textContent = fmtTime(Date.now() - recStart);
-                }, 250);
-            }
-
-            function cleanupMedia() {
-                if (micRafId) { cancelAnimationFrame(micRafId); micRafId = null; }
-                if (micStream) {
-                    micStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
-                    micStream = null;
-                }
-                if (audioCtx) {
-                    try { audioCtx.close(); } catch(e){}
-                    audioCtx = null;
-                }
-                analyser = null;
-                micBarEls.forEach(bar => {
-                    bar.style.height = '3px';
-                    bar.style.background = 'rgba(255,138,128,0.3)';
-                });
-            }
-
-            function stopRecording() {
-                if (!isRecording) return;
-                isRecording = false;
-
-                if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-                if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-
-                try { recorder.stop(); } catch (e) {}
-                cleanupMedia();
-
-                recordBtn.classList.remove('recording');
-                recordBtn.innerText = '⏺ Enregistrer';
-
-                camRecordBtn.classList.remove('active');
-                camRecordBtn.innerText = '📷';
-                camRecordBtn.title = 'Enregistrer (vidéo + votre voix)';
-
-                cameraFloat.classList.remove('recording');
-                recTimer.classList.remove('active');
-                recIndicator.classList.remove('active');
-
-                setTimeout(() => {
-                    previewPanel.classList.remove('active');
-                }, 600);
-            }
-
-            recordBtn.addEventListener('click', () => {
-                if (isRecording) stopRecording();
-                else startRecording();
-            });
-
-            camRecordBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (isRecording) stopRecording();
-                else startRecording();
-            });
-
-            window.addEventListener('beforeunload', () => {
-                if (isRecording) {
-                    try { recorder.stop(); } catch(e){}
-                    cleanupMedia();
-                }
-            });
-
-            qualitySelect.addEventListener('change', () => {
-                if (!isRecording) applyQuality();
-            });
-        })();
-
-        window.addEventListener('load', () => {
-            const ta = document.getElementById('textInput');
-            if (!ta.value) {
-                ta.value = "Hello, how are you?\nBonjour, comment allez-vous ?\nI am learning English.\nJ'apprends l'anglais.";
-            }
+        if (cur) lines.push(cur);
+        const lh = fs * 1.15;
+        const y0 = Hh / 2 - (lines.length - 1) * lh / 2;
+        lines.forEach((l, i) => targetCtx.fillText(l, W / 2, y0 + i * lh));
+    }
+
+    // Camera bubble
+    if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+        const br = camEl.getBoundingClientRect();
+        const sr = stage.getBoundingClientRect();
+        const kx = W / sr.width, ky = Hh / sr.height;
+        const cx = (br.left - sr.left + br.width / 2) * kx;
+        const cy = (br.top - sr.top + br.height / 2) * ky;
+        const rad = (br.width / 2) * kx;
+
+        targetCtx.save();
+        targetCtx.beginPath();
+        targetCtx.arc(cx, cy, rad, 0, Math.PI * 2);
+        targetCtx.clip();
+        targetCtx.translate(cx, cy);
+        if (facing === 'user') targetCtx.scale(-1, 1);
+
+        const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+        const side = Math.min(vw, vh);
+        const sxv = (vw - side) / 2, syv = (vh - side) / 2;
+        targetCtx.drawImage(videoEl, sxv, syv, side, side, -rad, -rad, rad * 2, rad * 2);
+        targetCtx.restore();
+
+        targetCtx.beginPath();
+        targetCtx.arc(cx, cy, rad, 0, Math.PI * 2);
+        targetCtx.lineWidth = Math.max(3, rad * 0.06);
+        targetCtx.strokeStyle = '#fff';
+        targetCtx.stroke();
+    }
+}
+
+let lastFrame = 0, lastPreview = 0;
+function loop(now) {
+    rafId = requestAnimationFrame(loop);
+    if (now - lastFrame < 33) return; // ~30fps
+    lastFrame = now;
+    draw(ctx, canvas.width, canvas.height, true);
+    if (now - lastPreview > 125) { // ~8fps preview
+        draw(previewCtx, previewCanvas.width, previewCanvas.height, true);
+        lastPreview = now;
+    }
+    // Mic level on the timer dot
+    if (analyser) {
+        const d = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(d);
+        let s = 0; for (let i = 0; i < 20; i++) s += d[i];
+        const lvl = Math.min(1, s / 20 / 90);
+        document.querySelector('#timer .dot').style.opacity = 0.4 + lvl * 0.6;
+    }
+}
+
+function fmt(ms) {
+    const s = Math.floor(ms / 1000);
+    return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+function pickMime() {
+    const c = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+    return c.find(m => MediaRecorder.isTypeSupported(m)) || '';
+}
+
+async function startRec() {
+    if (recording) return;
+    applyQuality();
+
+    try {
+        micStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true }
         });
-    </script>
+    } catch (e) { alert('Microphone requis.'); return; }
+
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 128;
+    src.connect(analyser);
+
+    const combined = new MediaStream();
+    canvas.captureStream(quality.fps).getVideoTracks().forEach(t => combined.addTrack(t));
+    micStream.getAudioTracks().forEach(t => combined.addTrack(t));
+
+    const mime = pickMime();
+    try {
+        recorder = new MediaRecorder(combined, {
+            ...(mime && { mimeType: mime }),
+            videoBitsPerSecond: quality.bitrate,
+            audioBitsPerSecond: 128_000
+        });
+    } catch (e) { alert('Enregistrement indisponible.'); cleanup(); return; }
+
+    chunks = [];
+    recorder.ondataavailable = e => {
+        if (e.data.size > 0) {
+            chunks.push(e.data);
+            if (chunks.length > MAX_CHUNKS) chunks.shift();
+        }
+    };
+    recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+        a.href = url; a.download = `lecon-${quality.label}-${ts}.webm`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        chunks = [];
+    };
+
+    document.getElementById('previewPanel').classList.add('active');
+    recording = true;
+    t0 = Date.now();
+    document.getElementById('recordBtn').classList.add('recording');
+    document.getElementById('recordBtn').innerText = '⏹ Stop';
+    document.getElementById('camRec').classList.add('active');
+    document.getElementById('camRec').innerText = '⏹';
+    camEl.classList.add('recording');
+    document.getElementById('timer').classList.add('active');
+
+    loop(performance.now());
+    recorder.start(2000);
+    timerId = setInterval(() => {
+        document.getElementById('time').textContent = fmt(Date.now() - t0);
+    }, 500);
+}
+
+function cleanup() {
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if (audioCtx) { try { audioCtx.close(); } catch(e){} audioCtx = null; }
+    analyser = null;
+}
+
+function stopRec() {
+    if (!recording) return;
+    recording = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (timerId) { clearInterval(timerId); timerId = null; }
+    try { recorder.stop(); } catch(e){}
+    cleanup();
+
+    document.getElementById('recordBtn').classList.remove('recording');
+    document.getElementById('recordBtn').innerText = '⏺ Enregistrer';
+    document.getElementById('camRec').classList.remove('active');
+    document.getElementById('camRec').innerText = '📷';
+    camEl.classList.remove('recording');
+    document.getElementById('timer').classList.remove('active');
+    setTimeout(() => document.getElementById('previewPanel').classList.remove('active'), 500);
+}
+
+document.getElementById('recordBtn').onclick = () => recording ? stopRec() : startRec();
+document.getElementById('camRec').onclick = e => {
+    e.stopPropagation();
+    recording ? stopRec() : startRec();
+};
+
+// Default text
+window.addEventListener('load', () => {
+    const ta = document.getElementById('textInput');
+    if (!ta.value) ta.value =
+        "Hello, how are you?\nBonjour, comment allez-vous ?\nI am learning English.\nJ'apprends l'anglais.";
+});
+</script>
 </body>
 </html>
