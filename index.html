@@ -71,6 +71,17 @@
     #pauseBtn { background: #f0ad4e; color: white; display: none; }
     #stopBtn { background: #333; color: white; }
     #loopBtn { background: #f0f0f0; color: #555; border: 2px solid transparent; }
+    #recordBtn { background: var(--record-red); color: white; border: 2px solid transparent; }
+    #recordBtn.recording {
+        background: #b71c1c;
+        border-color: #ff8a80;
+        animation: recPulse 1.2s infinite;
+    }
+
+    @keyframes recPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.6); }
+        50%      { box-shadow: 0 0 0 8px rgba(229, 57, 53, 0); }
+    }
 
     #loopBtn.active { 
         background: var(--success-green); 
@@ -163,7 +174,6 @@
 
     .camera-float:hover { transform: scale(1.03); }
 
-    /* Red ring around camera when recording */
     .camera-float.recording {
         border-color: #ff3b30;
         box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.35), 0 18px 40px rgba(0,0,0,0.5);
@@ -385,6 +395,7 @@
             <button id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
             <button id="stopBtn" onclick="stopSpeech()">⏹ Arrêter</button>
             <button id="loopBtn" onclick="toggleLoop()">🔁 Boucle : OFF</button>
+            <button id="recordBtn" title="Enregistrer l'écran + la caméra + votre voix">⏺ Enregistrer</button>
             <div class="rec-timer" id="recTimer">
                 ⏺ <span id="recTime">00:00</span>
                 <span class="mic-bars" id="micBars">
@@ -841,10 +852,12 @@
 
         // ============================================================
         //  RECORDING — video (canvas composite) + YOUR MICROPHONE audio
-        //  Triggered by the 📷 camera icon button
+        //  Controlled by BOTH the toolbar "⏺ Enregistrer" button
+        //  AND the 📷 camera icon. They stay in sync.
         // ============================================================
         (function initRecorder() {
-            const camRecordBtn = document.getElementById('camRecordBtn');
+            const recordBtn = document.getElementById('recordBtn');       // toolbar
+            const camRecordBtn = document.getElementById('camRecordBtn');  // camera icon
             const recTimer = document.getElementById('recTimer');
             const recTime  = document.getElementById('recTime');
             const recIndicator = document.getElementById('recIndicator');
@@ -1094,10 +1107,16 @@
                 isRecording = true;
                 recStart = Date.now();
 
-                // UI: switch camera icon to "stop" state
+                // ---- UI: sync BOTH buttons into recording state ----
+                // Toolbar button
+                recordBtn.classList.add('recording');
+                recordBtn.innerText = '⏹ Stop';
+
+                // Camera icon
                 camRecordBtn.classList.add('active');
                 camRecordBtn.innerText = '⏹';
                 camRecordBtn.title = 'Arrêter l\'enregistrement';
+
                 cameraFloat.classList.add('recording');
                 recTimer.classList.add('active');
                 recIndicator.classList.add('active');
@@ -1135,10 +1154,14 @@
                 try { recorder.stop(); } catch (e) {}
                 cleanupMedia();
 
-                // UI reset
+                // ---- UI: reset BOTH buttons ----
+                recordBtn.classList.remove('recording');
+                recordBtn.innerText = '⏺ Enregistrer';
+
                 camRecordBtn.classList.remove('active');
                 camRecordBtn.innerText = '📷';
                 camRecordBtn.title = 'Enregistrer (vidéo + votre voix)';
+
                 cameraFloat.classList.remove('recording');
                 recTimer.classList.remove('active');
                 recIndicator.classList.remove('active');
@@ -1148,7 +1171,13 @@
                 }, 600);
             }
 
-            // Click the camera icon to start / stop
+            // Toolbar button handler
+            recordBtn.addEventListener('click', () => {
+                if (isRecording) stopRecording();
+                else startRecording();
+            });
+
+            // Camera icon handler
             camRecordBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (isRecording) stopRecording();
