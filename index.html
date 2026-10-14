@@ -71,17 +71,6 @@
     #pauseBtn { background: #f0ad4e; color: white; display: none; }
     #stopBtn { background: #333; color: white; }
     #loopBtn { background: #f0f0f0; color: #555; border: 2px solid transparent; }
-    #recordBtn { background: var(--record-red); color: white; border: 2px solid transparent; }
-    #recordBtn.recording {
-        background: #b71c1c;
-        border-color: #ff8a80;
-        animation: recPulse 1.2s infinite;
-    }
-
-    @keyframes recPulse {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.6); }
-        50%      { box-shadow: 0 0 0 8px rgba(229, 57, 53, 0); }
-    }
 
     #loopBtn.active { 
         background: var(--success-green); 
@@ -162,7 +151,7 @@
         background: #111;
         z-index: 1000;
         cursor: grab;
-        transition: box-shadow 0.2s, transform 0.15s;
+        transition: box-shadow 0.2s, transform 0.15s, border-color 0.2s;
         user-select: none;
         touch-action: none;
     }
@@ -173,6 +162,18 @@
     }
 
     .camera-float:hover { transform: scale(1.03); }
+
+    /* Red ring around camera when recording */
+    .camera-float.recording {
+        border-color: #ff3b30;
+        box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.35), 0 18px 40px rgba(0,0,0,0.5);
+        animation: recRing 1.4s infinite;
+    }
+
+    @keyframes recRing {
+        0%, 100% { box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.35), 0 18px 40px rgba(0,0,0,0.5); }
+        50%      { box-shadow: 0 0 0 8px rgba(255, 59, 48, 0.10), 0 18px 40px rgba(0,0,0,0.5); }
+    }
 
     .camera-float video {
         width: 100%;
@@ -222,7 +223,7 @@
         display: flex; align-items: center; justify-content: center;
         cursor: pointer;
         backdrop-filter: blur(4px);
-        transition: background 0.2s, transform 0.1s, color 0.2s;
+        transition: background 0.2s, transform 0.1s, color 0.2s, box-shadow 0.2s;
         padding: 0;
     }
     .cam-btn:hover { background: rgba(0,0,0,0.9); transform: scale(1.1); }
@@ -230,6 +231,25 @@
         background: #ffaa00;
         color: #000;
         box-shadow: 0 0 12px #ffaa00, 0 0 4px #ffaa00;
+    }
+
+    /* Camera icon (record) button */
+    .cam-btn.cam-record {
+        background: rgba(255,255,255,0.85);
+        color: #111;
+        width: 30px; height: 30px;
+        font-size: 15px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+    }
+    .cam-btn.cam-record:hover {
+        background: #ffffff;
+        transform: scale(1.12);
+    }
+    .cam-btn.cam-record.active {
+        background: #ff3b30;
+        color: #fff;
+        box-shadow: 0 0 0 3px rgba(255,59,48,0.35), 0 0 14px rgba(255,59,48,0.7);
+        animation: recBlink 1s infinite;
     }
 
     .rec-indicator {
@@ -278,7 +298,6 @@
     }
     .rec-timer.active { display: flex; }
 
-    /* Mic level indicator inside rec-timer */
     .mic-bars {
         display: inline-flex;
         align-items: flex-end;
@@ -346,12 +365,13 @@
 
     @media (max-width: 600px) {
         .camera-float {
-            width: 100px;
-            height: 100px;
+            width: 110px;
+            height: 110px;
             bottom: 15px;
             right: 15px;
         }
-        .cam-btn { width: 20px; height: 20px; font-size: 10px; }
+        .cam-btn { width: 22px; height: 22px; font-size: 11px; }
+        .cam-btn.cam-record { width: 26px; height: 26px; font-size: 13px; }
     }
 </style>
 </head>
@@ -365,7 +385,6 @@
             <button id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
             <button id="stopBtn" onclick="stopSpeech()">⏹ Arrêter</button>
             <button id="loopBtn" onclick="toggleLoop()">🔁 Boucle : OFF</button>
-            <button id="recordBtn" title="Enregistrer l'écran + la caméra + votre voix">⏺ Enregistrer</button>
             <div class="rec-timer" id="recTimer">
                 ⏺ <span id="recTime">00:00</span>
                 <span class="mic-bars" id="micBars">
@@ -397,6 +416,8 @@
         <div class="rec-indicator" id="recIndicator"><span class="rec-dot"></span>REC</div>
         
         <div class="camera-controls">
+            <!-- Camera / record icon — click to start/stop recording -->
+            <button class="cam-btn cam-record" id="camRecordBtn" title="Enregistrer (vidéo + votre voix)">📷</button>
             <button class="cam-btn" id="switchCamBtn" title="Changer caméra avant/arrière">🔄</button>
             <button class="cam-btn" id="flashBtn" title="Flash (torche)">⚡</button>
             <button class="cam-btn" id="filterBtn" title="Filtre lissant">✨</button>
@@ -820,9 +841,10 @@
 
         // ============================================================
         //  RECORDING — video (canvas composite) + YOUR MICROPHONE audio
+        //  Triggered by the 📷 camera icon button
         // ============================================================
         (function initRecorder() {
-            const recordBtn = document.getElementById('recordBtn');
+            const camRecordBtn = document.getElementById('camRecordBtn');
             const recTimer = document.getElementById('recTimer');
             const recTime  = document.getElementById('recTime');
             const recIndicator = document.getElementById('recIndicator');
@@ -832,6 +854,7 @@
             const previewCanvas = document.getElementById('previewCanvas');
             const micBars = document.getElementById('micBars');
             const micBarEls = micBars.querySelectorAll('span');
+            const cameraFloat = document.getElementById('cameraFloat');
 
             // Recording canvas (offscreen, 1280x720)
             const canvas = document.createElement('canvas');
@@ -971,15 +994,13 @@
                 if (!analyser) return;
                 const data = new Uint8Array(analyser.frequencyBinCount);
                 analyser.getByteFrequencyData(data);
-                // Average in the voice band (roughly first 40 bins)
                 let sum = 0;
                 const N = Math.min(40, data.length);
                 for (let i = 0; i < N; i++) sum += data[i];
-                const avg = sum / N; // 0..255
-                const norm = Math.min(1, avg / 90); // 0..1, boost sensitivity
+                const avg = sum / N;
+                const norm = Math.min(1, avg / 90);
 
                 micBarEls.forEach((bar, i) => {
-                    // 5 bars: each lights up at increasing thresholds
                     const threshold = (i + 1) / micBarEls.length;
                     const active = norm >= threshold * 0.85;
                     const h = active 
@@ -1019,7 +1040,7 @@
                     return;
                 }
 
-                // 2. Set up audio analyser for the level meter
+                // 2. Audio analyser for the level meter
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioCtx.createMediaStreamSource(micStream);
                 analyser = audioCtx.createAnalyser();
@@ -1027,7 +1048,7 @@
                 analyser.smoothingTimeConstant = 0.6;
                 source.connect(analyser);
 
-                // 3. Build combined stream: canvas video + mic audio
+                // 3. Combined stream: canvas video + mic audio
                 const canvasStream = canvas.captureStream(30);
                 const combinedStream = new MediaStream();
                 combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
@@ -1065,7 +1086,6 @@
                     setTimeout(() => URL.revokeObjectURL(url), 2000);
                 };
 
-                // 4. Kick off render + mic meter + recorder
                 previewPanel.classList.add('active');
                 renderLoop();
                 updateMicLevel();
@@ -1074,8 +1094,11 @@
                 isRecording = true;
                 recStart = Date.now();
 
-                recordBtn.classList.add('recording');
-                recordBtn.innerText = '⏹ Stop';
+                // UI: switch camera icon to "stop" state
+                camRecordBtn.classList.add('active');
+                camRecordBtn.innerText = '⏹';
+                camRecordBtn.title = 'Arrêter l\'enregistrement';
+                cameraFloat.classList.add('recording');
                 recTimer.classList.add('active');
                 recIndicator.classList.add('active');
                 recTime.textContent = '00:00';
@@ -1096,7 +1119,6 @@
                     audioCtx = null;
                 }
                 analyser = null;
-                // Reset mic bars
                 micBarEls.forEach(bar => {
                     bar.style.height = '3px';
                     bar.style.background = 'rgba(255,138,128,0.3)';
@@ -1113,8 +1135,11 @@
                 try { recorder.stop(); } catch (e) {}
                 cleanupMedia();
 
-                recordBtn.classList.remove('recording');
-                recordBtn.innerText = '⏺ Enregistrer';
+                // UI reset
+                camRecordBtn.classList.remove('active');
+                camRecordBtn.innerText = '📷';
+                camRecordBtn.title = 'Enregistrer (vidéo + votre voix)';
+                cameraFloat.classList.remove('recording');
                 recTimer.classList.remove('active');
                 recIndicator.classList.remove('active');
 
@@ -1123,7 +1148,9 @@
                 }, 600);
             }
 
-            recordBtn.addEventListener('click', () => {
+            // Click the camera icon to start / stop
+            camRecordBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 if (isRecording) stopRecording();
                 else startRecording();
             });
