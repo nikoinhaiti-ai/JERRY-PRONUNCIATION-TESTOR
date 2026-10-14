@@ -278,6 +278,21 @@
     }
     .rec-timer.active { display: flex; }
 
+    /* Mic level indicator inside rec-timer */
+    .mic-bars {
+        display: inline-flex;
+        align-items: flex-end;
+        gap: 2px;
+        height: 12px;
+        margin-left: 4px;
+    }
+    .mic-bars span {
+        width: 2px;
+        background: #ff8a80;
+        border-radius: 1px;
+        transition: height 0.06s linear;
+    }
+
     /* ---------- PREVIEW PANEL ---------- */
     .preview-panel {
         display: none;
@@ -350,8 +365,13 @@
             <button id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
             <button id="stopBtn" onclick="stopSpeech()">⏹ Arrêter</button>
             <button id="loopBtn" onclick="toggleLoop()">🔁 Boucle : OFF</button>
-            <button id="recordBtn" title="Enregistrer l'écran + la caméra + le son">⏺ Enregistrer</button>
-            <div class="rec-timer" id="recTimer">⏺ <span id="recTime">00:00</span></div>
+            <button id="recordBtn" title="Enregistrer l'écran + la caméra + votre voix">⏺ Enregistrer</button>
+            <div class="rec-timer" id="recTimer">
+                ⏺ <span id="recTime">00:00</span>
+                <span class="mic-bars" id="micBars">
+                    <span></span><span></span><span></span><span></span><span></span>
+                </span>
+            </div>
         </div>
     </div>
 
@@ -799,7 +819,7 @@
         })();
 
         // ============================================================
-        //  RECORDING — video (canvas) + AUDIO (tab capture via getDisplayMedia)
+        //  RECORDING — video (canvas composite) + YOUR MICROPHONE audio
         // ============================================================
         (function initRecorder() {
             const recordBtn = document.getElementById('recordBtn');
@@ -810,6 +830,8 @@
             const videoEl = document.getElementById('cameraVideo');
             const previewPanel = document.getElementById('previewPanel');
             const previewCanvas = document.getElementById('previewCanvas');
+            const micBars = document.getElementById('micBars');
+            const micBarEls = micBars.querySelectorAll('span');
 
             // Recording canvas (offscreen, 1280x720)
             const canvas = document.createElement('canvas');
@@ -829,11 +851,11 @@
             let recStart = 0;
             let isRecording = false;
 
-            // Audio capture state
-            let displayStream = null;        // getDisplayMedia stream (for audio)
+            // Mic capture state
+            let micStream = null;
             let audioCtx = null;
-            let mixDest = null;
-            let combinedStream = null;
+            let analyser = null;
+            let micRafId = null;
 
             function fmtTime(ms) {
                 const s = Math.floor(ms / 1000);
@@ -944,62 +966,72 @@
                 rafId = requestAnimationFrame(renderLoop);
             }
 
-            // ---- Acquire tab audio via getDisplayMedia ----
-            async function acquireAudioStream() {
+            // ---- Mic level meter (5 small bars) ----
+            function updateMicLevel() {
+                if (!analyser) return;
+                const data = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(data);
+                // Average in the voice band (roughly first 40 bins)
+                let sum = 0;
+                const N = Math.min(40, data.length);
+                for (let i = 0; i < N; i++) sum += data[i];
+                const avg = sum / N; // 0..255
+                const norm = Math.min(1, avg / 90); // 0..1, boost sensitivity
+
+                micBarEls.forEach((bar, i) => {
+                    // 5 bars: each lights up at increasing thresholds
+                    const threshold = (i + 1) / micBarEls.length;
+                    const active = norm >= threshold * 0.85;
+                    const h = active 
+                        ? 6 + (i * 1.5) + (norm * 6) 
+                        : 3 + (i * 0.4);
+                    bar.style.height = Math.min(12, h) + 'px';
+                    bar.style.background = active ? '#ff8a80' : 'rgba(255,138,128,0.3)';
+                });
+
+                micRafId = requestAnimationFrame(updateMicLevel);
+            }
+
+            async function acquireMicrophone() {
                 try {
-                    // This prompts the user to pick "This tab" + share audio.
-                    const stream = await navigator.mediaDevices.getDisplayMedia({
-                        video: true,      // needed to satisfy API; we won't use the video
+                    const stream = await navigator.mediaDevices.getUserMedia({
                         audio: {
-                            echoCancellation: false,
-                            noiseSuppression: false,
-                            autoGainControl: false,
-                            sampleRate: 48000
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
                         },
-                        preferCurrentTab: true,
-                        selfBrowserSurface: 'include',
-                        systemAudio: 'include'
+                        video: false
                     });
-
-                    // We only need the audio tracks
-                    const audioTracks = stream.getAudioTracks();
-                    if (audioTracks.length === 0) {
-                        console.warn('Aucune piste audio obtenue. L\'utilisateur doit cocher "Partager l\'audio".');
-                        // Stop the video track we don't use
-                        stream.getVideoTracks().forEach(t => t.stop());
-                        return { stream: null, hasAudio: false };
-                    }
-
-                    // Stop the unnecessary video tracks to save resources
-                    stream.getVideoTracks().forEach(t => t.stop());
-
-                    return { stream, hasAudio: true };
+                    return stream;
                 } catch (err) {
-                    console.warn('getDisplayMedia failed or cancelled:', err);
-                    return { stream: null, hasAudio: false };
+                    console.warn('Microphone unavailable:', err);
+                    return null;
                 }
             }
 
             async function startRecording() {
                 if (isRecording) return;
 
-                // 1. Acquire tab audio (this is what captures speechSynthesis output)
-                const { stream: audioStream, hasAudio } = await acquireAudioStream();
-                displayStream = audioStream;
-
-                // 2. Build combined stream: canvas video + (optionally) tab audio
-                const canvasStream = canvas.captureStream(30);
-                const videoTrack = canvasStream.getVideoTracks()[0];
-
-                combinedStream = new MediaStream();
-                combinedStream.addTrack(videoTrack);
-
-                if (hasAudio && audioStream) {
-                    audioStream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
-                    console.log('✓ Audio track added to recording');
-                } else {
-                    console.warn('⚠ Recording without audio — user did not share tab audio');
+                // 1. Acquire microphone
+                micStream = await acquireMicrophone();
+                if (!micStream) {
+                    alert("Impossible d'accéder au microphone. Vérifiez les permissions.");
+                    return;
                 }
+
+                // 2. Set up audio analyser for the level meter
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioCtx.createMediaStreamSource(micStream);
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.6;
+                source.connect(analyser);
+
+                // 3. Build combined stream: canvas video + mic audio
+                const canvasStream = canvas.captureStream(30);
+                const combinedStream = new MediaStream();
+                combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
+                micStream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
 
                 const mimeType = pickMimeType();
                 const options = mimeType 
@@ -1010,7 +1042,7 @@
                     recorder = new MediaRecorder(combinedStream, options);
                 } catch (err) {
                     alert("Impossible de démarrer l'enregistrement : " + err.message);
-                    cleanupAudio();
+                    cleanupMedia();
                     return;
                 }
 
@@ -1033,9 +1065,10 @@
                     setTimeout(() => URL.revokeObjectURL(url), 2000);
                 };
 
-                // 3. Start rendering loop + recorder
+                // 4. Kick off render + mic meter + recorder
                 previewPanel.classList.add('active');
                 renderLoop();
+                updateMicLevel();
                 recorder.start(1000);
 
                 isRecording = true;
@@ -1050,30 +1083,24 @@
                 timerInterval = setInterval(() => {
                     recTime.textContent = fmtTime(Date.now() - recStart);
                 }, 250);
-
-                // If user stops sharing the tab, auto-stop recording
-                if (audioStream) {
-                    audioStream.getAudioTracks().forEach(track => {
-                        track.onended = () => {
-                            if (isRecording) stopRecording();
-                        };
-                    });
-                }
             }
 
-            function cleanupAudio() {
-                if (displayStream) {
-                    displayStream.getTracks().forEach(t => {
-                        try { t.stop(); } catch(e){}
-                    });
-                    displayStream = null;
+            function cleanupMedia() {
+                if (micRafId) { cancelAnimationFrame(micRafId); micRafId = null; }
+                if (micStream) {
+                    micStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
+                    micStream = null;
                 }
                 if (audioCtx) {
                     try { audioCtx.close(); } catch(e){}
                     audioCtx = null;
                 }
-                mixDest = null;
-                combinedStream = null;
+                analyser = null;
+                // Reset mic bars
+                micBarEls.forEach(bar => {
+                    bar.style.height = '3px';
+                    bar.style.background = 'rgba(255,138,128,0.3)';
+                });
             }
 
             function stopRecording() {
@@ -1084,7 +1111,7 @@
                 if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 
                 try { recorder.stop(); } catch (e) {}
-                cleanupAudio();
+                cleanupMedia();
 
                 recordBtn.classList.remove('recording');
                 recordBtn.innerText = '⏺ Enregistrer';
@@ -1104,7 +1131,7 @@
             window.addEventListener('beforeunload', () => {
                 if (isRecording) {
                     try { recorder.stop(); } catch(e){}
-                    cleanupAudio();
+                    cleanupMedia();
                 }
             });
         })();
