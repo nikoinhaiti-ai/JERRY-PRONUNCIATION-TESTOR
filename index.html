@@ -135,7 +135,7 @@
             transform: translateY(-50%);
         }
 
-        /* --- FLOATING CAMERA WIDGET (small, draggable) --- */
+        /* --- FLOATING CAMERA WIDGET (small, draggable, with flash/filter) --- */
         .camera-float {
             position: fixed;
             bottom: 30px;
@@ -164,7 +164,28 @@
             object-fit: cover;
             display: block;
             background: #000;
-            transform: scaleX(-1); /* mirror */
+            transform: scaleX(-1); /* mirror for front camera, adjusted dynamically */
+            transition: transform 0.3s ease, filter 0.3s ease;
+            filter: brightness(1.05) contrast(1.05) saturate(1.1) blur(0.3px); /* smooth face filter */
+        }
+
+        /* Flash overlay */
+        .flash-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s ease;
+            z-index: 10;
+            mix-blend-mode: overlay;
+        }
+
+        .flash-overlay.active {
+            opacity: 0.8;
         }
 
         /* tiny status light / label */
@@ -184,6 +205,7 @@
             display: flex;
             align-items: center;
             gap: 4px;
+            z-index: 20;
         }
 
         .camera-badge::before {
@@ -203,6 +225,49 @@
             100% { opacity: 1; }
         }
 
+        /* Camera control buttons */
+        .camera-controls {
+            position: absolute;
+            bottom: 8px;
+            right: 10px;
+            display: flex;
+            gap: 6px;
+            z-index: 30;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .camera-controls:hover {
+            opacity: 1;
+        }
+
+        .cam-btn {
+            background: rgba(0,0,0,0.6);
+            border: none;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: background 0.2s, transform 0.1s;
+            padding: 0;
+        }
+
+        .cam-btn:hover {
+            background: rgba(0,0,0,0.9);
+            transform: scale(1.1);
+        }
+
+        .cam-btn.flash-active {
+            background: #ffaa00;
+            color: #000;
+        }
+
         /* On small screens, adapt size */
         @media (max-width: 600px) {
             .camera-float {
@@ -210,6 +275,11 @@
                 height: 112px;
                 bottom: 15px;
                 right: 15px;
+            }
+            .cam-btn {
+                width: 24px;
+                height: 24px;
+                font-size: 12px;
             }
         }
     </style>
@@ -232,10 +302,17 @@
         <div id="scroller"></div>
     </div>
 
-    <!-- Floating camera widget -->
+    <!-- Floating camera widget with flash, switch, filter -->
     <div class="camera-float" id="cameraFloat" tabindex="0">
         <video id="cameraVideo" autoplay playsinline muted></video>
-        <div class="camera-badge">CAM LIVE</div>
+        <div class="flash-overlay" id="flashOverlay"></div>
+        <div class="camera-badge" id="cameraBadge">CAM LIVE</div>
+        
+        <div class="camera-controls">
+            <button class="cam-btn" id="switchCamBtn" title="Changer caméra avant/arrière">🔄</button>
+            <button class="cam-btn" id="flashBtn" title="Flash">⚡</button>
+            <button class="cam-btn" id="filterBtn" title="Filtre lissant">✨</button>
+        </div>
     </div>
 
     <script>
@@ -396,47 +473,84 @@
             speechSynthesis.onvoiceschanged = () => synth.getVoices();
         }
 
-        // ---------- FLOATING CAMERA ----------
+        // ---------- FLOATING CAMERA with FLASH, SWITCH, FILTER ----------
         (function initFloatingCamera() {
             const videoEl = document.getElementById('cameraVideo');
             const floatContainer = document.getElementById('cameraFloat');
+            const flashOverlay = document.getElementById('flashOverlay');
+            const switchCamBtn = document.getElementById('switchCamBtn');
+            const flashBtn = document.getElementById('flashBtn');
+            const filterBtn = document.getElementById('filterBtn');
             
-            // Request camera with multiple fallbacks
-            async function startCamera() {
+            let currentStream = null;
+            let currentFacingMode = 'user'; // 'user' or 'environment'
+            let flashEnabled = false; // flash effect (screen overlay)
+            let filterEnabled = true; // smooth skin filter default ON
+            let isDragging = false;
+            let startX, startY, startLeft, startTop;
+            let cameraAvailable = false;
+
+            // ----- Camera management -----
+            async function startCamera(facingMode = 'user') {
+                // Stop previous stream
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                    currentStream = null;
+                }
+
                 try {
-                    // First attempt: front camera
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            facingMode: 'user',
+                    const constraints = {
+                        video: {
+                            facingMode: facingMode,
                             width: { ideal: 640 },
                             height: { ideal: 480 }
-                        }, 
-                        audio: false 
-                    });
+                        },
+                        audio: false
+                    };
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    currentStream = stream;
                     videoEl.srcObject = stream;
                     await videoEl.play();
-                    console.log('Camera started (front)');
+                    cameraAvailable = true;
+                    
+                    // Apply mirror based on facing mode
+                    if (facingMode === 'user') {
+                        videoEl.style.transform = 'scaleX(-1)';
+                    } else {
+                        videoEl.style.transform = 'scaleX(1)';
+                    }
+                    
+                    // Hide fallback if any
+                    const fallback = floatContainer.querySelector('.camera-fallback');
+                    if (fallback) fallback.remove();
+                    videoEl.style.display = 'block';
+                    
+                    console.log(`Camera started (${facingMode})`);
                 } catch (err) {
-                    console.warn('Front camera failed, trying default...', err);
-                    try {
-                        // Second attempt: any camera
-                        const stream = await navigator.mediaDevices.getUserMedia({ 
-                            video: true, 
-                            audio: false 
-                        });
-                        videoEl.srcObject = stream;
-                        await videoEl.play();
-                        console.log('Camera started (default)');
-                    } catch (err2) {
-                        console.error('Camera unavailable:', err2);
-                        showCameraFallback(err2.message || 'Caméra indisponible');
+                    console.warn(`Camera ${facingMode} failed:`, err);
+                    // If environment fails, try user
+                    if (facingMode === 'environment') {
+                        try {
+                            await startCamera('user');
+                            currentFacingMode = 'user';
+                        } catch (err2) {
+                            showCameraFallback(err2.message || 'Caméra indisponible');
+                        }
+                    } else {
+                        showCameraFallback(err.message || 'Caméra indisponible');
                     }
                 }
             }
 
             function showCameraFallback(message) {
+                cameraAvailable = false;
                 videoEl.style.display = 'none';
+                // Remove existing fallback
+                const existing = floatContainer.querySelector('.camera-fallback');
+                if (existing) existing.remove();
+                
                 const fallback = document.createElement('div');
+                fallback.className = 'camera-fallback';
                 fallback.style.cssText = `
                     width: 100%; height: 100%; display: flex; flex-direction: column;
                     align-items: center; justify-content: center;
@@ -451,17 +565,68 @@
                 floatContainer.appendChild(fallback);
             }
 
-            // Check if mediaDevices API is available
+            // Check API
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                startCamera();
+                startCamera('user');
             } else {
                 showCameraFallback('API caméra non supportée');
             }
 
-            // ---------- DRAGGABLE BEHAVIOR ----------
-            let isDragging = false;
-            let startX, startY, startLeft, startTop;
+            // Switch camera button
+            switchCamBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (!cameraAvailable) return;
+                const newMode = currentFacingMode === 'user' ? 'environment' : 'user';
+                currentFacingMode = newMode;
+                await startCamera(newMode);
+            });
 
+            // Flash button (screen flash effect)
+            flashBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                flashEnabled = !flashEnabled;
+                
+                if (flashEnabled) {
+                    // Trigger flash overlay
+                    flashOverlay.classList.add('active');
+                    setTimeout(() => {
+                        flashOverlay.classList.remove('active');
+                    }, 150);
+                    
+                    // Repeat flash a few times for effect
+                    setTimeout(() => {
+                        flashOverlay.classList.add('active');
+                        setTimeout(() => flashOverlay.classList.remove('active'), 100);
+                    }, 200);
+                    
+                    flashBtn.classList.add('flash-active');
+                } else {
+                    flashOverlay.classList.remove('active');
+                    flashBtn.classList.remove('flash-active');
+                }
+            });
+
+            // Filter button (smooth face)
+            filterBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                filterEnabled = !filterEnabled;
+                if (filterEnabled) {
+                    videoEl.style.filter = 'brightness(1.05) contrast(1.05) saturate(1.1) blur(0.3px)';
+                    filterBtn.style.color = '#ffaa00';
+                    filterBtn.textContent = '✨';
+                } else {
+                    videoEl.style.filter = 'none';
+                    filterBtn.style.color = 'white';
+                    filterBtn.textContent = '✨';
+                }
+            });
+            // Set initial filter state
+            if (filterEnabled) {
+                videoEl.style.filter = 'brightness(1.05) contrast(1.05) saturate(1.1) blur(0.3px)';
+                filterBtn.style.color = '#ffaa00';
+            }
+
+            // ---------- DRAGGABLE BEHAVIOR ----------
             function setInitialPosition() {
                 const rect = floatContainer.getBoundingClientRect();
                 floatContainer.style.bottom = 'auto';
@@ -486,6 +651,8 @@
             });
 
             floatContainer.addEventListener('mousedown', (e) => {
+                // Ignore if clicking on buttons
+                if (e.target.closest('.cam-btn')) return;
                 e.preventDefault();
                 isDragging = true;
                 const rect = floatContainer.getBoundingClientRect();
@@ -528,6 +695,7 @@
 
             // Touch support
             floatContainer.addEventListener('touchstart', (e) => {
+                if (e.target.closest('.cam-btn')) return;
                 const touch = e.touches[0];
                 if (!touch) return;
                 e.preventDefault();
