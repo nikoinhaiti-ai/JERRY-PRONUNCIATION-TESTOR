@@ -69,7 +69,33 @@
                   display:none; }
     .torch-info.show { display:block; }
 
-    /* MP4 conversion status banner */
+    /* ===== VIDEO GALLERY ===== */
+    .gallery { width:100%; max-width:820px; margin-top:20px; }
+    .gallery h3 { font-size:14px; margin:0 0 10px; color:#555; display:flex;
+                  align-items:center; justify-content:space-between; }
+    .gallery h3 .count { background:#eee; color:#555; padding:2px 8px; border-radius:10px; font-size:11px; }
+    .gallery-list { display:flex; flex-direction:column; gap:10px; }
+    .gallery-empty { padding:24px; text-align:center; color:#aaa; font-size:13px;
+                     background:#fafafa; border:1px dashed #ddd; border-radius:10px; }
+    .video-card { display:flex; gap:12px; background:#fafafa; border:1px solid #eee;
+                  border-radius:12px; padding:12px; align-items:center; }
+    .video-card video { width:140px; height:79px; border-radius:8px; background:#000; object-fit:cover; flex-shrink:0; }
+    .video-info { flex:1; min-width:0; }
+    .video-info .name { font-weight:700; font-size:13px; margin-bottom:3px;
+                        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .video-info .meta { font-size:11px; color:#888; display:flex; gap:8px; flex-wrap:wrap; }
+    .video-info .meta .badge { padding:1px 6px; border-radius:6px; background:#e8e8e8; color:#555; font-weight:600; }
+    .video-info .meta .badge.mp4 { background:#c8e6c9; color:#2e7d32; }
+    .video-info .meta .badge.webm { background:#ffe0b2; color:#e65100; }
+    .video-info .meta .badge.converting { background:#bbdefb; color:#1565c0; }
+    .video-info .meta .badge.failed { background:#ffcdd2; color:#c62828; }
+    .video-actions { display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
+    .video-actions button { padding:7px 12px; font-size:11px; }
+    .video-actions .btn-download { background:#28a745; color:#fff; }
+    .video-actions .btn-delete { background:#eee; color:#c62828; }
+    .video-card .progress { width:100%; height:4px; background:#e0e0e0; border-radius:2px; overflow:hidden; margin-top:6px; }
+    .video-card .progress > i { display:block; height:100%; width:0%; background:#0275d8; transition:width .3s; }
+
     .conv-banner { position:fixed; top:16px; left:50%; transform:translateX(-50%);
                    background:rgba(20,20,20,.95); color:#fff; padding:12px 18px; border-radius:10px;
                    font-size:13px; font-weight:600; z-index:2000; display:none;
@@ -80,7 +106,8 @@
     .conv-banner .sub { font-weight:400; font-size:11px; opacity:.75; margin-top:4px; }
 
     @media (max-width:600px){ .cam{width:100px;height:100px;bottom:12px;right:12px;}
-                              .sentence-item{font-size:26px;padding:0 24px;height:120px;} }
+                              .sentence-item{font-size:26px;padding:0 24px;height:120px;}
+                              .video-card video{width:100px;height:56px;} }
 </style>
 </head>
 <body>
@@ -107,6 +134,14 @@
 <div class="preview" id="previewPanel">
     <h4><span class="dot"></span>REC — Aperçu (contenu de la vidéo)</h4>
     <canvas id="previewCanvas"></canvas>
+</div>
+
+<!-- ===== IN-APP VIDEO GALLERY ===== -->
+<div class="gallery">
+    <h3>📁 Mes vidéos <span class="count" id="galleryCount">0</span></h3>
+    <div class="gallery-list" id="galleryList">
+        <div class="gallery-empty">Aucune vidéo enregistrée pour le moment.</div>
+    </div>
 </div>
 
 <div class="torch-info" id="torchInfo"></div>
@@ -226,7 +261,7 @@ document.getElementById('loopBtn').onclick = e => {
 };
 speechSynthesis.onvoiceschanged = () => synth.getVoices();
 
-// ============ CAMERA + REAL LED TORCH (FRONT + BACK) ============
+// ============ CAMERA + REAL LED TORCH ============
 const camEl = document.getElementById('cam');
 const videoEl = document.getElementById('camVideo');
 const torchBtn = document.getElementById('camTorch');
@@ -346,7 +381,7 @@ document.addEventListener('visibilitychange', async () => {
 
 startCam('user');
 
-// ============ RECORDING (MP4 OUTPUT) ============
+// ============ RECORDING ============
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 const previewCanvas = document.getElementById('previewCanvas');
@@ -445,29 +480,24 @@ function fmt(ms) {
     return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 }
 
-// Prefer NATIVE MP4 if available (Safari). Otherwise WebM (Chrome/Firefox/Edge).
 function pickRecorderMime() {
-    const mp4Candidates = [
-        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',   // Safari H.264 + AAC
-        'video/mp4;codecs=h264,aac',
-        'video/mp4;codecs=avc1',
-        'video/mp4'
-    ];
-    for (const m of mp4Candidates) {
-        if (MediaRecorder.isTypeSupported(m)) return { mime: m, nativeMp4: true };
-    }
-    const webmCandidates = [
+    const candidates = [
         'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
-        'video/webm'
+        'video/webm',
+        'video/mp4'
     ];
-    for (const m of webmCandidates) {
-        if (MediaRecorder.isTypeSupported(m)) return { mime: m, nativeMp4: false };
-    }
-    return { mime: '', nativeMp4: false };
+    for (const m of candidates) if (MediaRecorder.isTypeSupported(m)) return m;
+    return '';
 }
 
-// ============ FFMPEG.WASM (lazy loaded) ============
+function timestamp() {
+    return new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+}
+
+// ============================================================
+// ============ FFMPEG.WASM — AUTO MP4 CONVERSION =============
+// ============================================================
 let ffmpegInstance = null;
 let ffmpegLoading = null;
 
@@ -477,13 +507,13 @@ async function loadFFmpeg(onProgress) {
 
     ffmpegLoading = (async () => {
         onProgress && onProgress('Téléchargement du convertisseur…', 5);
-        // Load the UMD bundle
+
         if (!window.FFmpegWASM) {
             await new Promise((resolve, reject) => {
                 const s = document.createElement('script');
                 s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
                 s.onload = resolve;
-                s.onerror = () => reject(new Error('Échec du chargement de ffmpeg.js'));
+                s.onerror = () => reject(new Error('ffmpeg.js load failed'));
                 document.head.appendChild(s);
             });
         }
@@ -492,7 +522,7 @@ async function loadFFmpeg(onProgress) {
                 const s = document.createElement('script');
                 s.src = 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js';
                 s.onload = resolve;
-                s.onerror = () => reject(new Error('Échec du chargement de ffmpeg util'));
+                s.onerror = () => reject(new Error('ffmpeg util load failed'));
                 document.head.appendChild(s);
             });
         }
@@ -516,7 +546,51 @@ async function loadFFmpeg(onProgress) {
     return ffmpegLoading;
 }
 
-// ============ CONVERSION BANNER ============
+// Convert a WebM blob → MP4 blob
+async function convertWebmToMp4(webmBlob, onProgress) {
+    onProgress && onProgress('Chargement du convertisseur…', 5);
+    const ff = await loadFFmpeg(onProgress);
+
+    // ffmpeg progress event
+    const progressHandler = ({ progress }) => {
+        const pct = Math.max(20, Math.min(95, 20 + (progress || 0) * 75));
+        onProgress && onProgress('Encodage H.264…', pct);
+    };
+    ff.on('progress', progressHandler);
+
+    const { fetchFile } = window.FFmpegUtil;
+    const input = 'input.webm';
+    const output = 'output.mp4';
+
+    onProgress && onProgress('Préparation…', 20);
+    ff.writeFile(input, await fetchFile(webmBlob));
+
+    onProgress && onProgress('Encodage H.264…', 30);
+    await ff.exec([
+        '-i', input,
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '23',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
+        output
+    ]);
+
+    onProgress && onProgress('Finalisation…', 96);
+    const data = ff.readFile(output);
+    const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
+
+    try { ff.deleteFile(input); ff.deleteFile(output); } catch(e){}
+    ff.off && ff.off('progress', progressHandler);
+
+    return mp4Blob;
+}
+
+// ============================================================
+// ============ CONVERSION BANNER ============================
+// ============================================================
 const convBanner = document.getElementById('convBanner');
 const convText = document.getElementById('convText');
 const convBar = document.getElementById('convBar');
@@ -532,59 +606,187 @@ function hideConv(delay = 0) {
     setTimeout(() => convBanner.classList.remove('show'), delay);
 }
 
-// Convert a WebM blob → MP4 blob using ffmpeg.wasm
-async function convertToMp4(webmBlob) {
-    showConv('Conversion en MP4…', 'Chargement du convertisseur…', 5);
-    const ff = await loadFFmpeg((msg, p) => showConv('Conversion en MP4…', msg, p));
+// ============================================================
+// ============ INDEXEDDB STORAGE =============================
+// ============================================================
+const DB_NAME = 'tts-cam-videos';
+const DB_VERSION = 1;
+const STORE = 'videos';
+let dbPromise = null;
 
-    ff.on('progress', ({ progress, time }) => {
-        const pct = Math.max(20, Math.min(95, 20 + (progress || 0) * 75));
-        showConv('Conversion en MP4…', `Encodage H.264… ${Math.round(pct)}%`, pct);
+function openDB() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(STORE)) {
+                const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+                store.createIndex('createdAt', 'createdAt');
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
     });
-
-    const { fetchFile } = window.FFmpegUtil;
-    const inputName = 'input.webm';
-    const outputName = 'output.mp4';
-
-    showConv('Conversion en MP4…', 'Préparation du fichier…', 20);
-    ff.writeFile(inputName, await fetchFile(webmBlob));
-
-    showConv('Conversion en MP4…', 'Encodage vidéo (H.264)…', 30);
-    await ff.exec([
-        '-i', inputName,
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '23',
-        '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-movflags', '+faststart',
-        outputName
-    ]);
-
-    showConv('Conversion en MP4…', 'Finalisation…', 96);
-    const data = ff.readFile(outputName);
-    const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
-
-    // cleanup FS
-    try { ff.deleteFile(inputName); ff.deleteFile(outputName); } catch(e){}
-
-    return mp4Blob;
+    return dbPromise;
 }
 
-// ============ DOWNLOAD ============
-function triggerDownload(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+async function dbAdd(record) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const req = tx.objectStore(STORE).add(record);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
 }
 
-function timestamp() {
-    return new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+async function dbUpdate(id, patch) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        const getReq = store.get(id);
+        getReq.onsuccess = () => {
+            const rec = getReq.result;
+            if (!rec) return reject(new Error('Not found'));
+            Object.assign(rec, patch);
+            const putReq = store.put(rec);
+            putReq.onsuccess = () => resolve(putReq.result);
+            putReq.onerror = () => reject(putReq.error);
+        };
+        getReq.onerror = () => reject(getReq.error);
+    });
 }
 
-// ============ RECORDING CONTROL ============
+async function dbDelete(id) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const req = tx.objectStore(STORE).delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function dbGetAll() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+// ============================================================
+// ============ GALLERY UI ====================================
+// ============================================================
+const galleryList = document.getElementById('galleryList');
+const galleryCount = document.getElementById('galleryCount');
+const objectUrls = new Map();
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' o';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' Ko';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
+}
+
+function formatDate(ts) {
+    return new Date(ts).toLocaleString('fr-FR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
+}
+
+// status: 'converting' | 'ready' | 'failed'
+function renderCard(rec) {
+    const url = objectUrls.get(rec.id);
+    const isMp4 = rec.mime.includes('mp4');
+    const ext = isMp4 ? 'mp4' : 'webm';
+    const status = rec.status || 'ready';
+
+    const badgeClass = status === 'converting' ? 'converting'
+                     : status === 'failed' ? 'failed'
+                     : isMp4 ? 'mp4' : 'webm';
+    const badgeText = status === 'converting' ? 'CONVERSION…'
+                    : status === 'failed' ? 'ÉCHEC MP4'
+                    : ext.toUpperCase();
+
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.dataset.id = rec.id;
+
+    card.innerHTML = `
+        <video src="${url}" controls preload="metadata" playsinline></video>
+        <div class="video-info">
+            <div class="name">${rec.name}</div>
+            <div class="meta">
+                <span class="badge ${badgeClass}">${badgeText}</span>
+                <span>${formatSize(rec.size)}</span>
+                <span>${rec.quality}</span>
+                <span>${formatDate(rec.createdAt)}</span>
+            </div>
+            ${status === 'converting' ? '<div class="progress"><i></i></div>' : ''}
+        </div>
+        <div class="video-actions">
+            <button class="btn-download" data-action="download">⬇ Download</button>
+            <button class="btn-delete" data-action="delete">🗑 Supprimer</button>
+        </div>
+    `;
+
+    card.querySelector('[data-action="download"]').onclick = () => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = rec.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    };
+
+    card.querySelector('[data-action="delete"]').onclick = async () => {
+        if (!confirm(`Supprimer "${rec.name}" ?`)) return;
+        await dbDelete(rec.id);
+        const u = objectUrls.get(rec.id);
+        if (u) { URL.revokeObjectURL(u); objectUrls.delete(rec.id); }
+        renderGallery();
+    };
+
+    return card;
+}
+
+async function renderGallery() {
+    const records = (await dbGetAll()).sort((a, b) => b.createdAt - a.createdAt);
+    galleryCount.textContent = records.length;
+
+    for (const url of objectUrls.values()) URL.revokeObjectURL(url);
+    objectUrls.clear();
+
+    if (!records.length) {
+        galleryList.innerHTML = '<div class="gallery-empty">Aucune vidéo enregistrée pour le moment.</div>';
+        return;
+    }
+
+    galleryList.innerHTML = '';
+    for (const rec of records) {
+        const url = URL.createObjectURL(rec.blob);
+        objectUrls.set(rec.id, url);
+        galleryList.appendChild(renderCard(rec));
+    }
+}
+
+// ============================================================
+// ============ RECORDING CONTROL =============================
+// ============================================================
+function pickNativeMp4() {
+    const mp4 = [
+        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+        'video/mp4;codecs=h264,aac',
+        'video/mp4'
+    ].find(m => MediaRecorder.isTypeSupported(m));
+    return mp4 || null;
+}
+
 async function startRec() {
     if (recording) return;
     applyQuality();
@@ -605,7 +807,9 @@ async function startRec() {
     canvas.captureStream(quality.fps).getVideoTracks().forEach(t => combined.addTrack(t));
     micStream.getAudioTracks().forEach(t => combined.addTrack(t));
 
-    const { mime, nativeMp4 } = pickRecorderMime();
+    // Try native MP4 first (Safari), else WebM
+    const nativeMp4Mime = pickNativeMp4();
+    const mime = nativeMp4Mime || pickRecorderMime();
 
     try {
         recorder = new MediaRecorder(combined, {
@@ -615,7 +819,7 @@ async function startRec() {
         });
     } catch (e) { alert('Enregistrement indisponible.'); cleanup(); return; }
 
-    recorder._nativeMp4 = nativeMp4;
+    recorder._nativeMp4 = !!nativeMp4Mime;
 
     chunks = [];
     recorder.ondataavailable = e => {
@@ -626,27 +830,41 @@ async function startRec() {
     };
 
     recorder.onstop = async () => {
-        const srcMime = recorder._nativeMp4 ? 'video/mp4' : 'video/webm';
+        const isNativeMp4 = recorder._nativeMp4;
+        const srcMime = isNativeMp4 ? 'video/mp4' : 'video/webm';
         const srcBlob = new Blob(chunks, { type: srcMime });
         chunks = [];
-        const ts = timestamp();
 
-        try {
-            if (recorder._nativeMp4) {
-                // Safari path — already MP4, download directly
-                triggerDownload(srcBlob, `lecon-${quality.label}-${ts}.mp4`);
-            } else {
-                // Chrome/Firefox/Edge — convert WebM → MP4
-                const mp4 = await convertToMp4(srcBlob);
-                showConv('✅ Conversion terminée', 'Téléchargement…', 100);
-                triggerDownload(mp4, `lecon-${quality.label}-${ts}.mp4`);
-                hideConv(1500);
-            }
-        } catch (err) {
-            console.error('Conversion failed, downloading WebM instead:', err);
-            showConv('⚠️ Conversion échouée', 'Téléchargement du WebM original…', 100);
-            triggerDownload(srcBlob, `lecon-${quality.label}-${ts}.webm`);
-            hideConv(2500);
+        const ts = timestamp();
+        const baseName = `lecon-${quality.label}-${ts}`;
+
+        if (isNativeMp4) {
+            // Safari: already MP4, just store
+            const id = await dbAdd({
+                name: `${baseName}.mp4`,
+                blob: srcBlob,
+                mime: 'video/mp4',
+                size: srcBlob.size,
+                quality: quality.label,
+                createdAt: Date.now(),
+                status: 'ready'
+            });
+            await renderGallery();
+        } else {
+            // Chrome/Firefox/Edge: store WebM first, then auto-convert
+            const id = await dbAdd({
+                name: `${baseName}.webm`,
+                blob: srcBlob,
+                mime: 'video/webm',
+                size: srcBlob.size,
+                quality: quality.label,
+                createdAt: Date.now(),
+                status: 'converting'
+            });
+            await renderGallery();
+
+            // Auto-convert in background
+            autoConvertToMp4(id, srcBlob, baseName);
         }
     };
 
@@ -666,8 +884,42 @@ async function startRec() {
         document.getElementById('time').textContent = fmt(Date.now() - t0);
     }, 500);
 
-    // Warm up ffmpeg in the background (only if not on Safari/native MP4)
-    if (!nativeMp4) loadFFmpeg().catch(() => {});
+    // Preload ffmpeg in background so conversion is fast
+    if (!nativeMp4Mime) loadFFmpeg().catch(() => {});
+}
+
+// Auto-convert a stored WebM record into MP4, replacing the blob
+async function autoConvertToMp4(id, webmBlob, baseName) {
+    showConv('Conversion MP4 automatique…', 'Préparation…', 5);
+    try {
+        const mp4Blob = await convertWebmToMp4(webmBlob, (msg, pct) => {
+            showConv('Conversion MP4 automatique…', msg, pct);
+        });
+
+        // Replace blob + mime + name + size in DB
+        const newName = `${baseName}.mp4`;
+        await dbUpdate(id, {
+            blob: mp4Blob,
+            mime: 'video/mp4',
+            size: mp4Blob.size,
+            name: newName,
+            status: 'ready'
+        });
+
+        // Revoke old URL, refresh gallery
+        const oldUrl = objectUrls.get(id);
+        if (oldUrl) { URL.revokeObjectURL(oldUrl); objectUrls.delete(id); }
+        await renderGallery();
+
+        showConv('✅ MP4 prêt', 'Converti automatiquement', 100);
+        hideConv(1800);
+    } catch (err) {
+        console.error('Auto-conversion failed:', err);
+        await dbUpdate(id, { status: 'failed' });
+        await renderGallery();
+        showConv('⚠️ Conversion échouée', 'Le WebM reste disponible', 100);
+        hideConv(2500);
+    }
 }
 
 function cleanup() {
@@ -700,10 +952,11 @@ document.getElementById('camRec').onclick = e => {
 };
 
 // Default text
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
     const ta = document.getElementById('textInput');
     if (!ta.value) ta.value =
         "Hello, how are you?\nBonjour, comment allez-vous ?\nI am learning English.\nJ'apprends l'anglais.";
+    await renderGallery();
 });
 </script>
 </body>
