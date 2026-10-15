@@ -53,8 +53,6 @@
                     background:rgba(229,57,53,.9); color:#fff; font-size:9px; font-weight:700;
                     padding:2px 8px; border-radius:12px; display:none; z-index:5; }
     .cam.recording .rec-tag { display:block; }
-
-    /* Real LED torch indicators */
     .cam.torch-on { border-color:#ffd54f; box-shadow:0 0 30px 6px rgba(255,213,79,.55), 0 10px 25px rgba(0,0,0,.35); }
     .cam.torch-front-on { border-color:#4fc3f7; box-shadow:0 0 30px 6px rgba(79,195,247,.55), 0 10px 25px rgba(0,0,0,.35); }
 
@@ -70,6 +68,16 @@
                   padding:6px 10px; border-radius:8px; font-size:11px; max-width:230px; z-index:999;
                   display:none; }
     .torch-info.show { display:block; }
+
+    /* MP4 conversion status banner */
+    .conv-banner { position:fixed; top:16px; left:50%; transform:translateX(-50%);
+                   background:rgba(20,20,20,.95); color:#fff; padding:12px 18px; border-radius:10px;
+                   font-size:13px; font-weight:600; z-index:2000; display:none;
+                   box-shadow:0 8px 30px rgba(0,0,0,.35); min-width:260px; text-align:center; }
+    .conv-banner.show { display:block; }
+    .conv-banner .bar { margin-top:8px; height:6px; background:rgba(255,255,255,.15); border-radius:3px; overflow:hidden; }
+    .conv-banner .bar > i { display:block; height:100%; width:0%; background:linear-gradient(90deg,#4fc3f7,#81c784); transition:width .3s; }
+    .conv-banner .sub { font-weight:400; font-size:11px; opacity:.75; margin-top:4px; }
 
     @media (max-width:600px){ .cam{width:100px;height:100px;bottom:12px;right:12px;}
                               .sentence-item{font-size:26px;padding:0 24px;height:120px;} }
@@ -102,6 +110,12 @@
 </div>
 
 <div class="torch-info" id="torchInfo"></div>
+
+<div class="conv-banner" id="convBanner">
+    <div id="convText">Conversion en MP4…</div>
+    <div class="bar"><i id="convBar"></i></div>
+    <div class="sub" id="convSub">Préparation…</div>
+</div>
 
 <div class="cam" id="cam">
     <video id="camVideo" autoplay playsinline muted></video>
@@ -219,8 +233,6 @@ const torchBtn = document.getElementById('camTorch');
 const torchInfo = document.getElementById('torchInfo');
 let stream = null, facing = 'user', dragging = false, sx, sy, sl, st;
 let torchOn = false;
-
-// Cache of torch capability per side (probed at startup)
 const torchCapability = { user: null, environment: null };
 
 function showTorchInfo(msg, ms = 2500) {
@@ -230,20 +242,13 @@ function showTorchInfo(msg, ms = 2500) {
     showTorchInfo._t = setTimeout(() => torchInfo.classList.remove('show'), ms);
 }
 
-// Read the current track's torch capability
 function currentTrackSupportsTorch() {
     if (!stream) return false;
     const track = stream.getVideoTracks()[0];
     if (!track || typeof track.getCapabilities !== 'function') return false;
-    try {
-        const caps = track.getCapabilities();
-        return !!caps.torch;
-    } catch (e) {
-        return false;
-    }
+    try { return !!track.getCapabilities().torch; } catch (e) { return false; }
 }
 
-// Apply the torch constraint to the active track's real LED
 async function applyRealTorch(on) {
     if (!stream) return false;
     const track = stream.getVideoTracks()[0];
@@ -251,166 +256,97 @@ async function applyRealTorch(on) {
     try {
         await track.applyConstraints({ advanced: [{ torch: on }] });
         return true;
-    } catch (e) {
-        console.warn('Torch apply failed:', e);
-        return false;
-    }
+    } catch (e) { console.warn('Torch apply failed:', e); return false; }
 }
 
-// Update visuals depending on which side has the LED on
 function updateTorchVisual() {
-    const frontOn = torchOn && facing === 'user';
-    const backOn  = torchOn && facing === 'environment';
-    camEl.classList.toggle('torch-on', backOn);           // yellow ring → rear LED
-    camEl.classList.toggle('torch-front-on', frontOn);    // blue ring → front LED
+    camEl.classList.toggle('torch-on', torchOn && facing === 'environment');
+    camEl.classList.toggle('torch-front-on', torchOn && facing === 'user');
     torchBtn.classList.toggle('on', torchOn);
 }
 
-// Update button tooltip based on the current camera's capability
 function refreshTorchButtonState() {
     const capable = torchCapability[facing] === true;
     torchBtn.classList.toggle('unsupported', !capable);
-    if (capable) {
-        torchBtn.title = facing === 'environment'
-            ? 'LED arrière disponible'
-            : 'LED avant disponible';
-    } else {
-        torchBtn.title = facing === 'environment'
-            ? 'Pas de LED arrière sur cet appareil'
-            : 'Pas de LED avant sur cet appareil';
-    }
+    torchBtn.title = capable
+        ? (facing === 'environment' ? 'LED arrière disponible' : 'LED avant disponible')
+        : (facing === 'environment' ? 'Pas de LED arrière' : 'Pas de LED avant');
 }
 
 async function startCam(mode) {
-    // Turn off any active real torch before releasing the track
-    if (torchOn) {
-        await applyRealTorch(false);
-        torchOn = false;
-        updateTorchVisual();
-    }
-
+    if (torchOn) { await applyRealTorch(false); torchOn = false; updateTorchVisual(); }
     if (stream) stream.getTracks().forEach(t => t.stop());
 
     try {
         stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: mode,
-                width: { ideal: 640 },
-                height: { ideal: 640 },
-                frameRate: { ideal: 24 }
-            },
+            video: { facingMode: mode, width:{ideal:640}, height:{ideal:640}, frameRate:{ideal:24} },
             audio: false
         });
         videoEl.srcObject = stream;
         await videoEl.play();
         videoEl.style.transform = mode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
-
-        // Probe capability for this side if not cached yet
         const supports = currentTrackSupportsTorch();
-        if (torchCapability[mode] === null || torchCapability[mode] === undefined) {
-            torchCapability[mode] = supports;
-        }
+        if (torchCapability[mode] == null) torchCapability[mode] = supports;
         refreshTorchButtonState();
-    } catch (e) {
-        console.warn('Camera error', e);
-    }
+    } catch (e) { console.warn('Camera error', e); }
 }
 
-// Toggle the REAL LED of the currently active camera (front or back)
 async function toggleTorch() {
     if (!stream) return;
-
-    // First-time probe of this side's capability (in case cache was null)
-    if (torchCapability[facing] === null || torchCapability[facing] === undefined) {
+    if (torchCapability[facing] == null) {
         torchCapability[facing] = currentTrackSupportsTorch();
         refreshTorchButtonState();
     }
-
     if (torchCapability[facing] !== true) {
-        showTorchInfo(
-            facing === 'environment'
-                ? "🔦 Pas de LED arrière détectée"
-                : "🔦 Pas de LED avant détectée"
-        );
+        showTorchInfo(facing === 'environment' ? "🔦 Pas de LED arrière détectée" : "🔦 Pas de LED avant détectée");
         return;
     }
-
     const wantOn = !torchOn;
     const ok = await applyRealTorch(wantOn);
-    if (!ok) {
-        showTorchInfo("⚠️ Impossible de piloter la LED", 2000);
-        return;
-    }
+    if (!ok) { showTorchInfo("⚠️ Impossible de piloter la LED", 2000); return; }
     torchOn = wantOn;
     updateTorchVisual();
-
-    const sideName = facing === 'environment' ? 'arrière' : 'avant';
-    showTorchInfo(torchOn ? `🔦 LED ${sideName} allumée` : `🔦 LED ${sideName} éteinte`, 1500);
+    showTorchInfo(torchOn ? `🔦 LED ${facing === 'environment' ? 'arrière' : 'avant'} allumée` : `🔦 LED éteinte`, 1500);
 }
 
 document.getElementById('camSwitch').onclick = async e => {
     e.stopPropagation();
-    // turn off LED before switching to prevent stuck torch
-    if (torchOn) {
-        await applyRealTorch(false);
-        torchOn = false;
-        updateTorchVisual();
-    }
+    if (torchOn) { await applyRealTorch(false); torchOn = false; updateTorchVisual(); }
     facing = facing === 'user' ? 'environment' : 'user';
     startCam(facing);
 };
+torchBtn.onclick = e => { e.stopPropagation(); toggleTorch(); };
 
-torchBtn.onclick = e => {
-    e.stopPropagation();
-    toggleTorch();
-};
-
-// Drag
 function setPos(l, t) {
     const r = camEl.getBoundingClientRect();
     l = Math.max(0, Math.min(l, innerWidth - r.width));
     t = Math.max(0, Math.min(t, innerHeight - r.height));
-    camEl.style.left = l + 'px';
-    camEl.style.top = t + 'px';
-    camEl.style.right = 'auto';
-    camEl.style.bottom = 'auto';
+    camEl.style.left = l + 'px'; camEl.style.top = t + 'px';
+    camEl.style.right = 'auto'; camEl.style.bottom = 'auto';
 }
-
 camEl.addEventListener('pointerdown', e => {
     if (e.target.closest('button')) return;
     dragging = true;
     const r = camEl.getBoundingClientRect();
     sx = e.clientX; sy = e.clientY; sl = r.left; st = r.top;
-    camEl.style.cursor = 'grabbing';
-    camEl.setPointerCapture(e.pointerId);
+    camEl.style.cursor = 'grabbing'; camEl.setPointerCapture(e.pointerId);
 });
-camEl.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    setPos(sl + e.clientX - sx, st + e.clientY - sy);
-});
-camEl.addEventListener('pointerup', () => {
-    dragging = false;
-    camEl.style.cursor = 'grab';
-});
+camEl.addEventListener('pointermove', e => { if (dragging) setPos(sl + e.clientX - sx, st + e.clientY - sy); });
+camEl.addEventListener('pointerup', () => { dragging = false; camEl.style.cursor = 'grab'; });
 
-requestAnimationFrame(() => {
-    const r = camEl.getBoundingClientRect();
-    setPos(r.left, r.top);
-});
+requestAnimationFrame(() => { const r = camEl.getBoundingClientRect(); setPos(r.left, r.top); });
 
 document.addEventListener('visibilitychange', async () => {
     if (document.hidden && stream) {
         if (torchOn) await applyRealTorch(false);
         torchOn = false;
         stream.getTracks().forEach(t => t.stop());
-    } else if (!document.hidden && !stream) {
-        startCam(facing);
-    }
+    } else if (!document.hidden && !stream) startCam(facing);
 });
 
 startCam('user');
 
-// ============ RECORDING ============
+// ============ RECORDING (MP4 OUTPUT) ============
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 const previewCanvas = document.getElementById('previewCanvas');
@@ -422,9 +358,7 @@ function applyQuality() {
     previewCanvas.width = quality.w / 2; previewCanvas.height = quality.h / 2;
 }
 applyQuality();
-document.getElementById('qualitySelect').addEventListener('change', () => {
-    if (!recording) applyQuality();
-});
+document.getElementById('qualitySelect').addEventListener('change', () => { if (!recording) applyQuality(); });
 
 let recorder = null, chunks = [], recording = false;
 let rafId = null, timerId = null, t0 = 0;
@@ -445,7 +379,6 @@ function draw(targetCtx, W, Hh, fast) {
         targetCtx.fillStyle = color;
         targetCtx.textAlign = 'center';
         targetCtx.textBaseline = 'middle';
-
         const maxW = W * 0.82;
         const words = text.split(' ');
         const lines = []; let cur = '';
@@ -474,20 +407,16 @@ function draw(targetCtx, W, Hh, fast) {
         targetCtx.clip();
         targetCtx.translate(cx, cy);
         if (facing === 'user') targetCtx.scale(-1, 1);
-
         const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
         const side = Math.min(vw, vh);
         const sxv = (vw - side) / 2, syv = (vh - side) / 2;
         targetCtx.drawImage(videoEl, sxv, syv, side, side, -rad, -rad, rad * 2, rad * 2);
         targetCtx.restore();
 
-        // Ring color feedback: yellow = rear LED on, blue = front LED on
         targetCtx.beginPath();
         targetCtx.arc(cx, cy, rad, 0, Math.PI * 2);
         targetCtx.lineWidth = Math.max(3, rad * 0.06);
-        targetCtx.strokeStyle = torchOn
-            ? (facing === 'environment' ? '#ffd54f' : '#4fc3f7')
-            : '#fff';
+        targetCtx.strokeStyle = torchOn ? (facing === 'environment' ? '#ffd54f' : '#4fc3f7') : '#fff';
         targetCtx.stroke();
     }
 }
@@ -516,11 +445,146 @@ function fmt(ms) {
     return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 }
 
-function pickMime() {
-    const c = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
-    return c.find(m => MediaRecorder.isTypeSupported(m)) || '';
+// Prefer NATIVE MP4 if available (Safari). Otherwise WebM (Chrome/Firefox/Edge).
+function pickRecorderMime() {
+    const mp4Candidates = [
+        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',   // Safari H.264 + AAC
+        'video/mp4;codecs=h264,aac',
+        'video/mp4;codecs=avc1',
+        'video/mp4'
+    ];
+    for (const m of mp4Candidates) {
+        if (MediaRecorder.isTypeSupported(m)) return { mime: m, nativeMp4: true };
+    }
+    const webmCandidates = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm'
+    ];
+    for (const m of webmCandidates) {
+        if (MediaRecorder.isTypeSupported(m)) return { mime: m, nativeMp4: false };
+    }
+    return { mime: '', nativeMp4: false };
 }
 
+// ============ FFMPEG.WASM (lazy loaded) ============
+let ffmpegInstance = null;
+let ffmpegLoading = null;
+
+async function loadFFmpeg(onProgress) {
+    if (ffmpegInstance) return ffmpegInstance;
+    if (ffmpegLoading) return ffmpegLoading;
+
+    ffmpegLoading = (async () => {
+        onProgress && onProgress('Téléchargement du convertisseur…', 5);
+        // Load the UMD bundle
+        if (!window.FFmpegWASM) {
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('Échec du chargement de ffmpeg.js'));
+                document.head.appendChild(s);
+            });
+        }
+        if (!window.FFmpegUtil) {
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js';
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('Échec du chargement de ffmpeg util'));
+                document.head.appendChild(s);
+            });
+        }
+
+        const { FFmpeg } = window.FFmpegWASM;
+        const { toBlobURL } = window.FFmpegUtil;
+        const ff = new FFmpeg();
+
+        onProgress && onProgress('Chargement du noyau…', 15);
+
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        await ff.load({
+            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+        });
+
+        ffmpegInstance = ff;
+        return ff;
+    })();
+
+    return ffmpegLoading;
+}
+
+// ============ CONVERSION BANNER ============
+const convBanner = document.getElementById('convBanner');
+const convText = document.getElementById('convText');
+const convBar = document.getElementById('convBar');
+const convSub = document.getElementById('convSub');
+
+function showConv(text, sub = '', progress = 0) {
+    convText.textContent = text;
+    convSub.textContent = sub;
+    convBar.style.width = Math.max(0, Math.min(100, progress)) + '%';
+    convBanner.classList.add('show');
+}
+function hideConv(delay = 0) {
+    setTimeout(() => convBanner.classList.remove('show'), delay);
+}
+
+// Convert a WebM blob → MP4 blob using ffmpeg.wasm
+async function convertToMp4(webmBlob) {
+    showConv('Conversion en MP4…', 'Chargement du convertisseur…', 5);
+    const ff = await loadFFmpeg((msg, p) => showConv('Conversion en MP4…', msg, p));
+
+    ff.on('progress', ({ progress, time }) => {
+        const pct = Math.max(20, Math.min(95, 20 + (progress || 0) * 75));
+        showConv('Conversion en MP4…', `Encodage H.264… ${Math.round(pct)}%`, pct);
+    });
+
+    const { fetchFile } = window.FFmpegUtil;
+    const inputName = 'input.webm';
+    const outputName = 'output.mp4';
+
+    showConv('Conversion en MP4…', 'Préparation du fichier…', 20);
+    ff.writeFile(inputName, await fetchFile(webmBlob));
+
+    showConv('Conversion en MP4…', 'Encodage vidéo (H.264)…', 30);
+    await ff.exec([
+        '-i', inputName,
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '23',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
+        outputName
+    ]);
+
+    showConv('Conversion en MP4…', 'Finalisation…', 96);
+    const data = ff.readFile(outputName);
+    const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
+
+    // cleanup FS
+    try { ff.deleteFile(inputName); ff.deleteFile(outputName); } catch(e){}
+
+    return mp4Blob;
+}
+
+// ============ DOWNLOAD ============
+function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function timestamp() {
+    return new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+}
+
+// ============ RECORDING CONTROL ============
 async function startRec() {
     if (recording) return;
     applyQuality();
@@ -541,7 +605,8 @@ async function startRec() {
     canvas.captureStream(quality.fps).getVideoTracks().forEach(t => combined.addTrack(t));
     micStream.getAudioTracks().forEach(t => combined.addTrack(t));
 
-    const mime = pickMime();
+    const { mime, nativeMp4 } = pickRecorderMime();
+
     try {
         recorder = new MediaRecorder(combined, {
             ...(mime && { mimeType: mime }),
@@ -550,6 +615,8 @@ async function startRec() {
         });
     } catch (e) { alert('Enregistrement indisponible.'); cleanup(); return; }
 
+    recorder._nativeMp4 = nativeMp4;
+
     chunks = [];
     recorder.ondataavailable = e => {
         if (e.data.size > 0) {
@@ -557,15 +624,30 @@ async function startRec() {
             if (chunks.length > MAX_CHUNKS) chunks.shift();
         }
     };
-    recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const ts = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-        a.href = url; a.download = `lecon-${quality.label}-${ts}.webm`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+    recorder.onstop = async () => {
+        const srcMime = recorder._nativeMp4 ? 'video/mp4' : 'video/webm';
+        const srcBlob = new Blob(chunks, { type: srcMime });
         chunks = [];
+        const ts = timestamp();
+
+        try {
+            if (recorder._nativeMp4) {
+                // Safari path — already MP4, download directly
+                triggerDownload(srcBlob, `lecon-${quality.label}-${ts}.mp4`);
+            } else {
+                // Chrome/Firefox/Edge — convert WebM → MP4
+                const mp4 = await convertToMp4(srcBlob);
+                showConv('✅ Conversion terminée', 'Téléchargement…', 100);
+                triggerDownload(mp4, `lecon-${quality.label}-${ts}.mp4`);
+                hideConv(1500);
+            }
+        } catch (err) {
+            console.error('Conversion failed, downloading WebM instead:', err);
+            showConv('⚠️ Conversion échouée', 'Téléchargement du WebM original…', 100);
+            triggerDownload(srcBlob, `lecon-${quality.label}-${ts}.webm`);
+            hideConv(2500);
+        }
     };
 
     document.getElementById('previewPanel').classList.add('active');
@@ -583,6 +665,9 @@ async function startRec() {
     timerId = setInterval(() => {
         document.getElementById('time').textContent = fmt(Date.now() - t0);
     }, 500);
+
+    // Warm up ffmpeg in the background (only if not on Safari/native MP4)
+    if (!nativeMp4) loadFFmpeg().catch(() => {});
 }
 
 function cleanup() {
