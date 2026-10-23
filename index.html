@@ -1,963 +1,751 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TTS Bilingue + Caméra flottante</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>StreamLink — Live Camera + Chat</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
-    :root { --en:#d9534f; --fr:#0275d8; --rec:#e53935; }
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; background:#fff; color:#333; margin:0; padding:16px;
-           display:flex; flex-direction:column; align-items:center; }
-    .wrap { width:100%; max-width:820px; }
-    textarea { width:100%; height:90px; background:#fafafa; border:1px solid #ddd; padding:12px;
-               border-radius:10px; font-size:15px; resize:none; outline:none; }
-    .controls { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; }
-    button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:600; font-size:13px; }
-    button:hover:not(:disabled){ opacity:.9; }
-    button:disabled{ opacity:.25; cursor:not-allowed; }
-    #loadBtn{background:#eee;color:#555;} #playBtn{background:#e00;color:#fff;}
-    #pauseBtn{background:#f0ad4e;color:#fff;display:none;} #stopBtn{background:#333;color:#fff;}
-    #loopBtn{background:#eee;color:#555;} #loopBtn.active{background:#28a745;color:#fff;}
-    #recordBtn{background:var(--rec);color:#fff;} #recordBtn.recording{background:#b71c1c;}
-    select { padding:9px; border-radius:8px; border:1px solid #ddd; background:#eee; font-weight:600; font-size:13px; }
-    .stage { width:100%; max-width:820px; aspect-ratio:16/9; background:#fff; border-radius:14px;
-             overflow:hidden; position:relative; box-shadow:0 8px 30px rgba(0,0,0,.08); border:1px solid #eee; margin-top:10px; }
-    #scroller { position:absolute; width:100%; top:50%; transition:transform .35s cubic-bezier(.19,1,.22,1); }
-    .sentence-item { height:150px; display:flex; align-items:center; justify-content:center; text-align:center;
-                     padding:0 50px; font-size:38px; font-weight:700; opacity:.05; transition:opacity .4s, transform .4s; }
-    .sentence-item.active { opacity:1; transform:scale(1.06); }
-    .english{color:var(--en);} .french{color:var(--fr);}
-    .timer { display:none; align-items:center; gap:6px; background:#b71c1c; color:#fff;
-             padding:10px 12px; border-radius:8px; font-family:monospace; font-size:12px; font-weight:700; }
-    .timer.active{display:flex;}
-    .timer .dot{width:8px;height:8px;background:#fff;border-radius:50%;animation:blink 1s infinite;}
-    @keyframes blink{50%{opacity:.2;}}
+  :root{
+    --bg:#0a0d13; --panel:#111621; --panel-2:#171e2c; --border:#222c3f;
+    --text:#e9eefb; --muted:#8d9ab3; --accent:#4f8cff; --accent-2:#8b5cff;
+    --green:#2ee6a8; --danger:#ff4d6a; --radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input{font-family:inherit}
+  .screen{display:none;height:100dvh;width:100%}
+  .screen.active{display:flex}
 
-    .cam { position:fixed; bottom:24px; right:24px; width:130px; height:130px; border-radius:50%;
-           overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,.35); border:3px solid #fff;
-           background:#111; z-index:1000; cursor:grab; touch-action:none; user-select:none; }
-    .cam.recording { border-color:#f33; animation:ring 1.4s infinite; }
-    @keyframes ring{50%{box-shadow:0 0 0 8px rgba(255,51,51,.15),0 10px 25px rgba(0,0,0,.35);}}
-    .cam video { width:100%; height:100%; object-fit:cover; display:block; background:#000;
-                 transform:scaleX(-1); filter:brightness(1.03) contrast(1.06) saturate(1.1); }
-    .cam .btns { position:absolute; bottom:5px; left:50%; transform:translateX(-50%);
-                 display:flex; gap:4px; opacity:.8; z-index:5; }
-    .cam .btns button { background:rgba(0,0,0,.6); color:#fff; border-radius:50%; width:24px; height:24px;
-                        font-size:12px; padding:0; display:flex; align-items:center; justify-content:center; }
-    .cam .btns .rec { width:28px; height:28px; font-size:14px; background:rgba(255,255,255,.85); color:#111; }
-    .cam .btns .rec.active { background:#f33; color:#fff; }
-    .cam .btns .torch.on { background:#ffd54f; color:#111; }
-    .cam .btns .torch.unsupported { opacity:.35; }
-    .cam .rec-tag { position:absolute; top:6px; left:50%; transform:translateX(-50%);
-                    background:rgba(229,57,53,.9); color:#fff; font-size:9px; font-weight:700;
-                    padding:2px 8px; border-radius:12px; display:none; z-index:5; }
-    .cam.recording .rec-tag { display:block; }
-    .cam.torch-on { border-color:#ffd54f; box-shadow:0 0 30px 6px rgba(255,213,79,.55), 0 10px 25px rgba(0,0,0,.35); }
-    .cam.torch-front-on { border-color:#4fc3f7; box-shadow:0 0 30px 6px rgba(79,195,247,.55), 0 10px 25px rgba(0,0,0,.35); }
+  /* ---------- LANDING ---------- */
+  #landing{
+    align-items:center;justify-content:center;padding:24px;
+    background:
+      radial-gradient(900px 600px at 12% -10%, rgba(79,140,255,.20), transparent 62%),
+      radial-gradient(760px 540px at 112% 112%, rgba(139,92,255,.20), transparent 62%),
+      var(--bg);
+  }
+  .card{
+    width:100%;max-width:440px;padding:34px 30px;
+    background:rgba(17,22,33,.82);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--border);border-radius:24px;
+    box-shadow:0 30px 90px rgba(0,0,0,.55);
+    animation:rise .5s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;letter-spacing:.3px;color:var(--muted);margin-bottom:22px}
+  .logo .dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+  h1{font-size:25px;line-height:1.3;font-weight:700;letter-spacing:-.4px;margin-bottom:10px}
+  h1 span{background:linear-gradient(100deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:26px}
 
-    .preview { display:none; width:100%; max-width:820px; margin-top:14px; background:#0d1117;
-               border-radius:12px; padding:10px; border:1px solid #30363d; }
-    .preview.active{ display:block; }
-    .preview h4 { margin:0 0 8px; color:#e6edf3; font-size:11px; font-weight:600;
-                  display:flex; align-items:center; gap:6px; }
-    .preview h4 .dot{width:7px;height:7px;background:#f33;border-radius:50%;animation:blink 1s infinite;}
-    .preview canvas { width:100%; height:auto; display:block; border-radius:6px; background:#fff; aspect-ratio:16/9; }
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:14px 20px;border-radius:13px;font-size:15px;font-weight:600;
+    transition:transform .12s ease, filter .2s ease, background .2s;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn.primary{
+    width:100%;color:#fff;
+    background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    box-shadow:0 10px 30px rgba(79,140,255,.34);
+  }
+  .btn.primary:hover{filter:brightness(1.08)}
+  .divider{
+    display:flex;align-items:center;gap:12px;color:var(--muted);
+    font-size:12px;text-transform:uppercase;letter-spacing:1.2px;margin:22px 0 16px;
+  }
+  .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+  .join-row{display:flex;gap:9px}
+  .join-row input{
+    flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:13px;padding:14px 16px;color:var(--text);font-size:15px;
+    letter-spacing:4px;text-align:center;font-weight:600;outline:none;transition:border-color .2s;
+  }
+  .join-row input::placeholder{letter-spacing:normal;font-weight:400;color:#5b6780}
+  .join-row input:focus{border-color:var(--accent)}
+  .join-row .btn{background:var(--panel-2);border:1px solid var(--border);padding:14px 22px}
+  .join-row .btn:hover{background:#1e2637}
+  .error{color:var(--danger);font-size:13px;margin-top:14px;text-align:center;min-height:18px}
+  .hint{font-size:12px;color:#5b6780;text-align:center;margin-top:10px}
 
-    .torch-info { position:fixed; bottom:170px; right:24px; background:rgba(0,0,0,.85); color:#fff;
-                  padding:6px 10px; border-radius:8px; font-size:11px; max-width:230px; z-index:999;
-                  display:none; }
-    .torch-info.show { display:block; }
+  /* ---------- ROOM ---------- */
+  #room{flex-direction:row;position:relative;background:#05070b}
+  .stage{position:relative;flex:1;min-width:0;background:#05070b;overflow:hidden}
+  #mainVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#05070b}
+  #mainVideo.mirrored{transform:scaleX(-1)}
 
-    /* ===== VIDEO GALLERY ===== */
-    .gallery { width:100%; max-width:820px; margin-top:20px; }
-    .gallery h3 { font-size:14px; margin:0 0 10px; color:#555; display:flex;
-                  align-items:center; justify-content:space-between; }
-    .gallery h3 .count { background:#eee; color:#555; padding:2px 8px; border-radius:10px; font-size:11px; }
-    .gallery-list { display:flex; flex-direction:column; gap:10px; }
-    .gallery-empty { padding:24px; text-align:center; color:#aaa; font-size:13px;
-                     background:#fafafa; border:1px dashed #ddd; border-radius:10px; }
-    .video-card { display:flex; gap:12px; background:#fafafa; border:1px solid #eee;
-                  border-radius:12px; padding:12px; align-items:center; }
-    .video-card video { width:140px; height:79px; border-radius:8px; background:#000; object-fit:cover; flex-shrink:0; }
-    .video-info { flex:1; min-width:0; }
-    .video-info .name { font-weight:700; font-size:13px; margin-bottom:3px;
-                        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .video-info .meta { font-size:11px; color:#888; display:flex; gap:8px; flex-wrap:wrap; }
-    .video-info .meta .badge { padding:1px 6px; border-radius:6px; background:#e8e8e8; color:#555; font-weight:600; }
-    .video-info .meta .badge.mp4 { background:#c8e6c9; color:#2e7d32; }
-    .video-info .meta .badge.webm { background:#ffe0b2; color:#e65100; }
-    .video-info .meta .badge.converting { background:#bbdefb; color:#1565c0; }
-    .video-info .meta .badge.failed { background:#ffcdd2; color:#c62828; }
-    .video-actions { display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
-    .video-actions button { padding:7px 12px; font-size:11px; }
-    .video-actions .btn-download { background:#28a745; color:#fff; }
-    .video-actions .btn-delete { background:#eee; color:#c62828; }
-    .video-card .progress { width:100%; height:4px; background:#e0e0e0; border-radius:2px; overflow:hidden; margin-top:6px; }
-    .video-card .progress > i { display:block; height:100%; width:0%; background:#0275d8; transition:width .3s; }
+  .overlay-top{
+    position:absolute;top:0;left:0;right:0;z-index:12;
+    display:flex;align-items:center;gap:9px;padding:14px;
+    background:linear-gradient(180deg,rgba(5,7,11,.82),transparent);
+  }
+  .spacer{flex:1}
+  .pill{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:8px 13px;border-radius:999px;font-size:12.5px;font-weight:600;
+    background:rgba(17,22,33,.82);border:1px solid var(--border);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);white-space:nowrap;
+  }
+  .pill .live-dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .pill.live .live-dot{background:var(--danger);box-shadow:0 0 0 0 rgba(255,77,106,.7);animation:pulse 1.8s infinite}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(255,77,106,.65)}
+    70%{box-shadow:0 0 0 9px rgba(255,77,106,0)}
+    100%{box-shadow:0 0 0 0 rgba(255,77,106,0)}
+  }
+  .code-pill{cursor:pointer;letter-spacing:1.6px;color:var(--accent);transition:background .18s}
+  .code-pill:hover{background:rgba(79,140,255,.16)}
 
-    .conv-banner { position:fixed; top:16px; left:50%; transform:translateX(-50%);
-                   background:rgba(20,20,20,.95); color:#fff; padding:12px 18px; border-radius:10px;
-                   font-size:13px; font-weight:600; z-index:2000; display:none;
-                   box-shadow:0 8px 30px rgba(0,0,0,.35); min-width:260px; text-align:center; }
-    .conv-banner.show { display:block; }
-    .conv-banner .bar { margin-top:8px; height:6px; background:rgba(255,255,255,.15); border-radius:3px; overflow:hidden; }
-    .conv-banner .bar > i { display:block; height:100%; width:0%; background:linear-gradient(90deg,#4fc3f7,#81c784); transition:width .3s; }
-    .conv-banner .sub { font-weight:400; font-size:11px; opacity:.75; margin-top:4px; }
+  .waiting{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    z-index:11;padding:12px 20px;border-radius:999px;font-size:13.5px;color:var(--muted);
+    background:rgba(17,22,33,.8);border:1px solid var(--border);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    display:flex;align-items:center;gap:9px;transition:opacity .3s;text-align:center;
+  }
+  .waiting.hidden{opacity:0;pointer-events:none}
+  .spinner{
+    width:13px;height:13px;border-radius:50%;flex-shrink:0;
+    border:2px solid rgba(141,154,179,.28);border-top-color:var(--accent);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
 
-    @media (max-width:600px){ .cam{width:100px;height:100px;bottom:12px;right:12px;}
-                              .sentence-item{font-size:26px;padding:0 24px;height:120px;}
-                              .video-card video{width:100px;height:56px;} }
+  .overlay-bottom{
+    position:absolute;left:0;right:0;bottom:0;z-index:12;
+    display:flex;align-items:center;justify-content:center;gap:11px;
+    padding:18px 14px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(0deg,rgba(5,7,11,.88),transparent);
+  }
+  .ctrl{
+    display:flex;align-items:center;justify-content:center;gap:7px;
+    min-width:52px;height:52px;padding:0 16px;border-radius:16px;
+    background:rgba(23,30,44,.9);border:1px solid var(--border);
+    font-size:14px;font-weight:600;color:var(--text);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    transition:background .18s, transform .12s, opacity .2s;
+  }
+  .ctrl:hover{background:rgba(34,44,63,.95)}
+  .ctrl:active{transform:scale(.95)}
+  .ctrl.off{background:rgba(255,77,106,.16);border-color:rgba(255,77,106,.4);color:#ff8fa2}
+  .ctrl.danger{background:linear-gradient(120deg,#e8394f,#ff4d6a);border-color:transparent;color:#fff}
+  .ctrl.danger:hover{filter:brightness(1.1)}
+
+  /* ---------- CHAT ---------- */
+  .chat{
+    width:344px;flex-shrink:0;display:flex;flex-direction:column;height:100%;
+    background:var(--panel);border-left:1px solid var(--border);z-index:20;
+  }
+  .chat-head{
+    display:flex;align-items:center;gap:10px;
+    padding:16px;border-bottom:1px solid var(--border);flex-shrink:0;
+  }
+  .chat-head h2{font-size:14.5px;font-weight:650;letter-spacing:-.1px}
+  .badge{
+    margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted);
+    background:var(--panel-2);border:1px solid var(--border);
+    padding:4px 10px;border-radius:999px;white-space:nowrap;
+  }
+  .messages{
+    flex:1;overflow-y:auto;overscroll-behavior:contain;
+    padding:16px;display:flex;flex-direction:column;gap:10px;
+  }
+  .messages::-webkit-scrollbar{width:6px}
+  .messages::-webkit-scrollbar-thumb{background:#2a3448;border-radius:99px}
+  .msg{max-width:86%;display:flex;flex-direction:column;gap:3px;animation:pop .22s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .msg.me{align-self:flex-end;align-items:flex-end}
+  .msg.them{align-self:flex-start;align-items:flex-start}
+  .bubble{
+    padding:9px 13px;border-radius:15px;font-size:14px;line-height:1.45;
+    word-break:break-word;white-space:pre-wrap;
+  }
+  .msg.me .bubble{
+    background:linear-gradient(125deg,var(--accent),var(--accent-2));color:#fff;
+    border-bottom-right-radius:5px;box-shadow:0 6px 18px rgba(79,140,255,.24);
+  }
+  .msg.them .bubble{
+    background:var(--panel-2);border:1px solid var(--border);border-bottom-left-radius:5px;
+  }
+  .time{font-size:10px;color:#5b6780;padding:0 4px}
+  .msg.system{align-self:center;max-width:100%}
+  .msg.system .bubble{
+    background:transparent;border:none;color:var(--muted);
+    font-size:12px;text-align:center;padding:2px 8px;
+  }
+
+  .composer{
+    display:flex;gap:9px;padding:12px;flex-shrink:0;
+    border-top:1px solid var(--border);background:var(--panel);
+    padding-bottom:calc(12px + env(safe-area-inset-bottom));
+  }
+  .composer input{
+    flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:13px;padding:12px 15px;color:var(--text);font-size:14px;
+    outline:none;transition:border-color .2s;
+  }
+  .composer input::placeholder{color:#5b6780}
+  .composer input:focus{border-color:var(--accent)}
+  .composer button{
+    padding:0 18px;border-radius:13px;font-size:14px;font-weight:650;color:#fff;
+    background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    transition:filter .18s, transform .12s;
+  }
+  .composer button:hover{filter:brightness(1.1)}
+  .composer button:active{transform:scale(.96)}
+
+  #chatToggle{
+    display:none;align-items:center;justify-content:center;
+    width:40px;height:40px;border-radius:12px;font-size:17px;
+    background:rgba(17,22,33,.82);border:1px solid var(--border);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative;
+  }
+  #chatToggle .unread{
+    position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;
+    background:var(--danger);border:2px solid var(--bg);display:none;
+  }
+  #chatToggle.has-unread .unread{display:block}
+
+  /* ---------- MOBILE ---------- */
+  @media (max-width:820px){
+    .chat{
+      position:absolute;left:0;right:0;bottom:0;width:100%;height:66%;
+      border-left:none;border-top:1px solid var(--border);
+      border-radius:20px 20px 0 0;box-shadow:0 -20px 60px rgba(0,0,0,.55);
+      transform:translateY(112%);
+      transition:transform .3s cubic-bezier(.2,.8,.2,1);
+    }
+    .chat.open{transform:translateY(0)}
+    #chatToggle{display:flex}
+    .ctrl{min-width:48px;height:48px;padding:0 13px;font-size:13px}
+    h1{font-size:22px}
+  }
+  @media (min-width:821px){ #chatToggle{display:none} }
 </style>
 </head>
 <body>
 
-<div class="wrap">
-    <textarea id="textInput" placeholder="Anglais&#10;Français&#10;Anglais..."></textarea>
-    <div class="controls">
-        <button id="loadBtn">1. Charger</button>
-        <button id="playBtn" disabled>▶ Lire</button>
-        <button id="pauseBtn">⏸ Pause</button>
-        <button id="stopBtn">⏹ Stop</button>
-        <button id="loopBtn">🔁 Boucle</button>
-        <button id="recordBtn">⏺ Enregistrer</button>
-        <select id="qualitySelect">
-            <option value="720" selected>720p</option>
-            <option value="1080">1080p</option>
-        </select>
-        <div class="timer" id="timer"><span class="dot"></span><span id="time">00:00</span></div>
+<!-- ================= LANDING ================= -->
+<div id="landing" class="screen active">
+  <div class="card">
+    <div class="logo"><span class="dot"></span> StreamLink</div>
+    <h1>Go live from your camera.<br><span>Chat in real time.</span></h1>
+    <p class="sub">Start a stream and anyone with the room code can watch you live and message you instantly.</p>
+
+    <button id="btnGoLive" class="btn primary">
+      <span>●</span> Go Live
+    </button>
+
+    <div class="divider">or join a stream</div>
+
+    <div class="join-row">
+      <input id="codeInput" placeholder="Enter code" maxlength="4" value="1234"
+             inputmode="numeric" autocomplete="off" spellcheck="false">
+      <button id="btnJoin" class="btn">Join</button>
     </div>
+    <p class="hint">Room code: <strong>1234</strong></p>
+    <p id="landingError" class="error"></p>
+  </div>
 </div>
 
-<div class="stage" id="stage"><div id="scroller"></div></div>
+<!-- ================= ROOM ================= -->
+<div id="room" class="screen">
+  <div class="stage">
+    <video id="mainVideo" playsinline autoplay></video>
 
-<div class="preview" id="previewPanel">
-    <h4><span class="dot"></span>REC — Aperçu (contenu de la vidéo)</h4>
-    <canvas id="previewCanvas"></canvas>
-</div>
-
-<!-- ===== IN-APP VIDEO GALLERY ===== -->
-<div class="gallery">
-    <h3>📁 Mes vidéos <span class="count" id="galleryCount">0</span></h3>
-    <div class="gallery-list" id="galleryList">
-        <div class="gallery-empty">Aucune vidéo enregistrée pour le moment.</div>
+    <div class="overlay-top">
+      <div class="pill" id="statusPill">
+        <span class="live-dot"></span><span id="statusText">Connecting…</span>
+      </div>
+      <div class="spacer"></div>
+      <button class="pill code-pill" id="codePill" title="Copy invite link">
+        <span id="codeText">1234</span> · copy
+      </button>
+      <button id="chatToggle" title="Toggle chat">💬<span class="unread"></span></button>
     </div>
-</div>
 
-<div class="torch-info" id="torchInfo"></div>
-
-<div class="conv-banner" id="convBanner">
-    <div id="convText">Conversion en MP4…</div>
-    <div class="bar"><i id="convBar"></i></div>
-    <div class="sub" id="convSub">Préparation…</div>
-</div>
-
-<div class="cam" id="cam">
-    <video id="camVideo" autoplay playsinline muted></video>
-    <div class="rec-tag">REC</div>
-    <div class="btns">
-        <button class="rec" id="camRec" title="Enregistrer">📷</button>
-        <button id="camSwitch" title="Changer">🔄</button>
-        <button class="torch" id="camTorch" title="Torche">🔦</button>
+    <div class="waiting" id="waiting">
+      <span class="spinner"></span><span id="waitingText">Waiting for viewers…</span>
     </div>
+
+    <div class="overlay-bottom">
+      <button class="ctrl" id="micBtn" title="Toggle microphone">🎤</button>
+      <button class="ctrl" id="camBtn" title="Toggle camera">📹</button>
+      <button class="ctrl danger" id="endBtn" title="End stream">End</button>
+    </div>
+  </div>
+
+  <aside class="chat" id="chatPanel">
+    <div class="chat-head">
+      <h2>Live chat</h2>
+      <span class="badge" id="viewerCount">0 viewers</span>
+    </div>
+    <div class="messages" id="messages"></div>
+    <form class="composer" id="composer">
+      <input id="msgInput" placeholder="Send a message…" autocomplete="off" maxlength="500">
+      <button type="submit">Send</button>
+    </form>
+  </aside>
 </div>
 
 <script>
-// ============ QUALITY ============
-const PRESETS = {
-    '720':  { w:1280, h:720,  fps:30, bitrate:2_500_000, label:'720p'  },
-    '1080': { w:1920, h:1080, fps:30, bitrate:4_500_000, label:'1080p' }
-};
-let quality = PRESETS['720'];
-document.getElementById('qualitySelect').onchange = e => quality = PRESETS[e.target.value];
+(() => {
+  'use strict';
 
-// ============ TTS ============
-const synth = speechSynthesis;
-let data = [], idx = 0, rep = 0, playing = false, paused = false, looping = false;
-const H = 150;
+  /* ---------------- Config ---------------- */
+  const ID_PREFIX = 'streamlink-v1-';   // namespace on the public PeerJS broker
+  const ROOM_CODE = '1234';             // fixed room code
+  const CODE_LEN  = ROOM_CODE.length;
 
-function processText() {
-    stopSpeech();
-    const scroller = document.getElementById('scroller');
-    const lines = document.getElementById('textInput').value.split('\n').map(s=>s.trim()).filter(Boolean);
-    scroller.innerHTML = ''; data = [];
-    lines.forEach((line, i) => {
-        const isEN = i % 2 === 0;
-        const div = document.createElement('div');
-        div.className = 'sentence-item ' + (isEN ? 'english' : 'french');
-        div.innerText = line;
-        scroller.appendChild(div);
-        data.push({ text: line, lang: isEN ? 'en-US' : 'fr-FR', el: div, max: isEN ? 2 : 1 });
-    });
-    if (data.length) {
-        scroller.style.transform = `translateY(${-H/2}px)`;
-        document.getElementById('playBtn').disabled = false;
+  /* ---------------- Elements ---------------- */
+  const $ = sel => document.querySelector(sel);
+  const landing      = $('#landing');
+  const room         = $('#room');
+  const mainVideo    = $('#mainVideo');
+  const codeInput    = $('#codeInput');
+  const landingError = $('#landingError');
+  const codeText     = $('#codeText');
+  const codePill     = $('#codePill');
+  const statusPill   = $('#statusPill');
+  const statusText   = $('#statusText');
+  const waiting      = $('#waiting');
+  const waitingText  = $('#waitingText');
+  const micBtn       = $('#micBtn');
+  const camBtn       = $('#camBtn');
+  const endBtn       = $('#endBtn');
+  const messagesEl   = $('#messages');
+  const composer     = $('#composer');
+  const msgInput     = $('#msgInput');
+  const viewerCount  = $('#viewerCount');
+  const chatPanel    = $('#chatPanel');
+  const chatToggle   = $('#chatToggle');
+
+  /* ---------------- State ---------------- */
+  const state = {
+    role: null,          // 'host' | 'viewer'
+    code: ROOM_CODE,
+    peer: null,
+    localStream: null,
+    conns: [],           // open data channels
+    calls: [],           // media connections
+    chatOpen: false,
+    unread: 0,
+    connected: false
+  };
+
+  /* ---------------- Helpers ---------------- */
+  const timeString = ts => new Date(ts || Date.now())
+    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const setStatus = (text, live) => {
+    statusText.textContent = text;
+    statusPill.classList.toggle('live', !!live);
+  };
+
+  const setViewerCount = n => {
+    viewerCount.textContent = n + (n === 1 ? ' viewer' : ' viewers');
+  };
+
+  const showWaiting = text => {
+    waitingText.textContent = text;
+    waiting.classList.remove('hidden');
+  };
+  const hideWaiting = () => waiting.classList.add('hidden');
+
+  /* ---------------- Chat UI ---------------- */
+  function addMessage(text, who, ts) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + who;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;          // textContent => XSS-safe
+    wrap.appendChild(bubble);
+
+    if (who !== 'system') {
+      const t = document.createElement('div');
+      t.className = 'time';
+      t.textContent = timeString(ts);
+      wrap.appendChild(t);
     }
-}
 
-function updateDisplay(i) {
-    data.forEach(s => s.el.classList.remove('active'));
-    if (!data[i]) return;
-    data[i].el.classList.add('active');
-    document.getElementById('scroller').style.transform = `translateY(${-i*H - H/2}px)`;
-}
+    const nearBottom =
+      messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 90;
 
-function speakStep() {
-    if (!playing || paused) return;
-    if (idx >= data.length) {
-        if (looping) { idx = 0; rep = 0; speakStep(); }
-        else stopSpeech();
-        return;
+    messagesEl.appendChild(wrap);
+
+    if (nearBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // Unread indicator when chat is collapsed on mobile
+    if (who === 'them' && !state.chatOpen && window.innerWidth <= 820) {
+      state.unread++;
+      chatToggle.classList.add('has-unread');
     }
-    const item = data[idx];
-    updateDisplay(idx);
-    const u = new SpeechSynthesisUtterance(item.text);
-    u.lang = item.lang;
-    const v = synth.getVoices().find(x => x.lang.startsWith(item.lang));
-    if (v) u.voice = v;
-    u.onend = () => {
-        if (!playing || paused) return;
-        rep++;
-        if (rep < item.max) speakStep();
-        else { idx++; rep = 0; speakStep(); }
-    };
-    u.onerror = () => playing && stopSpeech();
-    synth.speak(u);
-}
+  }
 
-function startPlayAll() {
-    if (!data.length) return;
-    synth.cancel();
-    playing = true; paused = false; idx = 0; rep = 0;
-    document.getElementById('playBtn').style.display = 'none';
-    document.getElementById('pauseBtn').style.display = 'flex';
-    document.getElementById('pauseBtn').innerText = '⏸ Pause';
-    speakStep();
-}
+  function sendChat(raw) {
+    const text = raw.trim();
+    if (!text) return;
 
-function togglePause() {
-    if (!playing) return;
-    paused = !paused;
-    const btn = document.getElementById('pauseBtn');
-    if (paused) { synth.pause(); btn.innerText = '▶ Reprendre'; }
-    else { btn.innerText = '⏸ Pause'; synth.paused ? synth.resume() : speakStep(); }
-}
+    const payload = { type: 'chat', text, ts: Date.now() };
+    addMessage(text, 'me', payload.ts);
 
-function stopSpeech() {
-    playing = false; paused = false; synth.cancel();
-    document.getElementById('playBtn').style.display = 'flex';
-    document.getElementById('playBtn').disabled = !data.length;
-    document.getElementById('pauseBtn').style.display = 'none';
-}
+    if (state.role === 'host') {
+      state.conns.forEach(c => { if (c.open) c.send(payload); });
+    } else {
+      const c = state.conns[0];
+      if (c && c.open) c.send(payload);
+    }
+  }
 
-document.getElementById('loadBtn').onclick = processText;
-document.getElementById('playBtn').onclick = startPlayAll;
-document.getElementById('pauseBtn').onclick = togglePause;
-document.getElementById('stopBtn').onclick = stopSpeech;
-document.getElementById('loopBtn').onclick = e => {
-    looping = !looping;
-    e.target.classList.toggle('active', looping);
-    e.target.innerText = looping ? '🔁 ON' : '🔁 Boucle';
-};
-speechSynthesis.onvoiceschanged = () => synth.getVoices();
+  function handleData(conn, data) {
+    if (!data || typeof data !== 'object') return;
 
-// ============ CAMERA + REAL LED TORCH ============
-const camEl = document.getElementById('cam');
-const videoEl = document.getElementById('camVideo');
-const torchBtn = document.getElementById('camTorch');
-const torchInfo = document.getElementById('torchInfo');
-let stream = null, facing = 'user', dragging = false, sx, sy, sl, st;
-let torchOn = false;
-const torchCapability = { user: null, environment: null };
+    if (data.type === 'chat') {
+      addMessage(data.text, 'them', data.ts);
+      // Host relays viewer messages to every other viewer
+      if (state.role === 'host') {
+        state.conns.forEach(c => { if (c !== conn && c.open) c.send(data); });
+      }
+    } else if (data.type === 'count' && state.role === 'viewer') {
+      setViewerCount(data.count);
+    }
+  }
 
-function showTorchInfo(msg, ms = 2500) {
-    torchInfo.textContent = msg;
-    torchInfo.classList.add('show');
-    clearTimeout(showTorchInfo._t);
-    showTorchInfo._t = setTimeout(() => torchInfo.classList.remove('show'), ms);
-}
+  /* ---------------- Data connections ---------------- */
+  function wireConnection(conn) {
+    conn.on('data', d => handleData(conn, d));
+    conn.on('close', () => dropConnection(conn));
+    conn.on('error', () => dropConnection(conn));
+  }
 
-function currentTrackSupportsTorch() {
-    if (!stream) return false;
-    const track = stream.getVideoTracks()[0];
-    if (!track || typeof track.getCapabilities !== 'function') return false;
-    try { return !!track.getCapabilities().torch; } catch (e) { return false; }
-}
+  function dropConnection(conn) {
+    state.conns = state.conns.filter(c => c !== conn);
 
-async function applyRealTorch(on) {
-    if (!stream) return false;
-    const track = stream.getVideoTracks()[0];
-    if (!track) return false;
+    const call = state.calls.find(c => c.peer === conn.peer);
+    if (call) { try { call.close(); } catch (e) {} }
+    state.calls = state.calls.filter(c => c.peer !== conn.peer);
+
+    if (state.role === 'host') syncCount();
+  }
+
+  function syncCount() {
+    const n = state.conns.filter(c => c.open).length;
+    setViewerCount(n);
+    const payload = { type: 'count', count: n };
+    state.conns.forEach(c => { if (c.open) c.send(payload); });
+
+    if (n > 0) hideWaiting();
+    else if (state.role === 'host') showWaiting('Waiting for viewers…');
+  }
+
+  /* ---------------- Host ---------------- */
+  async function goLive() {
+    landingError.textContent = '';
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      landingError.textContent =
+        'Camera access requires HTTPS or localhost. Open this page over a secure connection.';
+      return;
+    }
+
+    let stream;
     try {
-        await track.applyConstraints({ advanced: [{ torch: on }] });
-        return true;
-    } catch (e) { console.warn('Torch apply failed:', e); return false; }
-}
-
-function updateTorchVisual() {
-    camEl.classList.toggle('torch-on', torchOn && facing === 'environment');
-    camEl.classList.toggle('torch-front-on', torchOn && facing === 'user');
-    torchBtn.classList.toggle('on', torchOn);
-}
-
-function refreshTorchButtonState() {
-    const capable = torchCapability[facing] === true;
-    torchBtn.classList.toggle('unsupported', !capable);
-    torchBtn.title = capable
-        ? (facing === 'environment' ? 'LED arrière disponible' : 'LED avant disponible')
-        : (facing === 'environment' ? 'Pas de LED arrière' : 'Pas de LED avant');
-}
-
-async function startCam(mode) {
-    if (torchOn) { await applyRealTorch(false); torchOn = false; updateTorchVisual(); }
-    if (stream) stream.getTracks().forEach(t => t.stop());
-
-    try {
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: mode, width:{ideal:640}, height:{ideal:640}, frameRate:{ideal:24} },
-            audio: false
-        });
-        videoEl.srcObject = stream;
-        await videoEl.play();
-        videoEl.style.transform = mode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
-        const supports = currentTrackSupportsTorch();
-        if (torchCapability[mode] == null) torchCapability[mode] = supports;
-        refreshTorchButtonState();
-    } catch (e) { console.warn('Camera error', e); }
-}
-
-async function toggleTorch() {
-    if (!stream) return;
-    if (torchCapability[facing] == null) {
-        torchCapability[facing] = currentTrackSupportsTorch();
-        refreshTorchButtonState();
-    }
-    if (torchCapability[facing] !== true) {
-        showTorchInfo(facing === 'environment' ? "🔦 Pas de LED arrière détectée" : "🔦 Pas de LED avant détectée");
-        return;
-    }
-    const wantOn = !torchOn;
-    const ok = await applyRealTorch(wantOn);
-    if (!ok) { showTorchInfo("⚠️ Impossible de piloter la LED", 2000); return; }
-    torchOn = wantOn;
-    updateTorchVisual();
-    showTorchInfo(torchOn ? `🔦 LED ${facing === 'environment' ? 'arrière' : 'avant'} allumée` : `🔦 LED éteinte`, 1500);
-}
-
-document.getElementById('camSwitch').onclick = async e => {
-    e.stopPropagation();
-    if (torchOn) { await applyRealTorch(false); torchOn = false; updateTorchVisual(); }
-    facing = facing === 'user' ? 'environment' : 'user';
-    startCam(facing);
-};
-torchBtn.onclick = e => { e.stopPropagation(); toggleTorch(); };
-
-function setPos(l, t) {
-    const r = camEl.getBoundingClientRect();
-    l = Math.max(0, Math.min(l, innerWidth - r.width));
-    t = Math.max(0, Math.min(t, innerHeight - r.height));
-    camEl.style.left = l + 'px'; camEl.style.top = t + 'px';
-    camEl.style.right = 'auto'; camEl.style.bottom = 'auto';
-}
-camEl.addEventListener('pointerdown', e => {
-    if (e.target.closest('button')) return;
-    dragging = true;
-    const r = camEl.getBoundingClientRect();
-    sx = e.clientX; sy = e.clientY; sl = r.left; st = r.top;
-    camEl.style.cursor = 'grabbing'; camEl.setPointerCapture(e.pointerId);
-});
-camEl.addEventListener('pointermove', e => { if (dragging) setPos(sl + e.clientX - sx, st + e.clientY - sy); });
-camEl.addEventListener('pointerup', () => { dragging = false; camEl.style.cursor = 'grab'; });
-
-requestAnimationFrame(() => { const r = camEl.getBoundingClientRect(); setPos(r.left, r.top); });
-
-document.addEventListener('visibilitychange', async () => {
-    if (document.hidden && stream) {
-        if (torchOn) await applyRealTorch(false);
-        torchOn = false;
-        stream.getTracks().forEach(t => t.stop());
-    } else if (!document.hidden && !stream) startCam(facing);
-});
-
-startCam('user');
-
-// ============ RECORDING ============
-const canvas = document.createElement('canvas');
-const ctx = canvas.getContext('2d');
-const previewCanvas = document.getElementById('previewCanvas');
-const previewCtx = previewCanvas.getContext('2d');
-const stage = document.getElementById('stage');
-
-function applyQuality() {
-    canvas.width = quality.w; canvas.height = quality.h;
-    previewCanvas.width = quality.w / 2; previewCanvas.height = quality.h / 2;
-}
-applyQuality();
-document.getElementById('qualitySelect').addEventListener('change', () => { if (!recording) applyQuality(); });
-
-let recorder = null, chunks = [], recording = false;
-let rafId = null, timerId = null, t0 = 0;
-let micStream = null, audioCtx = null, analyser = null;
-const MAX_CHUNKS = 400;
-
-function draw(targetCtx, W, Hh, fast) {
-    targetCtx.imageSmoothingQuality = fast ? 'low' : 'medium';
-    targetCtx.fillStyle = '#fff';
-    targetCtx.fillRect(0, 0, W, Hh);
-
-    const active = document.querySelector('.sentence-item.active');
-    if (active) {
-        const color = active.classList.contains('english') ? '#d9534f' : '#0275d8';
-        const text = active.innerText;
-        const fs = Math.round(Hh * 0.12);
-        targetCtx.font = `700 ${fs}px system-ui, sans-serif`;
-        targetCtx.fillStyle = color;
-        targetCtx.textAlign = 'center';
-        targetCtx.textBaseline = 'middle';
-        const maxW = W * 0.82;
-        const words = text.split(' ');
-        const lines = []; let cur = '';
-        for (const w of words) {
-            const t = cur ? cur + ' ' + w : w;
-            if (targetCtx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; }
-            else cur = t;
-        }
-        if (cur) lines.push(cur);
-        const lh = fs * 1.15;
-        const y0 = Hh / 2 - (lines.length - 1) * lh / 2;
-        lines.forEach((l, i) => targetCtx.fillText(l, W / 2, y0 + i * lh));
-    }
-
-    if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
-        const br = camEl.getBoundingClientRect();
-        const sr = stage.getBoundingClientRect();
-        const kx = W / sr.width, ky = Hh / sr.height;
-        const cx = (br.left - sr.left + br.width / 2) * kx;
-        const cy = (br.top - sr.top + br.height / 2) * ky;
-        const rad = (br.width / 2) * kx;
-
-        targetCtx.save();
-        targetCtx.beginPath();
-        targetCtx.arc(cx, cy, rad, 0, Math.PI * 2);
-        targetCtx.clip();
-        targetCtx.translate(cx, cy);
-        if (facing === 'user') targetCtx.scale(-1, 1);
-        const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
-        const side = Math.min(vw, vh);
-        const sxv = (vw - side) / 2, syv = (vh - side) / 2;
-        targetCtx.drawImage(videoEl, sxv, syv, side, side, -rad, -rad, rad * 2, rad * 2);
-        targetCtx.restore();
-
-        targetCtx.beginPath();
-        targetCtx.arc(cx, cy, rad, 0, Math.PI * 2);
-        targetCtx.lineWidth = Math.max(3, rad * 0.06);
-        targetCtx.strokeStyle = torchOn ? (facing === 'environment' ? '#ffd54f' : '#4fc3f7') : '#fff';
-        targetCtx.stroke();
-    }
-}
-
-let lastFrame = 0, lastPreview = 0;
-function loop(now) {
-    rafId = requestAnimationFrame(loop);
-    if (now - lastFrame < 33) return;
-    lastFrame = now;
-    draw(ctx, canvas.width, canvas.height, true);
-    if (now - lastPreview > 125) {
-        draw(previewCtx, previewCanvas.width, previewCanvas.height, true);
-        lastPreview = now;
-    }
-    if (analyser) {
-        const d = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(d);
-        let s = 0; for (let i = 0; i < 20; i++) s += d[i];
-        const lvl = Math.min(1, s / 20 / 90);
-        document.querySelector('#timer .dot').style.opacity = 0.4 + lvl * 0.6;
-    }
-}
-
-function fmt(ms) {
-    const s = Math.floor(ms / 1000);
-    return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-}
-
-function pickRecorderMime() {
-    const candidates = [
-        'video/webm;codecs=vp9,opus',
-        'video/webm;codecs=vp8,opus',
-        'video/webm',
-        'video/mp4'
-    ];
-    for (const m of candidates) if (MediaRecorder.isTypeSupported(m)) return m;
-    return '';
-}
-
-function timestamp() {
-    return new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-}
-
-// ============================================================
-// ============ FFMPEG.WASM — AUTO MP4 CONVERSION =============
-// ============================================================
-let ffmpegInstance = null;
-let ffmpegLoading = null;
-
-async function loadFFmpeg(onProgress) {
-    if (ffmpegInstance) return ffmpegInstance;
-    if (ffmpegLoading) return ffmpegLoading;
-
-    ffmpegLoading = (async () => {
-        onProgress && onProgress('Téléchargement du convertisseur…', 5);
-
-        if (!window.FFmpegWASM) {
-            await new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
-                s.onload = resolve;
-                s.onerror = () => reject(new Error('ffmpeg.js load failed'));
-                document.head.appendChild(s);
-            });
-        }
-        if (!window.FFmpegUtil) {
-            await new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js';
-                s.onload = resolve;
-                s.onerror = () => reject(new Error('ffmpeg util load failed'));
-                document.head.appendChild(s);
-            });
-        }
-
-        const { FFmpeg } = window.FFmpegWASM;
-        const { toBlobURL } = window.FFmpegUtil;
-        const ff = new FFmpeg();
-
-        onProgress && onProgress('Chargement du noyau…', 15);
-
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-        await ff.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
-        });
-
-        ffmpegInstance = ff;
-        return ff;
-    })();
-
-    return ffmpegLoading;
-}
-
-// Convert a WebM blob → MP4 blob
-async function convertWebmToMp4(webmBlob, onProgress) {
-    onProgress && onProgress('Chargement du convertisseur…', 5);
-    const ff = await loadFFmpeg(onProgress);
-
-    // ffmpeg progress event
-    const progressHandler = ({ progress }) => {
-        const pct = Math.max(20, Math.min(95, 20 + (progress || 0) * 75));
-        onProgress && onProgress('Encodage H.264…', pct);
-    };
-    ff.on('progress', progressHandler);
-
-    const { fetchFile } = window.FFmpegUtil;
-    const input = 'input.webm';
-    const output = 'output.mp4';
-
-    onProgress && onProgress('Préparation…', 20);
-    ff.writeFile(input, await fetchFile(webmBlob));
-
-    onProgress && onProgress('Encodage H.264…', 30);
-    await ff.exec([
-        '-i', input,
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '23',
-        '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-movflags', '+faststart',
-        output
-    ]);
-
-    onProgress && onProgress('Finalisation…', 96);
-    const data = ff.readFile(output);
-    const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
-
-    try { ff.deleteFile(input); ff.deleteFile(output); } catch(e){}
-    ff.off && ff.off('progress', progressHandler);
-
-    return mp4Blob;
-}
-
-// ============================================================
-// ============ CONVERSION BANNER ============================
-// ============================================================
-const convBanner = document.getElementById('convBanner');
-const convText = document.getElementById('convText');
-const convBar = document.getElementById('convBar');
-const convSub = document.getElementById('convSub');
-
-function showConv(text, sub = '', progress = 0) {
-    convText.textContent = text;
-    convSub.textContent = sub;
-    convBar.style.width = Math.max(0, Math.min(100, progress)) + '%';
-    convBanner.classList.add('show');
-}
-function hideConv(delay = 0) {
-    setTimeout(() => convBanner.classList.remove('show'), delay);
-}
-
-// ============================================================
-// ============ INDEXEDDB STORAGE =============================
-// ============================================================
-const DB_NAME = 'tts-cam-videos';
-const DB_VERSION = 1;
-const STORE = 'videos';
-let dbPromise = null;
-
-function openDB() {
-    if (dbPromise) return dbPromise;
-    dbPromise = new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
-        req.onupgradeneeded = () => {
-            const db = req.result;
-            if (!db.objectStoreNames.contains(STORE)) {
-                const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-                store.createIndex('createdAt', 'createdAt');
-            }
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-    return dbPromise;
-}
-
-async function dbAdd(record) {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readwrite');
-        const req = tx.objectStore(STORE).add(record);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-}
-
-async function dbUpdate(id, patch) {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readwrite');
-        const store = tx.objectStore(STORE);
-        const getReq = store.get(id);
-        getReq.onsuccess = () => {
-            const rec = getReq.result;
-            if (!rec) return reject(new Error('Not found'));
-            Object.assign(rec, patch);
-            const putReq = store.put(rec);
-            putReq.onsuccess = () => resolve(putReq.result);
-            putReq.onerror = () => reject(putReq.error);
-        };
-        getReq.onerror = () => reject(getReq.error);
-    });
-}
-
-async function dbDelete(id) {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readwrite');
-        const req = tx.objectStore(STORE).delete(id);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-    });
-}
-
-async function dbGetAll() {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readonly');
-        const req = tx.objectStore(STORE).getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
-    });
-}
-
-// ============================================================
-// ============ GALLERY UI ====================================
-// ============================================================
-const galleryList = document.getElementById('galleryList');
-const galleryCount = document.getElementById('galleryCount');
-const objectUrls = new Map();
-
-function formatSize(bytes) {
-    if (bytes < 1024) return bytes + ' o';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' Ko';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
-}
-
-function formatDate(ts) {
-    return new Date(ts).toLocaleString('fr-FR', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-    });
-}
-
-// status: 'converting' | 'ready' | 'failed'
-function renderCard(rec) {
-    const url = objectUrls.get(rec.id);
-    const isMp4 = rec.mime.includes('mp4');
-    const ext = isMp4 ? 'mp4' : 'webm';
-    const status = rec.status || 'ready';
-
-    const badgeClass = status === 'converting' ? 'converting'
-                     : status === 'failed' ? 'failed'
-                     : isMp4 ? 'mp4' : 'webm';
-    const badgeText = status === 'converting' ? 'CONVERSION…'
-                    : status === 'failed' ? 'ÉCHEC MP4'
-                    : ext.toUpperCase();
-
-    const card = document.createElement('div');
-    card.className = 'video-card';
-    card.dataset.id = rec.id;
-
-    card.innerHTML = `
-        <video src="${url}" controls preload="metadata" playsinline></video>
-        <div class="video-info">
-            <div class="name">${rec.name}</div>
-            <div class="meta">
-                <span class="badge ${badgeClass}">${badgeText}</span>
-                <span>${formatSize(rec.size)}</span>
-                <span>${rec.quality}</span>
-                <span>${formatDate(rec.createdAt)}</span>
-            </div>
-            ${status === 'converting' ? '<div class="progress"><i></i></div>' : ''}
-        </div>
-        <div class="video-actions">
-            <button class="btn-download" data-action="download">⬇ Download</button>
-            <button class="btn-delete" data-action="delete">🗑 Supprimer</button>
-        </div>
-    `;
-
-    card.querySelector('[data-action="download"]').onclick = () => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = rec.name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-    };
-
-    card.querySelector('[data-action="delete"]').onclick = async () => {
-        if (!confirm(`Supprimer "${rec.name}" ?`)) return;
-        await dbDelete(rec.id);
-        const u = objectUrls.get(rec.id);
-        if (u) { URL.revokeObjectURL(u); objectUrls.delete(rec.id); }
-        renderGallery();
-    };
-
-    return card;
-}
-
-async function renderGallery() {
-    const records = (await dbGetAll()).sort((a, b) => b.createdAt - a.createdAt);
-    galleryCount.textContent = records.length;
-
-    for (const url of objectUrls.values()) URL.revokeObjectURL(url);
-    objectUrls.clear();
-
-    if (!records.length) {
-        galleryList.innerHTML = '<div class="gallery-empty">Aucune vidéo enregistrée pour le moment.</div>';
-        return;
-    }
-
-    galleryList.innerHTML = '';
-    for (const rec of records) {
-        const url = URL.createObjectURL(rec.blob);
-        objectUrls.set(rec.id, url);
-        galleryList.appendChild(renderCard(rec));
-    }
-}
-
-// ============================================================
-// ============ RECORDING CONTROL =============================
-// ============================================================
-function pickNativeMp4() {
-    const mp4 = [
-        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-        'video/mp4;codecs=h264,aac',
-        'video/mp4'
-    ].find(m => MediaRecorder.isTypeSupported(m));
-    return mp4 || null;
-}
-
-async function startRec() {
-    if (recording) return;
-    applyQuality();
-
-    try {
-        micStream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true }
-        });
-    } catch (e) { alert('Microphone requis.'); return; }
-
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const src = audioCtx.createMediaStreamSource(micStream);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 128;
-    src.connect(analyser);
-
-    const combined = new MediaStream();
-    canvas.captureStream(quality.fps).getVideoTracks().forEach(t => combined.addTrack(t));
-    micStream.getAudioTracks().forEach(t => combined.addTrack(t));
-
-    // Try native MP4 first (Safari), else WebM
-    const nativeMp4Mime = pickNativeMp4();
-    const mime = nativeMp4Mime || pickRecorderMime();
-
-    try {
-        recorder = new MediaRecorder(combined, {
-            ...(mime && { mimeType: mime }),
-            videoBitsPerSecond: quality.bitrate,
-            audioBitsPerSecond: 128_000
-        });
-    } catch (e) { alert('Enregistrement indisponible.'); cleanup(); return; }
-
-    recorder._nativeMp4 = !!nativeMp4Mime;
-
-    chunks = [];
-    recorder.ondataavailable = e => {
-        if (e.data.size > 0) {
-            chunks.push(e.data);
-            if (chunks.length > MAX_CHUNKS) chunks.shift();
-        }
-    };
-
-    recorder.onstop = async () => {
-        const isNativeMp4 = recorder._nativeMp4;
-        const srcMime = isNativeMp4 ? 'video/mp4' : 'video/webm';
-        const srcBlob = new Blob(chunks, { type: srcMime });
-        chunks = [];
-
-        const ts = timestamp();
-        const baseName = `lecon-${quality.label}-${ts}`;
-
-        if (isNativeMp4) {
-            // Safari: already MP4, just store
-            const id = await dbAdd({
-                name: `${baseName}.mp4`,
-                blob: srcBlob,
-                mime: 'video/mp4',
-                size: srcBlob.size,
-                quality: quality.label,
-                createdAt: Date.now(),
-                status: 'ready'
-            });
-            await renderGallery();
-        } else {
-            // Chrome/Firefox/Edge: store WebM first, then auto-convert
-            const id = await dbAdd({
-                name: `${baseName}.webm`,
-                blob: srcBlob,
-                mime: 'video/webm',
-                size: srcBlob.size,
-                quality: quality.label,
-                createdAt: Date.now(),
-                status: 'converting'
-            });
-            await renderGallery();
-
-            // Auto-convert in background
-            autoConvertToMp4(id, srcBlob, baseName);
-        }
-    };
-
-    document.getElementById('previewPanel').classList.add('active');
-    recording = true;
-    t0 = Date.now();
-    document.getElementById('recordBtn').classList.add('recording');
-    document.getElementById('recordBtn').innerText = '⏹ Stop';
-    document.getElementById('camRec').classList.add('active');
-    document.getElementById('camRec').innerText = '⏹';
-    camEl.classList.add('recording');
-    document.getElementById('timer').classList.add('active');
-
-    loop(performance.now());
-    recorder.start(2000);
-    timerId = setInterval(() => {
-        document.getElementById('time').textContent = fmt(Date.now() - t0);
-    }, 500);
-
-    // Preload ffmpeg in background so conversion is fast
-    if (!nativeMp4Mime) loadFFmpeg().catch(() => {});
-}
-
-// Auto-convert a stored WebM record into MP4, replacing the blob
-async function autoConvertToMp4(id, webmBlob, baseName) {
-    showConv('Conversion MP4 automatique…', 'Préparation…', 5);
-    try {
-        const mp4Blob = await convertWebmToMp4(webmBlob, (msg, pct) => {
-            showConv('Conversion MP4 automatique…', msg, pct);
-        });
-
-        // Replace blob + mime + name + size in DB
-        const newName = `${baseName}.mp4`;
-        await dbUpdate(id, {
-            blob: mp4Blob,
-            mime: 'video/mp4',
-            size: mp4Blob.size,
-            name: newName,
-            status: 'ready'
-        });
-
-        // Revoke old URL, refresh gallery
-        const oldUrl = objectUrls.get(id);
-        if (oldUrl) { URL.revokeObjectURL(oldUrl); objectUrls.delete(id); }
-        await renderGallery();
-
-        showConv('✅ MP4 prêt', 'Converti automatiquement', 100);
-        hideConv(1800);
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: { echoCancellation: true, noiseSuppression: true }
+      });
     } catch (err) {
-        console.error('Auto-conversion failed:', err);
-        await dbUpdate(id, { status: 'failed' });
-        await renderGallery();
-        showConv('⚠️ Conversion échouée', 'Le WebM reste disponible', 100);
-        hideConv(2500);
+      landingError.textContent =
+        err && err.name === 'NotAllowedError'
+          ? 'Camera/microphone permission was denied.'
+          : 'No camera or microphone was found on this device.';
+      return;
     }
-}
 
-function cleanup() {
-    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-    if (audioCtx) { try { audioCtx.close(); } catch(e){} audioCtx = null; }
-    analyser = null;
-}
+    state.role = 'host';
+    state.localStream = stream;
+    state.code = ROOM_CODE;
 
-function stopRec() {
-    if (!recording) return;
-    recording = false;
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-    if (timerId) { clearInterval(timerId); timerId = null; }
-    try { recorder.stop(); } catch(e){}
-    cleanup();
+    mainVideo.srcObject = stream;
+    mainVideo.muted = true;               // avoid feedback loop
+    mainVideo.classList.add('mirrored');
+    mainVideo.play().catch(() => {});
 
-    document.getElementById('recordBtn').classList.remove('recording');
-    document.getElementById('recordBtn').innerText = '⏺ Enregistrer';
-    document.getElementById('camRec').classList.remove('active');
-    document.getElementById('camRec').innerText = '📷';
-    camEl.classList.remove('recording');
-    document.getElementById('timer').classList.remove('active');
-    setTimeout(() => document.getElementById('previewPanel').classList.remove('active'), 500);
-}
+    enterRoom();
+    codeText.textContent = state.code;
+    setStatus('Connecting…', false);
+    showWaiting('Waiting for viewers…');
+    setViewerCount(0);
 
-document.getElementById('recordBtn').onclick = () => recording ? stopRec() : startRec();
-document.getElementById('camRec').onclick = e => {
-    e.stopPropagation();
-    recording ? stopRec() : startRec();
-};
+    createPeer(ID_PREFIX + state.code);
+  }
 
-// Default text
-window.addEventListener('load', async () => {
-    const ta = document.getElementById('textInput');
-    if (!ta.value) ta.value =
-        "Hello, how are you?\nBonjour, comment allez-vous ?\nI am learning English.\nJ'apprends l'anglais.";
-    await renderGallery();
-});
+  function onIncomingConnection(conn) {
+    if (state.role !== 'host') { try { conn.close(); } catch (e) {} return; }
+
+    state.conns.push(conn);
+    wireConnection(conn);
+
+    const startCall = () => {
+      if (!state.localStream) return;
+      const call = state.peer.call(conn.peer, state.localStream);
+      if (!call) return;
+      state.calls.push(call);
+      call.on('close', () => { state.calls = state.calls.filter(c => c !== call); });
+      call.on('error', () => {});
+    };
+
+    if (conn.open) startCall();
+    else conn.on('open', () => { startCall(); syncCount(); });
+
+    conn.on('close', () => syncCount());
+  }
+
+  /* ---------------- Viewer ---------------- */
+  function joinStream(rawCode) {
+    landingError.textContent = '';
+    const code = (rawCode || '').trim();
+
+    if (code.length !== CODE_LEN) {
+      landingError.textContent = 'Please enter the ' + CODE_LEN + '-digit room code.';
+      return;
+    }
+    if (code !== ROOM_CODE) {
+      landingError.textContent = 'Wrong room code. The code for this stream is ' + ROOM_CODE + '.';
+      return;
+    }
+
+    state.role = 'viewer';
+    state.code = code;
+
+    enterRoom();
+    codeText.textContent = code;
+    setStatus('Connecting…', false);
+    showWaiting('Connecting to the stream…');
+    setViewerCount(1);
+
+    // Viewers don't publish media, so hide the host-only controls
+    micBtn.style.display = 'none';
+    camBtn.style.display = 'none';
+    endBtn.textContent = 'Leave';
+    mainVideo.muted = true;
+
+    createPeer(null);
+  }
+
+  function onIncomingCall(call) {
+    if (state.role !== 'viewer') return;
+
+    try { call.answer(); } catch (e) { /* recv-only answer */ }
+    state.calls.push(call);
+
+    call.on('stream', remoteStream => {
+      mainVideo.srcObject = remoteStream;
+      mainVideo.classList.remove('mirrored');
+      hideWaiting();
+      setStatus('Live', true);
+
+      // Autoplay with sound may be blocked until a gesture — fall back to muted
+      mainVideo.muted = false;
+      mainVideo.play().catch(() => {
+        mainVideo.muted = true;
+        mainVideo.play().catch(() => {});
+        addMessage('Tap the video to enable sound.', 'system');
+      });
+    });
+
+    call.on('close', () => {
+      setStatus('Stream ended', false);
+      showWaiting('The host has ended the stream.');
+    });
+  }
+
+  /* ---------------- Peer lifecycle ---------------- */
+  function createPeer(id) {
+    state.peer = id ? new Peer(id, { debug: 1 }) : new Peer({ debug: 1 });
+
+    state.peer.on('open', () => {
+      if (state.role === 'host') {
+        setStatus('Live', true);
+        addMessage('You are live. Room code: ' + ROOM_CODE + '.', 'system');
+      } else {
+        const conn = state.peer.connect(ID_PREFIX + state.code, { reliable: true });
+        state.conns.push(conn);
+        wireConnection(conn);
+
+        conn.on('open', () => {
+          state.connected = true;
+          setStatus('Connected — waiting for video…', true);
+        });
+        conn.on('close', () => {
+          setStatus('Disconnected', false);
+          showWaiting('The host has ended the stream.');
+        });
+      }
+    });
+
+    state.peer.on('connection', onIncomingConnection);
+    state.peer.on('call', onIncomingCall);
+
+    state.peer.on('disconnected', () => {
+      try { state.peer.reconnect(); } catch (e) {}
+    });
+
+    state.peer.on('error', err => {
+      const type = err && err.type;
+
+      if (type === 'peer-unavailable') {
+        if (state.role === 'viewer') {
+          landingError.textContent = 'Nobody is live on code ' + ROOM_CODE + ' right now. Ask the host to go live first.';
+          leaveRoom();
+        }
+      } else if (type === 'unavailable-id' && state.role === 'host') {
+        // Fixed code, so the room is already taken by another host
+        landingError.textContent = 'Room ' + ROOM_CODE + ' is already live on another device.';
+        leaveRoom();
+      } else if (type === 'network' || type === 'server-error' || type === 'socket-error') {
+        setStatus('Connection problem', false);
+        if (state.role === 'viewer') showWaiting('Connection lost. Trying to reconnect…');
+      } else {
+        console.warn('[PeerJS]', err);
+      }
+    });
+  }
+
+  /* ---------------- Navigation ---------------- */
+  function enterRoom() {
+    landing.classList.remove('active');
+    room.classList.add('active');
+    if (window.innerWidth > 820) chatPanel.classList.add('open');
+  }
+
+  function leaveRoom() {
+    // Tear down peer
+    try { state.peer && state.peer.destroy(); } catch (e) {}
+    state.peer = null;
+
+    // Stop local media
+    if (state.localStream) {
+      state.localStream.getTracks().forEach(t => t.stop());
+      state.localStream = null;
+    }
+
+    mainVideo.srcObject = null;
+    mainVideo.classList.remove('mirrored');
+
+    state.conns = [];
+    state.calls = [];
+    state.role = null;
+    state.code = ROOM_CODE;
+    state.connected = false;
+    state.unread = 0;
+
+    chatToggle.classList.remove('has-unread');
+    messagesEl.innerHTML = '';
+    chatPanel.classList.remove('open');
+    micBtn.style.display = '';
+    camBtn.style.display = '';
+    endBtn.textContent = 'End';
+    setStatus('Connecting…', false);
+    codeText.textContent = ROOM_CODE;
+
+    room.classList.remove('active');
+    landing.classList.add('active');
+    codeInput.value = ROOM_CODE;
+  }
+
+  /* ---------------- Media controls (host) ---------------- */
+  micBtn.addEventListener('click', () => {
+    const track = state.localStream && state.localStream.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    micBtn.classList.toggle('off', !track.enabled);
+    micBtn.textContent = track.enabled ? '🎤' : '🔇';
+  });
+
+  camBtn.addEventListener('click', () => {
+    const track = state.localStream && state.localStream.getVideoTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    camBtn.classList.toggle('off', !track.enabled);
+    camBtn.textContent = track.enabled ? '📹' : '🚫';
+  });
+
+  endBtn.addEventListener('click', () => {
+    if (state.role === 'host' && !confirm('End the stream for everyone?')) return;
+    leaveRoom();
+  });
+
+  /* ---------------- Copy invite link ---------------- */
+  codePill.addEventListener('click', async () => {
+    const link = location.origin + location.pathname + '#room=' + ROOM_CODE;
+    const original = codePill.innerHTML;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch (e) {
+      // Clipboard fallback
+      const ta = document.createElement('textarea');
+      ta.value = link;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+    }
+    codePill.textContent = 'Link copied ✓';
+    setTimeout(() => { codePill.innerHTML = original; }, 1400);
+  });
+
+  /* ---------------- Chat toggling (mobile) ---------------- */
+  chatToggle.addEventListener('click', () => {
+    state.chatOpen = !state.chatOpen;
+    chatPanel.classList.toggle('open', state.chatOpen);
+    if (state.chatOpen) {
+      state.unread = 0;
+      chatToggle.classList.remove('has-unread');
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      msgInput.focus();
+    }
+  });
+
+  composer.addEventListener('submit', e => {
+    e.preventDefault();
+    sendChat(msgInput.value);
+    msgInput.value = '';
+    msgInput.focus();
+  });
+
+  /* ---------------- Landing actions ---------------- */
+  $('#btnGoLive').addEventListener('click', goLive);
+  $('#btnJoin').addEventListener('click', () => joinStream(codeInput.value));
+  codeInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') joinStream(codeInput.value);
+  });
+  codeInput.addEventListener('input', () => {
+    codeInput.value = codeInput.value.replace(/[^0-9]/g, '').slice(0, CODE_LEN);
+  });
+
+  /* ---------------- Deep link (#room=1234) ---------------- */
+  (function handleHash() {
+    const m = location.hash.match(/room=(\d{4})/);
+    if (m) {
+      codeInput.value = m[1];
+      landingError.textContent = 'Press "Join" to watch this stream.';
+    }
+  })();
+
+  /* ---------------- Cleanup ---------------- */
+  window.addEventListener('beforeunload', () => {
+    try { state.peer && state.peer.destroy(); } catch (e) {}
+    if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
+  });
+})();
 </script>
 </body>
 </html>
